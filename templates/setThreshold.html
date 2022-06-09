@@ -7,20 +7,26 @@
 
 
 <div>
-    <table><tr><td>Beginning<img src="{{data.images[0]}}" /></td>
-        <td>Middle<img src="{{data.images[1]}}" /></td>
-        <td>End<img src="{{data.images[2]}}" /></td>
+    <div class="container" style="position: relative; background-color:Salmon" align="center">
+    <table><tr><td><img src="{{data.images[0]}}" /></td>
+    </div>
+    <div class="container" style="position: relative; background-color:Salmon" align="center">
+        <td><img src="{{data.images[1]}}" /></td>
+    </div>
+    <div class="container" style="position: relative; background-color:Salmon" align="center">
+        <td><img src="{{data.images[2]}}" /></td>
+    </div>
     </tr></table>
     <form method="post">
 
-<p style="font-family:Helvetica"><label for="user_name">Threshold:</label>
-<input type="text" id="user_name" name="user_name" value="{{data.threshold}}">
+<p style="font-family:Helvetica"><label for="threshold_nb">Threshold:</label>
+<input type="text" id="threshold_nb" name="threshold_nb" value="{{data.threshold}}">
 <br>
-<input type="radio" id="correct" name="type_call" value="correct">
-<label for="correctly classified" style="font-family:Helvetica">Threshold is good</label></br>
+<input type="radio" id="correct" name="threshold" value="correct">
+<label for="correct" style="font-family:Helvetica">Threshold is good</label></br>
 
-<input type="radio" id="Echo" name="type_call" value="Echo">
-<label for="Echo" style="font-family:Helvetica">Update threshold</label></br>
+<input type="radio" id="change" name="threshold" value="change" checked="checked">
+<label for="change" style="font-family:Helvetica">Update threshold</label></br>
 <input type="submit">
 </form>
 
