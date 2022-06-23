@@ -4,7 +4,7 @@
 <div class="container" style="position: relative; background-color:Salmon" align="center">
 <h1 style="font-family:Helvetica">BattyKoda</h1>
 
-<p style="font-family:Helvetica">Current experiment: User / Experiment / Date / Species</p>
+<p style="font-family:Helvetica">Current experiment: User / Species/ Date</p>
 </div>
 
 <form method="post">
@@ -29,47 +29,7 @@
 <input type="radio" id="correct" name="type_call" value="correct">
 <label for="correctly classified" style="font-family:Helvetica">Correctly classified</label></br>
 
-<input type="radio" id="Echo" name="type_call" value="Echo">
-<label for="Echo" style="font-family:Helvetica">Echolocation</label></br>
-
-<input type="radio" id="FMB" name="type_call" value="FMB">
-<label for="FMB" style="font-family:Helvetica">FMB</label></br>
-
-<input type="radio" id="LFM" name="type_call" value="LFM">
-<label for="LFM" style="font-family:Helvetica">LFM</label></br>
-
-<input type="radio" id="U" name="type_call" value="U">
-<label for="U" style="font-family:Helvetica">U</label></br>
-
-<input type="radio" id="sDFMI-FM" name="type_call" value="sDFMI-FM">
-<label for="sDFMI-FM" style="font-family:Helvetica">sDFMI-FM</label></br>
-
-<input type="radio" id="CS" name="type_call" value="CS">
-<label for="CS" style="font-family:Helvetica">CS</label></br>
-
-<input type="radio" id="SFM" name="type_call" value="SFM">
-<label for="SFM" style="font-family:Helvetica">SFM</label></br>
-
-<input type="radio" id="DFMI" name="type_call" value="DFMI">
-<label for="DFMI" style="font-family:Helvetica">DFMI</label></br>
-
-<input type="radio" id="LsinFM" name="type_call" value="LsinFM">
-<label for="LsinFM" style="font-family:Helvetica">LsinFM</label></br>
-
-<input type="radio" id="sHFM" name="type_call" value="sHFM">
-<label for="sHFM" style="font-family:Helvetica">sHFM</label></br>
-
-<input type="radio" id="QCF" name="type_call" value="QCF">
-<label for="QCF" style="font-family:Helvetica">QCF</label></br>
-
-<input type="radio" id="QCF-DFM" name="type_call" value="QCF-DFM">
-<label for="QCF-DFM" style="font-family:Helvetica">QCF-DFM</label></br>
-
-<input type="radio" id="DFMs" name="type_call" value="DFMs">
-<label for="DFMs" style="font-family:Helvetica">DFMs</label></br>
-
-<input type="radio" id="UFM" name="type_call" value="UFM">
-<label for="UFM" style="font-family:Helvetica">UFM</label></br>
+    {{ data.species }}
 
 <input type="radio" id="Unsure" name="type_call" value="Unsure">
 <label for="Unsure" style="font-family:Helvetica">Unsure</label></br>
@@ -80,8 +40,8 @@
 </div>
 
 <div class="container" style="position: absolute; top: 150px; left: 850px; width:500px;height:450px; background-color:PeachPuff" align="center">
-<p style="font-family:Helvetica"><i>E. fuscus</i> template</p>
-<img src="static/Figure1.jpg" alt="template" width="500" height="450" alight="left">
+<p style="font-family:Helvetica"><i>Spectrogram</i> template</p>
+<img src="{{data.jpgname}}" alt="template" width="500" height="450" alight="left">
 </div>
 
 

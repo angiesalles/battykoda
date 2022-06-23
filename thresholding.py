@@ -2,18 +2,18 @@ import numpy as np
 import scipy.signal
 
 def elliptic_filter(data, FLow, FHigh, Fs):
-    sos = scipy.signal.ellip(2,3,40,[FLow FHigh]*2/Fs)
+    sos = scipy.signal.ellip(2,3,40,Wn=np.array([FLow, FHigh])*2/Fs,btype='bandpass', output='sos')
     return scipy.signal.sosfilt(sos, data)
 
 
 def SmoothData(rawsong,Fs):
-    F_low = 20000.0
-    F_high = 100000.0
+    Flow = 20000.0
+    Fhigh = 100000.0
     sm_win = 2.0
-    filtsong = elliptic_filter(rawsong, F_low, F_high, Fs)
+    filtsong = elliptic_filter(rawsong, Flow, Fhigh, Fs)
     squared_song = filtsong ** 2
     len1 = round(Fs * sm_win / 1000)
-    h = np.ones(1, len1) / len1
+    h = np.ones(len1) / len1
     smooth = np.convolve(h, squared_song)
     offset = round((len(smooth) - len(filtsong)) / 2)
     smooth = smooth[1 + offset:len(filtsong) + offset]
