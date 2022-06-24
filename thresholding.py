@@ -32,11 +32,11 @@ def SegmentNotes(smooth, Fs, threshold, min_int = 1.0, min_dur = 1.0):
     # eliminate short intervals
     temp_int = (onsets[1:]-offsets[:-1]) * 1000 / Fs
     real_ints = temp_int > min_int
-    onsets = np.vstack(onsets[0], onsets[1:][real_ints])
-    offsets = np.vstack(offsets[:-1][real_ints], offsets[-1])
+    onsets = np.hstack([onsets[0], onsets[1:][real_ints]])
+    offsets = np.hstack([offsets[:-1][real_ints], offsets[-1]])
     # eliminate short notes
     temp_dur = (offsets - onsets) * 1000 / Fs
     real_durs = temp_dur > min_dur
     onsets = onsets[real_durs]
-    offsets = offsets[real_ints]
+    offsets = offsets[real_durs]
     return onsets/Fs, offsets/Fs

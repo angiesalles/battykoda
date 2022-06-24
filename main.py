@@ -3,7 +3,7 @@ import tempfile
 import thresholding
 import htmlGenerator as hG
 from flask import Flask, render_template, request, url_for, redirect, Markup, send_from_directory
-
+import pickle
 import numpy as np
 import random
 import matplotlib.pyplot as plt
@@ -31,18 +31,37 @@ lookup = dict()
 fs = 250_000
 
 
-def store_task(result):
-    app.logger.info(result['type_call'])
-    app.logger.info('stored!')
+def store_task(path_to_file,result):
+
+    pfile = open(path_to_file + '.pickle', 'rb')
+    segmentData=pickle.load(pfile)
+    pfile.close()
+    pfile = open(path_to_file+'.pickle', 'wb')
+    pickle.dump({'threshold': segmentData['threshold'],
+                 'onsets': segmentData['onsets'],
+                 'offsets': segmentData['offsets'],
+                 'labels': segmentData['labels']+[result],
+                 'startFrq': [],
+                 'endFrq': []}, pfile)
+    pfile.close()
 
 
 def get_task(limit_confidence, path_to_file):
     ch2use = 0
-   
-    halfwin = 30
+
+    pfile = open(path_to_file + '.pickle', 'rb')
+    segmentData=pickle.load(pfile)
+    pfile.close()
+
+    hwin = 3 #ms before and after call
     datafile = h5py.File(path_to_file)
-    thrX1 = np.argmax(datafile['ni_data']['mic_data'][ch2use, :])
-    f, t, Sxx = scipy.signal.spectrogram(datafile['ni_data']['mic_data'][ch2use, thrX1-fs//1000*halfwin:thrX1+fs//1000*halfwin], fs, nperseg=2**8, noverlap=220, nfft=2**8)
+
+    call_to_do=len(segmentData['labels'])
+    onset=(segmentData['onsets'][call_to_do]*fs).astype(int)
+    offset=(segmentData['offsets'][call_to_do]*fs).astype(int)
+
+    thrX1 = datafile['ni_data']['mic_data'][ch2use, onset-(fs*hwin//1000):offset+(fs*hwin//1000)]
+    f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=220, nfft=2**8)
     plt.pcolormesh(t, f, np.arctan(1E8*Sxx), shading='auto')
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
@@ -63,25 +82,26 @@ def get_task(limit_confidence, path_to_file):
 def index(path_to_file,path, is_post):
     global global_user_name
     global global_limit_confidence
-    if is_post:
-        result = request.form
-        if result['user_name'] == '':
-            return '''
-          <html>
-          <body>Please enter annotator name
-          </body>
-          </html>
-          '''
-        global_user_name = result['user_name']
-        global_limit_confidence = result['limit_confidence']
-        store_task(result)
-        return redirect(url_for('index'))
-    data = get_task(global_limit_confidence, path_to_file)
-    data['user_name'] = global_user_name
-    txtsp,jpgsp=hG.spgather(path, osfolder)
-    data['species'] = Markup(txtsp)
-    data['jpgname'] = jpgsp
-    return render_template('AngieBK.html', data=data)
+    if not is_post:
+        data = get_task(global_limit_confidence, path_to_file)
+        data['user_name'] = global_user_name
+        txtsp, jpgsp = hG.spgather(path, osfolder)
+        data['species'] = Markup(txtsp)
+        data['jpgname'] = jpgsp
+        return render_template('AngieBK.html', data=data)
+    result = request.form
+    if result['user_name'] == '':
+        return '''
+      <html>
+      <body>Please enter annotator name
+      </body>
+      </html>
+      '''
+    global_user_name = result['user_name']
+    global_limit_confidence = result['limit_confidence']
+    store_task(path_to_file,result)
+    return redirect(path)
+
 
 
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
@@ -89,7 +109,7 @@ def static_cont(path):
     ch2use = 0
     global threshold
     if path[-5:] == '.mat/':
-        if exists(osfolder + path[:-1] + '.npy'):
+        if exists(osfolder + path[:-1] + '.pickle'):
             return index(osfolder + path[:-1], path, request.method == 'POST')
         if request.method == 'POST':
             result = request.form
@@ -97,11 +117,25 @@ def static_cont(path):
                 threshold = float(result['threshold_nb'])
             else:
                 storage = np.array([threshold])
-                np.save(osfolder + path[:-1] + '.npy', storage)
+
+
+                datafile = h5py.File(osfolder + path[:-1])
+                smoodAudio = thresholding.SmoothData(np.array(datafile['ni_data']['mic_data']).flatten(), fs)
+
+                onsets,offsets=thresholding.SegmentNotes(smoodAudio,fs,threshold)
+
+                f=open(osfolder + path[:-1] + '.pickle','wb')
+                pickle.dump({'threshold':threshold,
+                             'onsets':onsets,
+                             'offsets':offsets,
+                             'labels':[],
+                             'startFrq':[],
+                             'endFrq':[]},f)
+                f.close()
+
                 return index(osfolder + path[:-1],path, False)
 
         datafile = h5py.File(osfolder + path[:-1])
-
         smoodAudio=thresholding.SmoothData(np.array(datafile['ni_data']['mic_data']).flatten(),fs)
         
         listims = []
