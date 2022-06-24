@@ -23,10 +23,8 @@ threshold = 0.01
 app = Flask(__name__)
 osfolder = '/Users/angelessalles/Documents/data/'
 computer = platform.uname()
-splitter = '/'
 if computer.system == 'Windows':
     osfolder = 'C:/Users/Kevin/Documents/repos/capybara/data/'
-    splitter = '\\'
 global_limit_confidence = 100
 global_user_name = ""
 lookup = dict()
@@ -50,7 +48,7 @@ def get_task(limit_confidence, path_to_file):
     plt.xlabel('Time [sec]')
     tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
     plt.savefig(tf)
-    shorty = tf.name.split(splitter)[-1]
+    shorty = tf.name.split(os.sep)[-1]
     lookup[shorty] = tf.name
     tf.close()
     
@@ -123,7 +121,7 @@ def static_cont(path):
             plt.hlines(threshold, 0, segLen, 'k')
             plt.title(plttitle[idx])
             plt.savefig(tf)
-            shorty = tf.name.split(splitter)[-1]
+            shorty = tf.name.split(os.sep)[-1]
             lookup[shorty] = tf.name
             listims.append('/battykoda/img/'+shorty)
             tf.close()
@@ -131,7 +129,7 @@ def static_cont(path):
                                data={'images': listims,
                                      'threshold': str(threshold)})
     if path[:4] == 'img/':
-        return send_from_directory('/'.join(lookup[path[4:]].split(splitter)[:-1]), path[4:])
+        return send_from_directory('/'.join(lookup[path[4:]].split(os.sep)[:-1]), path[4:])
     if path[-4:] == '.jpg':
         return send_from_directory(osfolder, path.split('/')[-1])
 
