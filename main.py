@@ -53,15 +53,17 @@ def get_task(limit_confidence, path_to_file):
     segmentData=pickle.load(pfile)
     pfile.close()
 
-    hwin = 3 #ms before and after call
+    hwin = 10 #ms before and after call
     datafile = h5py.File(path_to_file)
-
+    if len(segmentData['labels'])==len(segmentData['offsets']):
+        return None
     call_to_do=len(segmentData['labels'])
     onset=(segmentData['onsets'][call_to_do]*fs).astype(int)
     offset=(segmentData['offsets'][call_to_do]*fs).astype(int)
 
     thrX1 = datafile['ni_data']['mic_data'][ch2use, onset-(fs*hwin//1000):offset+(fs*hwin//1000)]
-    f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=220, nfft=2**8)
+    f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=250, nfft=2**8)
+    plt.figure()
     plt.pcolormesh(t, f, np.arctan(1E8*Sxx), shading='auto')
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
@@ -84,6 +86,8 @@ def index(path_to_file,path, is_post):
     global global_limit_confidence
     if not is_post:
         data = get_task(global_limit_confidence, path_to_file)
+        if data==None:
+            return render_template('endFile.html',data={'filedirectory':'/battykoda/'+'/'.join(path.split('/')[:-2])+'/'})
         data['user_name'] = global_user_name
         txtsp, jpgsp = hG.spgather(path, osfolder)
         data['species'] = Markup(txtsp)
@@ -100,7 +104,7 @@ def index(path_to_file,path, is_post):
     global_user_name = result['user_name']
     global_limit_confidence = result['limit_confidence']
     store_task(path_to_file,result)
-    return redirect(path)
+    return index(path_to_file, path, False)
 
 
 
@@ -166,9 +170,15 @@ def static_cont(path):
         return send_from_directory('/'.join(lookup[path[4:]].split(os.sep)[:-1]), path[4:])
     if path[-4:] == '.jpg':
         return send_from_directory(osfolder, path.split('/')[-1])
+    list_of_files=os.listdir(osfolder + path)
+    collectFiles=''
+    for item in list_of_files:
+        if item.endswith('.pickle') or item.endswith('DS_Store'):
+            continue
+        collectFiles+='<li><a href="'+item+'/">'+item+'</a></li>'
 
     return render_template('listBK.html',
-                           data={'listicle': Markup(''.join(['<li><a href="'+item+'/">'+item+'</a></li>' for item in os.listdir((osfolder+path))]))})
+                           data={'listicle': Markup(collectFiles)})
 
 
 @app.route('/')
