@@ -66,7 +66,7 @@ def get_task(limit_confidence, path_to_file):
     thrX1 = audiodata[onset-(fs*hwin//1000):offset+(fs*hwin//1000)]
     f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=250, nfft=2**8)
     plt.figure()
-    plt.pcolormesh(t, f, np.arctan(1E8*Sxx), shading='auto')
+    plt.pcolormesh(t, f, np.arctan(1E4*Sxx), shading='auto')
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
     tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
@@ -122,6 +122,7 @@ def static_cont(path):
 
     if os.path.isdir(osfolder + path):
         list_of_files=os.listdir(osfolder + path)
+        list_of_files.sort()
         collectFiles=''
         for item in list_of_files:
             if item.endswith('.pickle') or item.endswith('DS_Store'):
@@ -135,9 +136,8 @@ def static_cont(path):
         return index(osfolder + path[:-1], path, request.method == 'POST')
     if request.method == 'POST':
         result = request.form
-        if result['threshold'] == 'change':
-            threshold = float(result['threshold_nb'])
-        else:
+        threshold = float(result['threshold_nb'])
+        if result['threshold'] == 'correct':
             storage = np.array([threshold])
 
             audiodata, fs = DataReader.data_read(osfolder + path[:-1])
