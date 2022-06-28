@@ -9,7 +9,7 @@ import random
 import matplotlib.pyplot as plt
 import scipy.signal
 from os.path import exists
-import h5py
+import DataReader
 import matplotlib
 import platform
 import time
@@ -28,7 +28,7 @@ if computer.system == 'Windows':
 global_limit_confidence = 100
 global_user_name = ""
 lookup = dict()
-fs = 250_000
+
 
 
 def store_task(path_to_file,result):
@@ -47,21 +47,23 @@ def store_task(path_to_file,result):
 
 
 def get_task(limit_confidence, path_to_file):
-    ch2use = 0
+
 
     pfile = open(path_to_file + '.pickle', 'rb')
     segmentData=pickle.load(pfile)
     pfile.close()
 
     hwin = 10 #ms before and after call
-    datafile = h5py.File(path_to_file)
+    audiodata, fs = DataReader.data_read(path_to_file)
+
+
     if len(segmentData['labels'])==len(segmentData['offsets']):
         return None
     call_to_do=len(segmentData['labels'])
     onset=(segmentData['onsets'][call_to_do]*fs).astype(int)
     offset=(segmentData['offsets'][call_to_do]*fs).astype(int)
 
-    thrX1 = datafile['ni_data']['mic_data'][ch2use, onset-(fs*hwin//1000):offset+(fs*hwin//1000)]
+    thrX1 = audiodata[onset-(fs*hwin//1000):offset+(fs*hwin//1000)]
     f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=250, nfft=2**8)
     plt.figure()
     plt.pcolormesh(t, f, np.arctan(1E8*Sxx), shading='auto')
@@ -112,74 +114,75 @@ def index(path_to_file,path, is_post):
 def static_cont(path):
     ch2use = 0
     global threshold
-    if path[-5:] == '.mat/':
-        if exists(osfolder + path[:-1] + '.pickle'):
-            return index(osfolder + path[:-1], path, request.method == 'POST')
-        if request.method == 'POST':
-            result = request.form
-            if result['threshold'] == 'change':
-                threshold = float(result['threshold_nb'])
-            else:
-                storage = np.array([threshold])
 
-
-                datafile = h5py.File(osfolder + path[:-1])
-                smoodAudio = thresholding.SmoothData(np.array(datafile['ni_data']['mic_data']).flatten(), fs)
-
-                onsets,offsets=thresholding.SegmentNotes(smoodAudio,fs,threshold)
-
-                f=open(osfolder + path[:-1] + '.pickle','wb')
-                pickle.dump({'threshold':threshold,
-                             'onsets':onsets,
-                             'offsets':offsets,
-                             'labels':[],
-                             'startFrq':[],
-                             'endFrq':[]},f)
-                f.close()
-
-                return index(osfolder + path[:-1],path, False)
-
-        datafile = h5py.File(osfolder + path[:-1])
-        smoodAudio=thresholding.SmoothData(np.array(datafile['ni_data']['mic_data']).flatten(),fs)
-        
-        listims = []
-        boink = []
-        plttitle = ['start', 'middle', 'end']
-        segLen=100000
-        for idx in range(3):
-            tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            plt.figure(figsize=(3, 3))
-            if idx == 0:
-                boink = idx
-            if idx == 1:
-                boink = datafile['ni_data']['mic_data'].shape[1]//2
-            if idx == 2:
-                boink = datafile['ni_data']['mic_data'].shape[1]-2*segLen
-            plt.plot(smoodAudio[0+boink:segLen+boink])
-            plt.hlines(threshold, 0, segLen, 'k')
-            plt.title(plttitle[idx])
-            plt.savefig(tf)
-            shorty = tf.name.split(os.sep)[-1]
-            lookup[shorty] = tf.name
-            listims.append('/battykoda/img/'+shorty)
-            tf.close()
-        return render_template('setThreshold.html',
-                               data={'images': listims,
-                                     'threshold': str(threshold)})
     if path[:4] == 'img/':
         return send_from_directory('/'.join(lookup[path[4:]].split(os.sep)[:-1]), path[4:])
     if path[-4:] == '.jpg':
         return send_from_directory(osfolder, path.split('/')[-1])
-    list_of_files=os.listdir(osfolder + path)
-    collectFiles=''
-    for item in list_of_files:
-        if item.endswith('.pickle') or item.endswith('DS_Store'):
-            continue
-        collectFiles+='<li><a href="'+item+'/">'+item+'</a></li>'
 
-    return render_template('listBK.html',
-                           data={'listicle': Markup(collectFiles)})
+    if os.path.isdir(osfolder + path):
+        list_of_files=os.listdir(osfolder + path)
+        collectFiles=''
+        for item in list_of_files:
+            if item.endswith('.pickle') or item.endswith('DS_Store'):
+                continue
+            collectFiles+='<li><a href="'+item+'/">'+item+'</a></li>'
 
+        return render_template('listBK.html', data={'listicle': Markup(collectFiles)})
+
+
+    if exists(osfolder + path[:-1] + '.pickle'):
+        return index(osfolder + path[:-1], path, request.method == 'POST')
+    if request.method == 'POST':
+        result = request.form
+        if result['threshold'] == 'change':
+            threshold = float(result['threshold_nb'])
+        else:
+            storage = np.array([threshold])
+
+            audiodata, fs = DataReader.data_read(osfolder + path[:-1])
+            smoodAudio = thresholding.SmoothData(audiodata, fs)
+
+            onsets, offsets = thresholding.SegmentNotes(smoodAudio, fs, threshold)
+
+            f = open(osfolder + path[:-1] + '.pickle', 'wb')
+            pickle.dump({'threshold': threshold,
+                         'onsets': onsets,
+                         'offsets': offsets,
+                         'labels': [],
+                         'startFrq': [],
+                         'endFrq': []}, f)
+            f.close()
+
+            return index(osfolder + path[:-1], path, False)
+
+    audiodata, fs = DataReader.data_read(osfolder + path[:-1])
+    smoodAudio = thresholding.SmoothData(audiodata, fs)
+
+    listims = []
+    boink = []
+    plttitle = ['start', 'middle', 'end']
+    segLen = 100000
+    for idx in range(3):
+        tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        plt.figure(figsize=(3, 3))
+        if idx == 0:
+            boink = idx
+        if idx == 1:
+            boink = audiodata.shape[0] // 2
+        if idx == 2:
+            boink = audiodata.shape[0] - 2 * segLen
+        plt.plot(smoodAudio[0 + boink:segLen + boink])
+        plt.hlines(threshold, 0, segLen, 'k')
+        plt.title(plttitle[idx])
+        plt.savefig(tf)
+        shorty = tf.name.split(os.sep)[-1]
+        lookup[shorty] = tf.name
+        listims.append('/battykoda/img/' + shorty)
+        tf.close()
+    return render_template('setThreshold.html',
+                           data={'images': listims,
+                                 'threshold': str(threshold)})
 
 @app.route('/')
 def mainpage():
