@@ -16,6 +16,9 @@
 
 <div class="container" style="position: absolute; top: 150px; left: 50px; width:600px;height:450px; background-color:PeachPuff" align="center">
 <p style="font-family:Helvetica">Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</p>
+<p style="font-family:Helvetica"><label for="contrast">Contrast:</label>
+<input type="text" id="contrast" name="contrast" value="{{data.contrast}}">
+<br>
 <img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="400" height="250" alight="left">
 </div>
 </div>

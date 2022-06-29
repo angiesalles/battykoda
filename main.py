@@ -28,6 +28,7 @@ if computer.system == 'Windows':
 global_limit_confidence = 100
 global_user_name = ""
 lookup = dict()
+global_contrast = 4
 
 
 
@@ -46,7 +47,7 @@ def store_task(path_to_file,result):
     pfile.close()
 
 
-def get_task(limit_confidence, path_to_file):
+def get_task(limit_confidence, contrast, path_to_file):
 
 
     pfile = open(path_to_file + '.pickle', 'rb')
@@ -56,6 +57,7 @@ def get_task(limit_confidence, path_to_file):
     hwin = 10 #ms before and after call
     audiodata, fs = DataReader.data_read(path_to_file)
 
+    temocontrast = 10**(float(contrast))
 
     if len(segmentData['labels'])==len(segmentData['offsets']):
         return None
@@ -66,7 +68,7 @@ def get_task(limit_confidence, path_to_file):
     thrX1 = audiodata[onset-(fs*hwin//1000):offset+(fs*hwin//1000)]
     f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=250, nfft=2**8)
     plt.figure()
-    plt.pcolormesh(t, f, np.arctan(1E4*Sxx), shading='auto')
+    plt.pcolormesh(t, f, np.arctan(temocontrast*Sxx), shading='auto')
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
     tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
@@ -81,6 +83,7 @@ def get_task(limit_confidence, path_to_file):
             'limit_confidence': str(limit_confidence),
             'currentcall' : call_to_do,
             'totalcalls' : len(segmentData['offsets']),
+            'contrast': str(contrast),
             }
     return data
 
@@ -88,8 +91,9 @@ def get_task(limit_confidence, path_to_file):
 def index(path_to_file,path, is_post):
     global global_user_name
     global global_limit_confidence
+    global global_contrast
     if not is_post:
-        data = get_task(global_limit_confidence, path_to_file)
+        data = get_task(global_limit_confidence, global_contrast, path_to_file)
         if data==None:
             return render_template('endFile.html',data={'filedirectory':'/battykoda/'+'/'.join(path.split('/')[:-2])+'/'})
         data['user_name'] = global_user_name
@@ -107,6 +111,7 @@ def index(path_to_file,path, is_post):
       '''
     global_user_name = result['user_name']
     global_limit_confidence = result['limit_confidence']
+    global_contrast = result['contrast']
     store_task(path_to_file,result)
     return index(path_to_file, path, False)
 
