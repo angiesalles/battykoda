@@ -78,7 +78,9 @@ def get_task(limit_confidence, path_to_file):
     data = {'spectrogram': '/battykoda/img/' + shorty,
             'guess': ['FMB', 'Echo', 'U'][random.randint(0, 2)],
             'confidence': str(random.randint(0, 100)),
-            'limit_confidence': str(limit_confidence)
+            'limit_confidence': str(limit_confidence),
+            'currentcall' : call_to_do,
+            'totalcalls' : len(segmentData['offsets']),
             }
     return data
 
