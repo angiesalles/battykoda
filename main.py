@@ -69,6 +69,7 @@ def get_task(limit_confidence, contrast, path_to_file):
     f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=250, nfft=2**8)
     plt.figure()
     plt.pcolormesh(t, f, np.arctan(temocontrast*Sxx), shading='auto')
+    plt.xlim(0, 0.050)
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
     tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
