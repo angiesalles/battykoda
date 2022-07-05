@@ -17,7 +17,7 @@
 <div class="container" style="position: absolute; top: 150px; left: 50px; width:600px;height:450px; background-color:PeachPuff" align="center">
 <p style="font-family:Helvetica">Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</p>
 <p style="font-family:Helvetica"><label for="contrast">Contrast:</label>
-<input type="text" id="contrast" name="contrast" value="{{data.contrast}}">
+<input type="number" id="contrast" name="contrast" value="{{data.contrast}}">
 <br>
 <img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="400" height="250" alight="left">
 </div>
@@ -52,7 +52,7 @@
 <p style="font-family:Helvetica">Call detected: {{data.guess}} </p>
 <p style="font-family:Helvetica">Confidence: {{data.confidence}} </p>
 <p style="font-family:Helvetica"><label for="limit_confidence">If future confidence is below this ask:</label>
-<input type="text" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
+<input type="number" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
 
 </form>
 </body>
