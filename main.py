@@ -32,7 +32,7 @@ global_contrast = 4
 
 
 
-def store_task(path_to_file,result):
+def store_task(path_to_file,result,sppath,browpath):
 
     pfile = open(path_to_file + '.pickle', 'rb')
     segmentData=pickle.load(pfile)
@@ -46,6 +46,15 @@ def store_task(path_to_file,result):
                  'endFrq': []}, pfile)
     pfile.close()
 
+
+    newpath = sppath + os.sep + 'classifier'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+    audiodata, fs = DataReader.data_read(path_to_file)
+    call_to_do = len(segmentData['labels'])
+    onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
+    offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
+    scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, audiodata[onset:offset])#ask gabby if she needs buffer around sound
 
 def get_task(limit_confidence, contrast, path_to_file):
 
@@ -65,22 +74,26 @@ def get_task(limit_confidence, contrast, path_to_file):
     onset=(segmentData['onsets'][call_to_do]*fs).astype(int)
     offset=(segmentData['offsets'][call_to_do]*fs).astype(int)
 
-    thrX1 = audiodata[onset-(fs*hwin//1000):offset+(fs*hwin//1000)]
+    thrX1 = audiodata[max(0,onset-(fs*hwin//1000)):min(offset+(fs*hwin//1000),len(audiodata))]
     f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=250, nfft=2**8)
-    plt.figure()
+    plt.figure(facecolor='peachpuff')
+    ax = plt.axes()
+    ax.set_facecolor('indigo')
     plt.pcolormesh(t, f, np.arctan(temocontrast*Sxx), shading='auto')
     plt.xlim(0, 0.050)
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
+
     tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
     plt.savefig(tf)
     shorty = tf.name.split(os.sep)[-1]
     lookup[shorty] = tf.name
     tf.close()
-    
+
+
     data = {'spectrogram': '/battykoda/img/' + shorty,
             'guess': ['FMB', 'Echo', 'U'][random.randint(0, 2)],
-            'confidence': str(random.randint(0, 100)),
+            'confidence': str(random.randint(0, 100)),#this is bongo code needs to be replaced with real output of classifier
             'limit_confidence': str(limit_confidence),
             'currentcall' : call_to_do,
             'totalcalls' : len(segmentData['offsets']),
@@ -113,7 +126,7 @@ def index(path_to_file,path, is_post):
     global_user_name = result['user_name']
     global_limit_confidence = result['limit_confidence']
     global_contrast = result['contrast']
-    store_task(path_to_file,result)
+    store_task(path_to_file,result,osfolder + path.split('/')[0] + os.sep + path.split('/')[1] + os.sep + path.split('/')[2],path)
     return index(path_to_file, path, False)
 
 

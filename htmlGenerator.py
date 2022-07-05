@@ -8,7 +8,10 @@ def spgather(wholepath,osfolder):
    collectstrings=''
    for idx in range(len(lines)):
       namecall= lines[idx].split(',')[0]
-      radiobutton=f'<input type="radio" id="{namecall}" name="type_call" value="{namecall}"><label for="{namecall}" style="font-family:Helvetica">{namecall}</label></br>'
+      particle = ''
+      if namecall == 'Echo':#this will be replaced with output of classifier
+         particle = "checked='checked'"
+      radiobutton=f'<input {particle} type="radio" id="{namecall}" name="type_call" value="{namecall}"><label for="{namecall}" style="font-family:Helvetica">{namecall}</label></br>'
       collectstrings+=radiobutton
 
    return collectstrings, jpgname

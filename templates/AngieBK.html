@@ -39,7 +39,7 @@
 
     {{ data.species }}
 
-<input type="radio" id="Unsure" name="type_call" value="Unsure" checked="checked">
+<input type="radio" id="Unsure" name="type_call" value="Unsure">
 <label for="Unsure" style="font-family:Helvetica">Unsure</label></br>
 
 <input type="radio" id="Other" name="type_call">
@@ -54,7 +54,7 @@
 
 
 <div class="container" style="position: absolute; top: 550px; left: 50px; width:600px;height:150px; background-color:PeachPuff" align="center"> 
-<p style="font-family:Helvetica">Call detected: {{data.guess}} </p>
+
 <p style="font-family:Helvetica">Confidence: {{data.confidence}} </p>
 <p style="font-family:Helvetica"><label for="limit_confidence">If future confidence is below this ask:</label>
 <input required type="number"  min="0" max="100" step="1" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
