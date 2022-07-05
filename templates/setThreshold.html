@@ -20,14 +20,19 @@
     <form method="post">
 
 <p style="font-family:Helvetica"><label for="threshold_nb">Threshold:</label>
-<input required type="number" id="threshold_nb" name="threshold_nb" value="{{data.threshold}}">
+<input required
+       type="text"
+       onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('threshold_nb').value))"
+       id="threshold_nb"
+       name="threshold_nb"
+       value="{{data.threshold}}">
 <br>
 <input type="radio" id="correct" name="threshold" value="correct">
 <label for="correct" style="font-family:Helvetica">Use threshold</label></br>
 
 <input type="radio" id="change" name="threshold" value="change" checked="checked">
 <label for="change" style="font-family:Helvetica">Update threshold</label></br>
-<input type="submit">
+<input id="submitbutton" type="submit">
 </form>
 
 </div>

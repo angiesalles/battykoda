@@ -25,7 +25,7 @@ osfolder = '/Users/angelessalles/Documents/data/'
 computer = platform.uname()
 if computer.system == 'Windows':
     osfolder = 'C:/Users/Kevin/Documents/repos/capybara/data/'
-global_limit_confidence = 100
+global_limit_confidence = 90
 global_user_name = ""
 lookup = dict()
 global_contrast = 4

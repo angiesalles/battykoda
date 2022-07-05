@@ -17,13 +17,18 @@
 <div class="container" style="position: absolute; top: 150px; left: 50px; width:600px;height:450px; background-color:PeachPuff" align="center">
 <p style="font-family:Helvetica">Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</p>
 <p style="font-family:Helvetica"><label for="contrast">Contrast:</label>
-<input required type="number" id="contrast" name="contrast" value="{{data.contrast}}">
+<input required
+       type="test"
+       id="contrast"
+       name="contrast"
+       onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('contrast').value))"
+       value="{{data.contrast}}">
 <br>
 <img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="400" height="250" alight="left">
 </div>
 </div>
 <div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:PeachPuff" align="center">
-<input type="submit" value="Next Call">
+<input id='submitbutton' type="submit" value="Next Call">
 </div> 
 
 
@@ -52,7 +57,7 @@
 <p style="font-family:Helvetica">Call detected: {{data.guess}} </p>
 <p style="font-family:Helvetica">Confidence: {{data.confidence}} </p>
 <p style="font-family:Helvetica"><label for="limit_confidence">If future confidence is below this ask:</label>
-<input required type="number" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
+<input required type="number"  min="0" max="100" step="1" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
 
 </form>
 </body>
