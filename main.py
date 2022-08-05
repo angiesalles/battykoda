@@ -205,6 +205,7 @@ def static_cont(path):
         lookup[shorty] = tf.name
         listims.append('/battykoda/img/' + shorty)
         tf.close()
+
     return render_template('setThreshold.html',
                            data={'images': listims,
                                  'threshold': str(threshold)})

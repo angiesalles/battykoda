@@ -32,7 +32,7 @@
 </div> 
 
 
-<div class="container" style="position: absolute; top: 200px; left: 600px;  width:300px;height:250px; background-color:Black" align="left">
+<div class="container" style="position: absolute; top: 200px; left: 600px;  width:300px;height:250px; color:white; background-color:Black" align="left">
 
 <input type="radio" id="correct" name="type_call" value="correct">
 <label for="correctly classified" style="color:white; font-family:Helvetica">Correctly classified</label></br>
@@ -53,13 +53,18 @@
 </div>
 
 
-<div class="container" style="position: absolute; top: 550px; left: 50px; width:600px;height:150px; background-color:Black" align="center">
+<div class="container" style="position: absolute; top: 550px; left: 50px; width:400px;height:150px; background-color:Black" align="center">
 
 <p style="color:white; font-family:Helvetica">Confidence: {{data.confidence}} </p>
 <p style="color:white; font-family:Helvetica"><label for="limit_confidence">If future confidence is below this ask:</label>
 <input required type="number"  min="0" max="100" step="1" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
 
 </form>
+ <script>
+        window.onload = function() {
+            document.getElementById("correct").focus();
+        }
+    </script>
 </body>
 </html>
 
