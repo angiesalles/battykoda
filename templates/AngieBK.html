@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<body style="background-color:PeachPuff;">
+<body style="background-color:Black;">
 <div class="container" style="position: relative; background-color:Salmon" align="center">
 <h1 style="font-family:Helvetica">BattyKoda</h1>
 
@@ -9,14 +9,14 @@
 
 <form method="post">
 
-<p style="font-family:Helvetica"><label for="user_name">User:</label>
+<p style="color:white; font-family:Helvetica"><label for="user_name">User:</label>
 <input required type="text" id="user_name" name="user_name" value="{{data.user_name}}">
 
 
 
-<div class="container" style="position: absolute; top: 150px; left: 50px; width:600px;height:450px; background-color:PeachPuff" align="center">
-<p style="font-family:Helvetica">Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</p>
-<p style="font-family:Helvetica"><label for="contrast">Contrast:</label>
+<div class="container" style="position: absolute; top: 150px; left: 30px; width:600px;height:450px; background-color:Black" align="center">
+<p style="color:white; font-family:Helvetica">Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</p>
+<p style="color:white; font-family:Helvetica"><label for="contrast">Contrast:</label>
 <input required
        type="test"
        id="contrast"
@@ -24,39 +24,39 @@
        onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('contrast').value))"
        value="{{data.contrast}}">
 <br>
-<img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="400" height="250" alight="left">
+<img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="600" height="250" alight="left">
 </div>
 </div>
-<div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:PeachPuff" align="center">
+<div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:Black" align="center">
 <input id='submitbutton' type="submit" value="Next Call">
 </div> 
 
 
-<div class="container" style="position: absolute; top: 200px; left: 600px;  width:300px;height:250px; background-color:PeachPuff" align="left">
+<div class="container" style="position: absolute; top: 200px; left: 600px;  width:300px;height:250px; background-color:Black" align="left">
 
 <input type="radio" id="correct" name="type_call" value="correct">
-<label for="correctly classified" style="font-family:Helvetica">Correctly classified</label></br>
+<label for="correctly classified" style="color:white; font-family:Helvetica">Correctly classified</label></br>
 
     {{ data.species }}
 
 <input type="radio" id="Unsure" name="type_call" value="Unsure">
-<label for="Unsure" style="font-family:Helvetica">Unsure</label></br>
+<label for="Unsure" style="color:white; font-family:Helvetica">Unsure</label></br>
 
 <input type="radio" id="Other" name="type_call">
-<label for="Other" style="font-family:Helvetica">Other:</label>
+<label for="Other" style="color:white; font-family:Helvetica">Other:</label>
 <input type="text" id="Other" name="type_call">
 </div>
 
-<div class="container" style="position: absolute; top: 150px; left: 850px; width:500px;height:450px; background-color:PeachPuff" align="center">
-<p style="font-family:Helvetica"><i>Spectrogram</i> template</p>
+<div class="container" style="position: absolute; top: 150px; left: 850px; width:500px;height:450px; background-color:Black" align="center">
+<p style="color:white; font-family:Helvetica"><i>Spectrogram</i> template</p>
 <img src="{{data.jpgname}}" alt="template" width="500" height="450" alight="left">
 </div>
 
 
-<div class="container" style="position: absolute; top: 550px; left: 50px; width:600px;height:150px; background-color:PeachPuff" align="center"> 
+<div class="container" style="position: absolute; top: 550px; left: 50px; width:600px;height:150px; background-color:Black" align="center">
 
-<p style="font-family:Helvetica">Confidence: {{data.confidence}} </p>
-<p style="font-family:Helvetica"><label for="limit_confidence">If future confidence is below this ask:</label>
+<p style="color:white; font-family:Helvetica">Confidence: {{data.confidence}} </p>
+<p style="color:white; font-family:Helvetica"><label for="limit_confidence">If future confidence is below this ask:</label>
 <input required type="number"  min="0" max="100" step="1" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
 
 </form>

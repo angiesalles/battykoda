@@ -75,12 +75,16 @@ def get_task(limit_confidence, contrast, path_to_file):
     offset=(segmentData['offsets'][call_to_do]*fs).astype(int)
 
     thrX1 = audiodata[max(0,onset-(fs*hwin//1000)):min(offset+(fs*hwin//1000),len(audiodata))]
-    f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=250, nfft=2**8)
-    plt.figure(facecolor='peachpuff')
+    f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2**8, noverlap=254, nfft=2**8)
+    plt.figure(facecolor='black')
     ax = plt.axes()
     ax.set_facecolor('indigo')
     plt.pcolormesh(t, f, np.arctan(temocontrast*Sxx), shading='auto')
     plt.xlim(0, 0.050)
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    ax.xaxis.label.set_color('white')
+    ax.yaxis.label.set_color('white')
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
 
