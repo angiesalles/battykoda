@@ -47,10 +47,6 @@ def store_task(path_to_file,result,sppath,browpath):
     pfile.close()
 
 
-
-def get_task(limit_confidence, contrast, path_to_file):
-
-
     # newpath = sppath + os.sep + 'classifier'
     # if not os.path.exists(newpath):
     #     os.makedirs(newpath)
@@ -59,9 +55,23 @@ def get_task(limit_confidence, contrast, path_to_file):
     # onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
     # offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
     # scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, audiodata[onset:offset])#ask gabby if she needs buffer around sound
+
+def get_task(limit_confidence, contrast, path_to_file, path, undo=False):
     pfile = open(path_to_file + '.pickle', 'rb')
     segmentData=pickle.load(pfile)
     pfile.close()
+    assumed_answer = 'Echo'
+    if undo:
+        popped = segmentData['labels'].pop()
+        assumed_answer = popped['type_call']
+        pfile = open(path_to_file + '.pickle', 'wb')
+        pickle.dump({'threshold': segmentData['threshold'],
+                     'onsets': segmentData['onsets'],
+                     'offsets': segmentData['offsets'],
+                     'labels': segmentData['labels'],
+                     'startFrq': [],
+                     'endFrq': []}, pfile)
+        pfile.close()
 
     hwin = 10 #ms before and after call
     audiodata, fs = DataReader.DataReader.data_read(path_to_file)
@@ -93,29 +103,32 @@ def get_task(limit_confidence, contrast, path_to_file):
     shorty = tf.name.split(os.sep)[-1]
     lookup[shorty] = tf.name
     tf.close()
-
+    backfragment = ''
+    if call_to_do > 0:
+        backfragment = Markup('<a href="/battykoda/back/'+path+'">Undo</a>')
 
     data = {'spectrogram': '/battykoda/img/' + shorty,
-            'guess': ['FMB', 'Echo', 'U'][random.randint(0, 2)],
+            'assumed_answer': assumed_answer,
             'confidence': str(random.randint(0, 100)),#this is bongo code needs to be replaced with real output of classifier
             'limit_confidence': str(limit_confidence),
             'currentcall' : call_to_do,
             'totalcalls' : len(segmentData['offsets']),
             'contrast': str(contrast),
+            'backlink': backfragment
             }
     return data
 
 
-def index(path_to_file,path, is_post):
+def index(path_to_file,path, is_post, undo=False):
     global global_user_name
     global global_limit_confidence
     global global_contrast
     if not is_post:
-        data = get_task(global_limit_confidence, global_contrast, path_to_file)
+        data = get_task(global_limit_confidence, global_contrast, path_to_file, path, undo)
         if data==None:
             return render_template('endFile.html',data={'filedirectory':'/battykoda/'+'/'.join(path.split('/')[:-2])+'/'})
         data['user_name'] = global_user_name
-        txtsp, jpgsp = hG.spgather(path, osfolder)
+        txtsp, jpgsp = hG.spgather(path, osfolder, data['assumed_answer'])
         data['species'] = Markup(txtsp)
         data['jpgname'] = jpgsp
         return render_template('AngieBK.html', data=data)
@@ -156,7 +169,8 @@ def static_cont(path):
 
         return render_template('listBK.html', data={'listicle': Markup(collectFiles)})
 
-
+    if path[:5] == 'back/':
+        return index(osfolder + path[5:-1], path[5:], request.method == 'POST', undo = True)
     if exists(osfolder + path[:-1] + '.pickle'):
         return index(osfolder + path[:-1], path, request.method == 'POST')
     if request.method == 'POST':
