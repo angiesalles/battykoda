@@ -29,6 +29,7 @@ global_limit_confidence = 90
 global_user_name = ""
 lookup = dict()
 global_contrast = 4
+global_priority = 0
 
 def get_audio_bit(path_to_file, call_to_do, hwin):
     audiodata, fs, hashof = DataReader.DataReader.data_read(path_to_file)
@@ -37,7 +38,7 @@ def get_audio_bit(path_to_file, call_to_do, hwin):
     onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
     offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
 
-    thrX1 = audiodata[max(0, onset - (fs * hwin // 1000)):min(offset + (fs * hwin // 1000), len(audiodata))]
+    thrX1 = audiodata[max(0, onset - (fs * hwin // 1000)):min(offset + (fs * hwin // 1000), len(audiodata)), :]
     return thrX1, fs, hashof
 
 def soft_create_folders(newpath):
@@ -66,6 +67,7 @@ def get_task(path_to_file, path, undo=False):
     global global_contrast
     global global_user_name
     global global_limit_confidence
+    global global_priority
     with open(path_to_file + '.pickle', 'rb') as pfile:
         segmentData = pickle.load(pfile)
     assumed_answer = 'Echo'
@@ -82,29 +84,39 @@ def get_task(path_to_file, path, undo=False):
     if call_to_do > 0:
         backfragment = Markup('<a href="/battykoda/back/'+path+'">Undo</a>')
     txtsp, jpgsp = hG.spgather(path, osfolder, assumed_answer)
-    _, _, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, 0)
-    spectr_particle = path \
-                      + str(len(segmentData['offsets'])) \
-                      + os.sep \
-                      + hashof \
-                      + os.sep \
-                      + str(global_contrast) \
-                      + os.sep \
-                      + str(call_to_do) \
-                      + '.png'
-    data = {'spectrogram': '/battykoda/img/' + spectr_particle,
-            'spectrogram_large': '/battykoda/overview/' + spectr_particle,
+    thrX1, _, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, 0)
+    def spectr_particle_fun(_channel):
+        return path \
+               + str(_channel) \
+               + '/' \
+               + str(len(segmentData['offsets'])) \
+               + '/' \
+               + hashof \
+               + '/' \
+               + str(global_contrast) \
+               + '/' \
+               + str(call_to_do) \
+               + '.png'
+
+    others = np.setdiff1d(range(thrX1.shape[1]), min(global_priority + 1, thrX1.shape[1])-1)
+    other_html = ['<p><img src="/battykoda/img/'+spectr_particle_fun(other)+'" width="600" height="250" ></p>' for other in others]
+    data = {'spectrogram': '/battykoda/img/' + spectr_particle_fun(global_priority),
+            'spectrogram_large': '/battykoda/overview/' + spectr_particle_fun(global_priority),
             'confidence': str(random.randint(0, 100)),#this is bongo code needs to be replaced with real output of classifier
             'limit_confidence': str(global_limit_confidence),
-            'currentcall' : call_to_do,
-            'totalcalls' : len(segmentData['offsets']),
+            'currentcall': call_to_do,
+            'totalcalls': len(segmentData['offsets']),
             'contrast': str(global_contrast),
             'backlink': backfragment,
-            'audiolink': '/battykoda/audio/' + path + hashof + os.sep + str(call_to_do) + '.wav',
+            'audiolink': '/battykoda/audio/' + path + str(min(global_priority+1, thrX1.shape[1])-1) + '/' + hashof + '/' + str(call_to_do) + '.wav',
             'user_name': global_user_name,
             'species': Markup(txtsp),
             'jpgname': jpgsp,
-            'focused': assumed_answer}
+            'focused': assumed_answer,
+            'priority': min(global_priority+1, thrX1.shape[1]),
+            'max_priority': thrX1.shape[1],
+            'others': Markup(''.join(other_html)),
+            }
     return render_template('AngieBK.html', data=data)
 
 
@@ -112,6 +124,7 @@ def index(path_to_file,path, is_post, undo=False):
     global global_user_name
     global global_limit_confidence
     global global_contrast
+    global global_priority
     if not is_post:
         return get_task(path_to_file, path, undo)
 
@@ -126,6 +139,7 @@ def index(path_to_file,path, is_post, undo=False):
     global_user_name = result['user_name']
     global_limit_confidence = result['limit_confidence']
     global_contrast = result['contrast']
+    global_priority = int(result['priority']) - 1
     store_task(path_to_file,result,osfolder + path.split('/')[0] + os.sep + path.split('/')[1] + os.sep + path.split('/')[2],path)
     return index(path_to_file, path, False)
 
@@ -134,17 +148,19 @@ def handleSound(path):
     if not exists('tempdata'+os.sep+path):
         soft_create_folders('tempdata'+os.sep+ os.sep.join(path.split('/')[:-1]))
         call_to_do = int(path[:-4].split('/')[-1])
-        thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-2]), call_to_do, 10)
-        assert path[:-4].split('/')[-2] == hashof
+        thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-3]), call_to_do, 10)
+        thrX1 = thrX1[:, int(path[:].split('/')[-3])]
+        assert path.split('/')[-2] == hashof
         scipy.io.wavfile.write('tempdata'+os.sep+path, fs // 10, thrX1.astype('float32').repeat(10)/2)
 
     return send_file('tempdata'+os.sep+path)
 
 def plotting(path, call_to_do, overview):
-    contrast = float(path[:-4].split('/')[-2])
+    contrast = float(path.split('/')[-2])
     hwin = 50 if overview else 10
-    thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-4]), call_to_do, hwin)
-    assert path[:-4].split('/')[-3] == hashof
+    thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-5]), call_to_do, hwin)
+    thrX1 = thrX1[:,int(path.split('/')[-5])]
+    assert path.split('/')[-3] == hashof
     f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2 ** 8, noverlap=254, nfft=2 ** 8)
     plt.figure(facecolor='black')
     ax = plt.axes()
@@ -168,14 +184,13 @@ def handleImage(path, overview):
         soft_create_folders('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]))
         plotting(path, call_to_do, overview)
     if not exists('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do + 1)):
-        if call_to_do+1 < int(path[:-4].split('/')[-4]):
+        if call_to_do+1 < int(path.split('/')[-4]):
             thr = threading.Thread(target=plotting, args=(path, call_to_do+1, overview), daemon=True)
             thr.start()
     return send_file('tempdata' + os.sep + path)
 
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def static_cont(path):
-    ch2use = 0
     global threshold
 
     if path.startswith('img/'):
@@ -185,7 +200,8 @@ def static_cont(path):
 
     if path.startswith('audio/'):
         return handleSound(path)
-
+    if path.startswith('thres/'):
+        return send_from_directory('/'.join(lookup[path[4:]].split(os.sep)[:-1]), path[4:])
     if path.endswith('.jpg'):
         return send_from_directory(osfolder, path.split('/')[-1])
 
@@ -227,6 +243,7 @@ def static_cont(path):
             return index(osfolder + path[:-1], path, False)
 
     audiodata, fs = DataReader.DataReader.data_read(osfolder + path[:-1])
+    audiodata = audiodata[:,0]
     smoodAudio = thresholding.SmoothData(audiodata, fs)
 
     listims = []
@@ -248,7 +265,7 @@ def static_cont(path):
         plt.savefig(tf)
         shorty = tf.name.split(os.sep)[-1]
         lookup[shorty] = tf.name
-        listims.append('/battykoda/img/' + shorty)
+        listims.append('/battykoda/thres/' + shorty)
         tf.close()
 
     return render_template('setThreshold.html',

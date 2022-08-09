@@ -18,13 +18,23 @@
 <p style="color:white; font-family:Helvetica">Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</p>
 <p style="color:white; font-family:Helvetica"><label for="contrast">Contrast:</label>
 <input required
-       type="test"
+       type="text"
        id="contrast"
        name="contrast"
        onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('contrast').value))"
        value="{{data.contrast}}">
+
 <br>
-<img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="600" height="250" alight="left">
+    <label for="priority">Priority channel:</label>
+<input required
+       type="number"
+       min="1"
+       max="{{ data.max_priority }}"
+       id="priority"
+       name="priority"
+       value="{{data.priority}}">
+
+    <img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="600" height="250" alight="left">
 </div>
 </div>
 <div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:Black" align="center">
@@ -69,6 +79,7 @@
     </audio></p>
 
 <p><img id="image" src="{{data.spectrogram_large}}" /></p>
+{{ data.others }}
  <script>
         window.onload = function() {
             document.getElementById("{{data.focused}}").focus();

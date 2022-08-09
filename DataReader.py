@@ -27,8 +27,9 @@ class DataReader:
                                        'hashof': hashof}
 
 
-        assert (np.sum(np.array(audiodata.shape) > 1) == 1) #here is where we assert only one channel
-        audiodata = audiodata.flatten().astype(float)
+        if len(audiodata.shape) == 1:
+            audiodata = audiodata.reshape([-1,1]).repeat(3, axis = 1)
+        audiodata = audiodata.astype(float)
         audiodata /= np.std(audiodata)
 
         return audiodata, fs, hashof
