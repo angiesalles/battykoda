@@ -55,13 +55,11 @@ def store_task(path_to_file,result,sppath,browpath):
 
 
     # newpath = sppath + os.sep + 'classifier'
-    # audiodata, fs = DataReader.DataReader.data_read(path_to_file)
     # soft_create_folders(newpath)
     #
     # call_to_do = len(segmentData['labels'])
-    # onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
-    # offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
-    # scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, audiodata[onset:offset])#ask gabby if she needs buffer around sound
+    # thrX1, fs = get_audio_bit(path_to_file, call_to_do)
+    # scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, thrX1)#ask gabby if she needs buffer around sound
 
 def get_task(limit_confidence, contrast, path_to_file, path, undo=False):
     pfile = open(path_to_file + '.pickle', 'rb')
