@@ -62,9 +62,8 @@ def store_task(path_to_file,result,sppath,browpath):
     # scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, thrX1)#ask gabby if she needs buffer around sound
 
 def get_task(limit_confidence, contrast, path_to_file, path, undo=False):
-    pfile = open(path_to_file + '.pickle', 'rb')
-    segmentData=pickle.load(pfile)
-    pfile.close()
+    with open(path_to_file + '.pickle', 'rb') as pfile:
+        segmentData = pickle.load(pfile)
     assumed_answer = 'Echo'
     if undo:
         popped = segmentData['labels'].pop()
