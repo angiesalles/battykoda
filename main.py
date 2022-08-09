@@ -61,42 +61,42 @@ def store_task(path_to_file,result,sppath,browpath):
     # thrX1, fs = get_audio_bit(path_to_file, call_to_do)
     # scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, thrX1)#ask gabby if she needs buffer around sound
 
-def get_task(limit_confidence, contrast, path_to_file, path, undo=False):
+
+
+def get_task(path_to_file, path, undo=False):
+    global global_contrast
+    global global_user_name
+    global global_limit_confidence
     with open(path_to_file + '.pickle', 'rb') as pfile:
         segmentData = pickle.load(pfile)
     assumed_answer = 'Echo'
     if undo:
         popped = segmentData['labels'].pop()
         assumed_answer = popped['type_call']
-
-    hwin = 10 #ms before and after call
-    audiodata, fs = DataReader.DataReader.data_read(path_to_file)
-
-    temocontrast = 10**(float(contrast))
-
-    if len(segmentData['labels'])==len(segmentData['offsets']):
-        return None
-    call_to_do=len(segmentData['labels'])
-    onset=(segmentData['onsets'][call_to_do]*fs).astype(int)
-    offset=(segmentData['offsets'][call_to_do]*fs).astype(int)
-
-    thrX1 = audiodata[max(0,onset-(fs*hwin//1000)):min(offset+(fs*hwin//1000),len(audiodata))]
         with open(path_to_file + '.pickle', 'wb') as pfile:
             pickle.dump(segmentData, pfile)
+    call_to_do = len(segmentData['labels'])
+    if call_to_do == len(segmentData['offsets']):
+        return render_template('endFile.html',
+                               data={'filedirectory': '/battykoda/' + '/'.join(path.split('/')[:-2]) + '/'})
     backfragment = ''
     if call_to_do > 0:
         backfragment = Markup('<a href="/battykoda/back/'+path+'">Undo</a>')
-
-    data = {'spectrogram': '/battykoda/img/' + shorty,
-            'assumed_answer': assumed_answer,
+    txtsp, jpgsp = hG.spgather(path, osfolder, assumed_answer)
+    _, _, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do)
+    data = {'spectrogram': '/battykoda/img/' + path + str(len(segmentData['offsets'])) + os.sep + hashof + os.sep + str(global_contrast) + os.sep +  str(call_to_do) + '.png',
             'confidence': str(random.randint(0, 100)),#this is bongo code needs to be replaced with real output of classifier
-            'limit_confidence': str(limit_confidence),
+            'limit_confidence': str(global_limit_confidence),
             'currentcall' : call_to_do,
             'totalcalls' : len(segmentData['offsets']),
-            'contrast': str(contrast),
-    return data
+            'contrast': str(global_contrast),
             'backlink': backfragment,
+            'audiolink': '/battykoda/audio/' + path + hashof + os.sep + str(call_to_do) + '.wav',
+            'user_name': global_user_name,
+            'species': Markup(txtsp),
+            'jpgname': jpgsp,
             'focused': assumed_answer}
+    return render_template('AngieBK.html', data=data)
 
 
 def index(path_to_file,path, is_post, undo=False):
@@ -104,14 +104,8 @@ def index(path_to_file,path, is_post, undo=False):
     global global_limit_confidence
     global global_contrast
     if not is_post:
-        data = get_task(global_limit_confidence, global_contrast, path_to_file, path, undo)
-        if data==None:
-            return render_template('endFile.html',data={'filedirectory':'/battykoda/'+'/'.join(path.split('/')[:-2])+'/'})
-        data['user_name'] = global_user_name
-        txtsp, jpgsp = hG.spgather(path, osfolder, data['assumed_answer'])
-        data['species'] = Markup(txtsp)
-        data['jpgname'] = jpgsp
-        return render_template('AngieBK.html', data=data)
+        return get_task(path_to_file, path, undo)
+
     result = request.form
     if result['user_name'] == '':
         return '''

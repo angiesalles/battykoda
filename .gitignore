@@ -1,3 +1,6 @@
 env/*
 .DS_Store
 .idea/*
+*.pyc
+/data/*
+/tempdata/*
