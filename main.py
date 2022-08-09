@@ -69,14 +69,6 @@ def get_task(limit_confidence, contrast, path_to_file, path, undo=False):
     if undo:
         popped = segmentData['labels'].pop()
         assumed_answer = popped['type_call']
-        pfile = open(path_to_file + '.pickle', 'wb')
-        pickle.dump({'threshold': segmentData['threshold'],
-                     'onsets': segmentData['onsets'],
-                     'offsets': segmentData['offsets'],
-                     'labels': segmentData['labels'],
-                     'startFrq': [],
-                     'endFrq': []}, pfile)
-        pfile.close()
 
     hwin = 10 #ms before and after call
     audiodata, fs = DataReader.DataReader.data_read(path_to_file)
@@ -108,6 +100,8 @@ def get_task(limit_confidence, contrast, path_to_file, path, undo=False):
     shorty = tf.name.split(os.sep)[-1]
     lookup[shorty] = tf.name
     tf.close()
+        with open(path_to_file + '.pickle', 'wb') as pfile:
+            pickle.dump(segmentData, pfile)
     backfragment = ''
     if call_to_do > 0:
         backfragment = Markup('<a href="/battykoda/back/'+path+'">Undo</a>')
