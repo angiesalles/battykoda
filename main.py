@@ -31,6 +31,9 @@ lookup = dict()
 global_contrast = 4
 
 
+def soft_create_folders(newpath):
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
 
 def store_task(path_to_file,result,sppath,browpath):
 
@@ -48,9 +51,9 @@ def store_task(path_to_file,result,sppath,browpath):
 
 
     # newpath = sppath + os.sep + 'classifier'
-    # if not os.path.exists(newpath):
-    #     os.makedirs(newpath)
     # audiodata, fs = DataReader.DataReader.data_read(path_to_file)
+    # soft_create_folders(newpath)
+    #
     # call_to_do = len(segmentData['labels'])
     # onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
     # offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
