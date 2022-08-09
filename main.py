@@ -24,7 +24,7 @@ app = Flask(__name__)
 osfolder = '/Users/angelessalles/Documents/data/'
 computer = platform.uname()
 if computer.system == 'Windows':
-    osfolder = 'C:/Users/Kevin/Documents/repos/capybara/data/'
+    osfolder = 'C:/Users/Kevin/Documents/repos/battykoda/data/'
 global_limit_confidence = 90
 global_user_name = ""
 lookup = dict()
@@ -47,24 +47,24 @@ def store_task(path_to_file,result,sppath,browpath):
     pfile.close()
 
 
-    newpath = sppath + os.sep + 'classifier'
-    if not os.path.exists(newpath):
-        os.makedirs(newpath)
-    audiodata, fs = DataReader.data_read(path_to_file)
-    call_to_do = len(segmentData['labels'])
-    onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
-    offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
-    scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, audiodata[onset:offset])#ask gabby if she needs buffer around sound
 
 def get_task(limit_confidence, contrast, path_to_file):
 
 
+    # newpath = sppath + os.sep + 'classifier'
+    # if not os.path.exists(newpath):
+    #     os.makedirs(newpath)
+    # audiodata, fs = DataReader.DataReader.data_read(path_to_file)
+    # call_to_do = len(segmentData['labels'])
+    # onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
+    # offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
+    # scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, audiodata[onset:offset])#ask gabby if she needs buffer around sound
     pfile = open(path_to_file + '.pickle', 'rb')
     segmentData=pickle.load(pfile)
     pfile.close()
 
     hwin = 10 #ms before and after call
-    audiodata, fs = DataReader.data_read(path_to_file)
+    audiodata, fs = DataReader.DataReader.data_read(path_to_file)
 
     temocontrast = 10**(float(contrast))
 
@@ -181,7 +181,7 @@ def static_cont(path):
 
             return index(osfolder + path[:-1], path, False)
 
-    audiodata, fs = DataReader.data_read(osfolder + path[:-1])
+    audiodata, fs = DataReader.DataReader.data_read(osfolder + path[:-1])
     smoodAudio = thresholding.SmoothData(audiodata, fs)
 
     listims = []
@@ -216,4 +216,8 @@ def mainpage():
 
 
 if __name__ == '__main__':
+
+    #from werkzeug.middleware.profiler import ProfilerMiddleware
+    #app.wsgi_app = ProfilerMiddleware(app.wsgi_app)
+
     app.run(host='0.0.0.0', debug=False, port=8060)
