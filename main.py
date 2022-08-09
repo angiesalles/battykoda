@@ -161,6 +161,24 @@ def handleSound(path):
 
     return send_file('tempdata'+os.sep+path)
 
+def plotting(path, call_to_do):
+    contrast = float(path[:-4].split('/')[-2])
+    thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-4]), call_to_do)
+    assert path[:-4].split('/')[-3] == hashof
+    f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2 ** 8, noverlap=254, nfft=2 ** 8)
+    plt.figure(facecolor='black')
+    ax = plt.axes()
+    ax.set_facecolor('indigo')
+    temocontrast = 10 ** (float(contrast))
+    plt.pcolormesh(t, f, np.arctan(temocontrast * Sxx), shading='auto')
+    plt.xlim(0, 0.050)
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    ax.xaxis.label.set_color('white')
+    ax.yaxis.label.set_color('white')
+    plt.ylabel('Frequency [Hz]')
+    plt.xlabel('Time [sec]')
+    plt.savefig('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do))
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def static_cont(path):
     ch2use = 0
