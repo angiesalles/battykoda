@@ -47,17 +47,11 @@ def soft_create_folders(newpath):
 
 def store_task(path_to_file,result,sppath,browpath):
 
-    pfile = open(path_to_file + '.pickle', 'rb')
-    segmentData=pickle.load(pfile)
-    pfile.close()
-    pfile = open(path_to_file+'.pickle', 'wb')
-    pickle.dump({'threshold': segmentData['threshold'],
-                 'onsets': segmentData['onsets'],
-                 'offsets': segmentData['offsets'],
-                 'labels': segmentData['labels']+[result],
-                 'startFrq': [],
-                 'endFrq': []}, pfile)
-    pfile.close()
+    with open(path_to_file + '.pickle', 'rb') as pfile:
+        segmentData = pickle.load(pfile)
+    segmentData['labels'].append(result)
+    with open(path_to_file+'.pickle', 'wb') as pfile:
+        pickle.dump(segmentData, pfile)
 
 
     # newpath = sppath + os.sep + 'classifier'
