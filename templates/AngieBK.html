@@ -60,14 +60,15 @@
 <input required type="number"  min="0" max="100" step="1" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
 
 </form>
-{{ data.backlink }}
-
-    <audio
+<p>{{ data.backlink }}</p>
+<p><audio
         controls
         src="{{ data.audiolink }}" preload="none">
             Your browser does not support the
             <code>audio</code> element.
-    </audio>
+    </audio></p>
+
+<p><img id="image" src="{{data.spectrogram_large}}" /></p>
  <script>
         window.onload = function() {
             document.getElementById("{{data.focused}}").focus();

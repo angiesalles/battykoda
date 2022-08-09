@@ -30,8 +30,7 @@ global_user_name = ""
 lookup = dict()
 global_contrast = 4
 
-def get_audio_bit(path_to_file, call_to_do):
-    hwin = 10  # ms before and after call
+def get_audio_bit(path_to_file, call_to_do, hwin):
     audiodata, fs, hashof = DataReader.DataReader.data_read(path_to_file)
     with open(path_to_file + '.pickle', 'rb') as pfile:
         segmentData = pickle.load(pfile)
@@ -58,7 +57,7 @@ def store_task(path_to_file,result,sppath,browpath):
     # soft_create_folders(newpath)
     #
     # call_to_do = len(segmentData['labels'])
-    # thrX1, fs = get_audio_bit(path_to_file, call_to_do)
+    # thrX1, fs = get_audio_bit(path_to_file, call_to_do, 0)
     # scipy.io.wavfile.write(newpath + os.sep + '.'.join(browpath.replace('/','_').split('.')[:-1]) + str(onset) +'_'+ result['type_call'] + '.wav', fs, thrX1)#ask gabby if she needs buffer around sound
 
 
@@ -83,8 +82,18 @@ def get_task(path_to_file, path, undo=False):
     if call_to_do > 0:
         backfragment = Markup('<a href="/battykoda/back/'+path+'">Undo</a>')
     txtsp, jpgsp = hG.spgather(path, osfolder, assumed_answer)
-    _, _, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do)
-    data = {'spectrogram': '/battykoda/img/' + path + str(len(segmentData['offsets'])) + os.sep + hashof + os.sep + str(global_contrast) + os.sep +  str(call_to_do) + '.png',
+    _, _, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, 0)
+    spectr_particle = path \
+                      + str(len(segmentData['offsets'])) \
+                      + os.sep \
+                      + hashof \
+                      + os.sep \
+                      + str(global_contrast) \
+                      + os.sep \
+                      + str(call_to_do) \
+                      + '.png'
+    data = {'spectrogram': '/battykoda/img/' + spectr_particle,
+            'spectrogram_large': '/battykoda/overview/' + spectr_particle,
             'confidence': str(random.randint(0, 100)),#this is bongo code needs to be replaced with real output of classifier
             'limit_confidence': str(global_limit_confidence),
             'currentcall' : call_to_do,
@@ -125,15 +134,16 @@ def handleSound(path):
     if not exists('tempdata'+os.sep+path):
         soft_create_folders('tempdata'+os.sep+ os.sep.join(path.split('/')[:-1]))
         call_to_do = int(path[:-4].split('/')[-1])
-        thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-2]), call_to_do)
+        thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-2]), call_to_do, 10)
         assert path[:-4].split('/')[-2] == hashof
         scipy.io.wavfile.write('tempdata'+os.sep+path, fs // 10, thrX1.astype('float32').repeat(10)/2)
 
     return send_file('tempdata'+os.sep+path)
 
-def plotting(path, call_to_do):
+def plotting(path, call_to_do, overview):
     contrast = float(path[:-4].split('/')[-2])
-    thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-4]), call_to_do)
+    hwin = 50 if overview else 10
+    thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-4]), call_to_do, hwin)
     assert path[:-4].split('/')[-3] == hashof
     f, t, Sxx = scipy.signal.spectrogram(thrX1, fs, nperseg=2 ** 8, noverlap=254, nfft=2 ** 8)
     plt.figure(facecolor='black')
@@ -141,7 +151,8 @@ def plotting(path, call_to_do):
     ax.set_facecolor('indigo')
     temocontrast = 10 ** (float(contrast))
     plt.pcolormesh(t, f, np.arctan(temocontrast * Sxx), shading='auto')
-    plt.xlim(0, 0.050)
+    if not overview:
+        plt.xlim(0, 0.050)
     ax.tick_params(axis='x', colors='white')
     ax.tick_params(axis='y', colors='white')
     ax.xaxis.label.set_color('white')
@@ -151,14 +162,14 @@ def plotting(path, call_to_do):
     plt.savefig('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do))
 
 
-def handleImage(path):
+def handleImage(path, overview):
     call_to_do = int(path[:-4].split('/')[-1])
     if not exists('tempdata' + os.sep + path):
         soft_create_folders('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]))
-        plotting(path, call_to_do)
+        plotting(path, call_to_do, overview)
     if not exists('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do + 1)):
         if call_to_do+1 < int(path[:-4].split('/')[-4]):
-            thr = threading.Thread(target=plotting, args=(path, call_to_do+1), daemon=True)
+            thr = threading.Thread(target=plotting, args=(path, call_to_do+1, overview), daemon=True)
             thr.start()
     return send_file('tempdata' + os.sep + path)
 
@@ -168,7 +179,10 @@ def static_cont(path):
     global threshold
 
     if path.startswith('img/'):
-        return handleImage(path)
+        return handleImage(path, overview=False)
+    if path.startswith('overview/'):
+        return handleImage(path, overview=True)
+
     if path.startswith('audio/'):
         return handleSound(path)
 
