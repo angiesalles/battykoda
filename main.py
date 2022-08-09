@@ -203,7 +203,7 @@ def static_cont(path):
 
         return render_template('listBK.html', data={'listicle': Markup(collectFiles)})
 
-    if path[:5] == 'back/':
+    if path.startswith('back/'):
         return index(osfolder + path[5:-1], path[5:], request.method == 'POST', undo = True)
     if exists(osfolder + path[:-1] + '.pickle'):
         return index(osfolder + path[:-1], path, request.method == 'POST')
