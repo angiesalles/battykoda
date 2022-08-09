@@ -13,6 +13,7 @@ import DataReader
 import matplotlib
 import platform
 import time
+import threading
 
 # Force matplotlib to not use any Xwindows backend.
 # https://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
@@ -179,13 +180,26 @@ def plotting(path, call_to_do):
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
     plt.savefig('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do))
+
+
+def handleImage(path):
+    call_to_do = int(path[:-4].split('/')[-1])
+    if not exists('tempdata' + os.sep + path):
+        soft_create_folders('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]))
+        plotting(path, call_to_do)
+    if not exists('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do + 1)):
+        if call_to_do+1 < int(path[:-4].split('/')[-4]):
+            thr = threading.Thread(target=plotting, args=(path, call_to_do+1), daemon=True)
+            thr.start()
+    return send_file('tempdata' + os.sep + path)
+
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def static_cont(path):
     ch2use = 0
     global threshold
 
-        return send_from_directory('/'.join(lookup[path[4:]].split(os.sep)[:-1]), path[4:])
     if path.startswith('img/'):
+        return handleImage(path)
     if path.startswith('audio/'):
         return handleSound(path)
 
