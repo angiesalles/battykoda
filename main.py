@@ -24,7 +24,7 @@ app = Flask(__name__)
 osfolder = '/Users/angelessalles/Documents/data/'
 computer = platform.uname()
 if computer.system == 'Windows':
-    osfolder = 'C:/Users/Kevin/Documents/repos/battykoda/data/'
+    osfolder = '.\\data\\'
 global_limit_confidence = 90
 global_user_name = ""
 lookup = dict()
