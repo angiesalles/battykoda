@@ -2,7 +2,7 @@ import os
 import tempfile
 import thresholding
 import htmlGenerator as hG
-from flask import Flask, render_template, request, url_for, redirect, Markup, send_from_directory
+from flask import Flask, render_template, request, url_for, redirect, Markup, send_from_directory, send_file
 import pickle
 import numpy as np
 import random
@@ -12,7 +12,6 @@ from os.path import exists
 import DataReader
 import matplotlib
 import platform
-import time
 import threading
 
 # Force matplotlib to not use any Xwindows backend.
