@@ -30,6 +30,16 @@ global_user_name = ""
 lookup = dict()
 global_contrast = 4
 
+def get_audio_bit(path_to_file, call_to_do):
+    hwin = 10  # ms before and after call
+    audiodata, fs, hashof = DataReader.DataReader.data_read(path_to_file)
+    with open(path_to_file + '.pickle', 'rb') as pfile:
+        segmentData = pickle.load(pfile)
+    onset = (segmentData['onsets'][call_to_do] * fs).astype(int)
+    offset = (segmentData['offsets'][call_to_do] * fs).astype(int)
+
+    thrX1 = audiodata[max(0, onset - (fs * hwin // 1000)):min(offset + (fs * hwin // 1000), len(audiodata))]
+    return thrX1, fs, hashof
 
 def soft_create_folders(newpath):
     if not os.path.exists(newpath):
