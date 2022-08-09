@@ -166,11 +166,12 @@ def static_cont(path):
     ch2use = 0
     global threshold
 
-    if path[:4] == 'img/':
         return send_from_directory('/'.join(lookup[path[4:]].split(os.sep)[:-1]), path[4:])
-    if path[-4:] == '.jpg':
+    if path.startswith('img/'):
     if path.startswith('audio/'):
         return handleSound(path)
+
+    if path.endswith('.jpg'):
         return send_from_directory(osfolder, path.split('/')[-1])
 
     if os.path.isdir(osfolder + path):
