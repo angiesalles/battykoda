@@ -114,9 +114,9 @@ def get_task(limit_confidence, contrast, path_to_file, path, undo=False):
             'currentcall' : call_to_do,
             'totalcalls' : len(segmentData['offsets']),
             'contrast': str(contrast),
-            'backlink': backfragment
-            }
     return data
+            'backlink': backfragment,
+            'focused': assumed_answer}
 
 
 def index(path_to_file,path, is_post, undo=False):
