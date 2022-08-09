@@ -151,6 +151,15 @@ def index(path_to_file,path, is_post, undo=False):
     return index(path_to_file, path, False)
 
 
+def handleSound(path):
+    if not exists('tempdata'+os.sep+path):
+        soft_create_folders('tempdata'+os.sep+ os.sep.join(path.split('/')[:-1]))
+        call_to_do = int(path[:-4].split('/')[-1])
+        thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-2]), call_to_do)
+        assert path[:-4].split('/')[-2] == hashof
+        scipy.io.wavfile.write('tempdata'+os.sep+path, fs // 10, thrX1.astype('float32').repeat(10)/2)
+
+    return send_file('tempdata'+os.sep+path)
 
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def static_cont(path):
@@ -160,6 +169,8 @@ def static_cont(path):
     if path[:4] == 'img/':
         return send_from_directory('/'.join(lookup[path[4:]].split(os.sep)[:-1]), path[4:])
     if path[-4:] == '.jpg':
+    if path.startswith('audio/'):
+        return handleSound(path)
         return send_from_directory(osfolder, path.split('/')[-1])
 
     if os.path.isdir(osfolder + path):
