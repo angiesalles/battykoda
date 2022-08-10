@@ -1,8 +1,8 @@
 def spgather(wholepath,osfolder, assumed_answer):
    species=wholepath.split('/')[2]
-   jpgname='/battykoda/'+species+'.jpg'
+   jpgname='/static/'+species+'.jpg'
 
-   f=open(osfolder+species+'.txt')
+   f=open(osfolder+'static/'+species+'.txt')
    lines=f.readlines()
    f.close()
    collectstrings=''

@@ -24,15 +24,23 @@
        onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('contrast').value))"
        value="{{data.contrast}}">
 
+<br><label for="loudness">Loudness:</label>
+    <input required
+       type="text"
+       id="loudness"
+       name="loudness"
+       onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('loudness').value))"
+       value="{{data.loudness}}">
+
 <br>
-    <label for="priority">Priority channel:</label>
+    <label for="main">Main channel:</label>
 <input required
        type="number"
        min="1"
-       max="{{ data.max_priority }}"
-       id="priority"
-       name="priority"
-       value="{{data.priority}}">
+       max="{{ data.max_main }}"
+       id="main"
+       name="main"
+       value="{{data.main}}">
 
     <img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="600" height="250" alight="left">
 </div>
