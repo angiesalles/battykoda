@@ -13,6 +13,15 @@ import DataReader
 import matplotlib
 import platform
 import threading
+import queue
+
+from dataclasses import dataclass, field
+from typing import Any
+
+@dataclass(order=True)
+class PrioritizedItem:
+    priority: int
+    item: Any=field(compare=False)
 
 # Force matplotlib to not use any Xwindows backend.
 # https://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
@@ -30,6 +39,8 @@ global_user_name = ""
 lookup = dict()
 global_contrast = 4
 global_priority = 0
+global_request_queue = queue.PriorityQueue()
+global_work_queue = queue.PriorityQueue()
 
 def get_audio_bit(path_to_file, call_to_do, hwin):
     audiodata, fs, hashof = DataReader.DataReader.data_read(path_to_file)
@@ -85,6 +96,7 @@ def get_task(path_to_file, path, undo=False):
         backfragment = Markup('<a href="/battykoda/back/'+path+'">Undo</a>')
     txtsp, jpgsp = hG.spgather(path, osfolder, assumed_answer)
     thrX1, _, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, 0)
+    global_priority = min(global_priority, thrX1.shape[1]-1)
     def spectr_particle_fun(_channel):
         return path \
                + str(_channel) \
@@ -98,7 +110,7 @@ def get_task(path_to_file, path, undo=False):
                + str(call_to_do) \
                + '.png'
 
-    others = np.setdiff1d(range(thrX1.shape[1]), min(global_priority + 1, thrX1.shape[1])-1)
+    others = np.setdiff1d(range(thrX1.shape[1]), global_priority)
     other_html = ['<p><img src="/battykoda/img/'+spectr_particle_fun(other)+'" width="600" height="250" ></p>' for other in others]
     data = {'spectrogram': '/battykoda/img/' + spectr_particle_fun(global_priority),
             'spectrogram_large': '/battykoda/overview/' + spectr_particle_fun(global_priority),
@@ -108,12 +120,12 @@ def get_task(path_to_file, path, undo=False):
             'totalcalls': len(segmentData['offsets']),
             'contrast': str(global_contrast),
             'backlink': backfragment,
-            'audiolink': '/battykoda/audio/' + path + str(min(global_priority+1, thrX1.shape[1])-1) + '/' + hashof + '/' + str(call_to_do) + '.wav',
+            'audiolink': '/battykoda/audio/' + path + str(global_priority) + '/' + hashof + '/' + str(call_to_do) + '.wav',
             'user_name': global_user_name,
             'species': Markup(txtsp),
             'jpgname': jpgsp,
             'focused': assumed_answer,
-            'priority': min(global_priority+1, thrX1.shape[1]),
+            'priority': global_priority+1,
             'max_priority': thrX1.shape[1],
             'others': Markup(''.join(other_html)),
             }
@@ -153,9 +165,12 @@ def handleSound(path):
         assert path.split('/')[-2] == hashof
         scipy.io.wavfile.write('tempdata'+os.sep+path, fs // 10, thrX1.astype('float32').repeat(10)/2)
 
-    return send_file('tempdata'+os.sep+path)
+    return send_file('tempdata' + os.sep + path.replace('/', os.sep))
 
-def plotting(path, call_to_do, overview):
+def plotting(path, event):
+    event.wait()
+    overview = path.startswith('overview/')
+    call_to_do = int(path[:-4].split('/')[-1])
     contrast = float(path.split('/')[-2])
     hwin = 50 if overview else 10
     thrX1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[1:-5]), call_to_do, hwin)
@@ -175,28 +190,55 @@ def plotting(path, call_to_do, overview):
     ax.yaxis.label.set_color('white')
     plt.ylabel('Frequency [Hz]')
     plt.xlabel('Time [sec]')
-    plt.savefig('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do))
+    soft_create_folders('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]))
+    plt.savefig('tempdata' + os.sep + path.replace('/', os.sep))
+
+def worker():
+    mythreadstorage = {}
+    while True:
+        item = global_request_queue.get()
+        if not item.item['path'] in mythreadstorage:
+            event = threading.Event()
+            thread = threading.Thread(target=plotting,
+                                      args=(item.item['path'], event),
+                                      daemon=True)
+            thread.start()
+            mythreadstorage[item.item['path']] = thread
+            global_work_queue.put(PrioritizedItem(item.priority, {'thread': thread, 'event': event}))
+        item.item['thread'] = mythreadstorage[item.item['path']]
+        global_request_queue.task_done()
 
 
-def handleImage(path, overview):
+def worker2():
+    while True:
+        item = global_work_queue.get().item
+        item['event'].set()
+        item['thread'].join()
+        global_work_queue.task_done()
+
+
+
+
+def handleImage(path):
+    priority_part = 0 if path.split('/')[-5]==str(global_priority) else 2
+    overview_part = 1 if path.startswith('overview') else 0
+    workload = {'path': path}
+    global_request_queue.put(PrioritizedItem(priority_part + overview_part, workload))
     call_to_do = int(path[:-4].split('/')[-1])
-    if not exists('tempdata' + os.sep + path):
-        soft_create_folders('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]))
-        plotting(path, call_to_do, overview)
-    if not exists('tempdata' + os.sep + os.sep.join(path.split('/')[:-1]) + os.sep + str(call_to_do + 1)):
-        if call_to_do+1 < int(path.split('/')[-4]):
-            thr = threading.Thread(target=plotting, args=(path, call_to_do+1, overview), daemon=True)
-            thr.start()
-    return send_file('tempdata' + os.sep + path)
+    path_next = '/'.join(path.split('/')[:-1]) + '/' + str(call_to_do + 1) + '.png'
+    global_request_queue.put(PrioritizedItem(4 + priority_part, {'path': path_next}))
+    global_request_queue.join()
+    workload['thread'].join()
+    return send_file('tempdata' + os.sep + path.replace('/', os.sep))
 
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def static_cont(path):
     global threshold
 
     if path.startswith('img/'):
-        return handleImage(path, overview=False)
+        return handleImage(path)
     if path.startswith('overview/'):
-        return handleImage(path, overview=True)
+        return handleImage(path)
 
     if path.startswith('audio/'):
         return handleSound(path)
@@ -281,5 +323,6 @@ if __name__ == '__main__':
 
     #from werkzeug.middleware.profiler import ProfilerMiddleware
     #app.wsgi_app = ProfilerMiddleware(app.wsgi_app)
-
+    threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=worker2, daemon=True).start()
     app.run(host='0.0.0.0', debug=False, port=8060)

@@ -21,16 +21,17 @@ class DataReader:
                 fs = 250000
             else:
                 fs, audiodata = wavfile.read(path_to_file)
+            if len(audiodata.shape) == 1:
+                audiodata = audiodata.reshape([-1, 1]).repeat(3, axis=1)
+            audiodata = audiodata.astype(float)
+            audiodata /= np.std(audiodata)
             cls.cache[path_to_file] = {'time': time.time(),
                                        'fs': fs,
                                        'audiodata': audiodata,
                                        'hashof': hashof}
 
 
-        if len(audiodata.shape) == 1:
-            audiodata = audiodata.reshape([-1,1]).repeat(3, axis = 1)
-        audiodata = audiodata.astype(float)
-        audiodata /= np.std(audiodata)
+
 
         return audiodata, fs, hashof
 
