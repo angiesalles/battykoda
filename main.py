@@ -109,9 +109,11 @@ def get_task(path_to_file, path, undo=False):
                + '/' \
                + str(call_to_do) \
                + '.png'
-
+    def audio_particle_fun(_channel):
+        return '/battykoda/audio/' + path + str(_channel) + '/' + hashof + '/' + str(call_to_do) + '.wav'
     others = np.setdiff1d(range(thrX1.shape[1]), global_priority)
-    other_html = ['<p><img src="/battykoda/img/'+spectr_particle_fun(other)+'" width="600" height="250" ></p>' for other in others]
+    other_html = ['<p><img src="/battykoda/img/'+spectr_particle_fun(other)+'" width="600" height="250" >' +
+                  '<audio controls src="' + audio_particle_fun(other) + '" preload="none" /></p>' for other in others]
     data = {'spectrogram': '/battykoda/img/' + spectr_particle_fun(global_priority),
             'spectrogram_large': '/battykoda/overview/' + spectr_particle_fun(global_priority),
             'confidence': str(random.randint(0, 100)),#this is bongo code needs to be replaced with real output of classifier
@@ -120,7 +122,7 @@ def get_task(path_to_file, path, undo=False):
             'totalcalls': len(segmentData['offsets']),
             'contrast': str(global_contrast),
             'backlink': backfragment,
-            'audiolink': '/battykoda/audio/' + path + str(global_priority) + '/' + hashof + '/' + str(call_to_do) + '.wav',
+            'audiolink': audio_particle_fun(global_priority),
             'user_name': global_user_name,
             'species': Markup(txtsp),
             'jpgname': jpgsp,
