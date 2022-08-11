@@ -46,7 +46,8 @@
 </div>
 </div>
 <div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:Black" align="center">
-<input id='submitbutton' type="submit" value="Next Call">
+    <input id='updatebutton' type="submit" name="updatebutton" value="Update">
+<input id='submitbutton' type="submit" name='submitbutton' value="Next Call">
 </div> 
 
 
@@ -87,6 +88,12 @@
     </audio></p>
 
 <p><img id="image" src="{{data.spectrogram_large}}" /></p>
+<p><audio
+        controls
+        src="{{ data.long_audiolink }}" preload="none">
+            Your browser does not support the
+            <code>audio</code> element.
+    </audio></p>
 {{ data.others }}
  <script>
         window.onload = function() {

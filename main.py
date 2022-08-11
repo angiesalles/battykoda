@@ -48,7 +48,8 @@ global_loudness = 0.5
 global_main = 0
 global_request_queue = queue.PriorityQueue()
 global_work_queue = queue.PriorityQueue()
-
+overview_hwin = 50
+normal_hwin = 10
 
 def get_audio_bit(path_to_file, call_to_do, hwin):
     audiodata, fs, hashof = DataReader.DataReader.data_read(path_to_file)
@@ -116,15 +117,16 @@ def get_task(path_to_file, path, undo=False):
                 'numcalls': len(segment_data['offsets'])}
         return '/img/' + path + 'spectrogram.png?' + urllib.parse.urlencode(args)
 
-    def audio_particle_fun(_channel):
+    def audio_particle_fun(_channel, _overview):
         args = {'hash': hashof,
                 'channel': _channel,
                 'call': call_to_do,
+                'overview': _overview,
                 'loudness': global_loudness}
         return '/audio/' + path + 'snippet.wav?' + urllib.parse.urlencode(args)
     others = np.setdiff1d(range(thr_x1.shape[1]), global_main)
     other_html = ['<p><img src="'+spectr_particle_fun(other, _overview=False)+'" width="600" height="250" >' +
-                  '<audio controls src="' + audio_particle_fun(other) + '" preload="none" /></p>' for other in others]
+                  '<audio controls src="' + audio_particle_fun(other, _overview=False) + '" preload="none" /></p>' for other in others]
     data = {'spectrogram': spectr_particle_fun(global_main, _overview=False),
             'spectrogram_large': spectr_particle_fun(global_main, _overview=True),
             'confidence': str(random.randint(0, 100)),  # this is bongo code
@@ -134,7 +136,9 @@ def get_task(path_to_file, path, undo=False):
             'contrast': str(global_contrast),
             'loudness': str(global_loudness),
             'backlink': backfragment,
-            'audiolink': audio_particle_fun(global_main),
+            'audiolink': audio_particle_fun(global_main, _overview=False),
+            'long_audiolink': audio_particle_fun(global_main, _overview=True),
+
             'user_name': global_user_name,
             'species': Markup(txtsp),
             'jpgname': jpgsp,
@@ -146,7 +150,7 @@ def get_task(path_to_file, path, undo=False):
     return render_template('AngieBK.html', data=data)
 
 
-def index(path_to_file, path, is_post, undo=False):
+def index(path_to_file, path, is_post, undo=False, justupdate=False):
     global global_user_name
     global global_limit_confidence
     global global_contrast
@@ -156,19 +160,13 @@ def index(path_to_file, path, is_post, undo=False):
         return get_task(path_to_file, path, undo)
 
     result = request.form
-    if result['user_name'] == '':
-        return '''
-      <html>
-      <body>Please enter annotator name
-      </body>
-      </html>
-      '''
     global_user_name = result['user_name']
     global_limit_confidence = result['limit_confidence']
     global_contrast = float(result['contrast'])
     global_loudness = float(result['loudness'])
     global_main = int(result['main']) - 1
-    store_task(path_to_file, result)
+    if not justupdate:
+        store_task(path_to_file, result)
     return index(path_to_file, path, False)
 
 
@@ -185,7 +183,9 @@ def handle_sound(path):
     if not exists(appropriate_file(path, request.args)):
         soft_create_folders(appropriate_file(path, request.args, folder_only=True))
         call_to_do = int(request.args['call'])
-        thr_x1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, 10)
+        overview = request.args['overview'] == 'True'
+        hwin = overview_hwin if overview else normal_hwin
+        thr_x1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, hwin)
         thr_x1 = thr_x1[:, int(request.args['channel'])]
         assert request.args['hash'] == hashof
         scipy.io.wavfile.write(appropriate_file(path, request.args),
@@ -200,7 +200,7 @@ def plotting(path, args, event):
     overview = args['overview'] == 'True'
     call_to_do = int(args['call'])
     contrast = float(args['contrast'])
-    hwin = 50 if overview else 10
+    hwin = overview_hwin if overview else normal_hwin
     thr_x1, fs, hashof = get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, hwin)
     thr_x1 = thr_x1[:, int(args['channel'])]
     assert args['hash'] == hashof
@@ -286,7 +286,7 @@ def static_cont(path):
     if path.startswith('back/'):
         return index(osfolder + path[5:-1], path[5:], request.method == 'POST', undo=True)
     if exists(osfolder + path[:-1] + '.pickle'):
-        return index(osfolder + path[:-1], path, request.method == 'POST')
+        return index(osfolder + path[:-1], path, request.method == 'POST', justupdate=('updatebutton' in request.form))
     if request.method == 'POST':
         result = request.form
         threshold = float(result['threshold_nb'])
