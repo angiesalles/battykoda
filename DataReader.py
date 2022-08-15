@@ -17,7 +17,7 @@ class DataReader:
             hashof = hashlib.md5(open(path_to_file, 'rb').read()).hexdigest()
             if path_to_file.endswith('.mat'):
                 datafile = h5py.File(path_to_file)
-                audiodata = np.array(datafile['ni_data']['mic_data'])
+                audiodata = np.array(datafile['sig']).T
                 fs = 250000
             else:
                 fs, audiodata = wavfile.read(path_to_file)

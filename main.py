@@ -14,7 +14,6 @@ import GetTask
 from AppropriateFile import appropriate_file
 import Workers
 import Hwin
-
 osfolder = '/Users/angelessalles/Documents/data/'
 computer = platform.uname()
 if computer.system == 'Windows':
