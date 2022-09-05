@@ -14,12 +14,13 @@ import GetTask
 from AppropriateFile import appropriate_file
 import Workers
 import Hwin
-osfolder = '/Users/angelessalles/Documents/data/'
+import htmlGenerator
+osfolder = '/'
 computer = platform.uname()
 if computer.system == 'Windows':
     osfolder = '.\\data\\'
 
-app = Flask(__name__, static_folder=osfolder + 'static')
+app = Flask(__name__, static_folder=osfolder + htmlGenerator.static_folder)
 global_user_setting = {'limit_confidence': '90',
                        'user_name': "",
                        'contrast': '4',
