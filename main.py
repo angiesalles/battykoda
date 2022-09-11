@@ -53,15 +53,16 @@ def mainpage():
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def handle_batty(path):
     global global_user_setting
+    user_setting = global_user_setting
     if os.path.isdir(osfolder + path):
         return FileList.file_list(osfolder, path)
     if request.method == 'POST':
-        global_user_setting = request.form.copy()
+        user_setting = request.form.copy()
         if 'submitbutton' in request.form:
             StoreTask.store_task(osfolder + path[:-1], request.form)
     return GetTask.get_task(path_to_file=osfolder + path[:-1],
                             path=path,
-                            user_setting=global_user_setting,
+                            user_setting=user_setting,
                             osfolder=osfolder,
                             undo=('undobutton' in request.form))
 
