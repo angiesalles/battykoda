@@ -69,8 +69,7 @@
 </div>
 
 <div class="container" style="position: absolute; top: 150px; left: 850px; width:500px;height:450px; background-color:Black" align="center">
-<p style="color:white; font-family:Helvetica"><i>Spectrogram</i> template</p>
-<img src="{{data.jpgname}}" alt="template" width="500" height="450" alight="left">
+<p><img id="image" src="{{data.spectrogram_large}}" /></p>
 </div>
 
 
@@ -88,8 +87,9 @@
             Your browser does not support the
             <code>audio</code> element.
     </audio></p>
+<p style="color:white; font-family:Helvetica"><i>Spectrogram</i> template</p>
+<img src="{{data.jpgname}}" alt="template" width="500" height="450" alight="left">
 
-<p><img id="image" src="{{data.spectrogram_large}}" /></p>
 <p><audio
         controls
         src="{{ data.long_audiolink }}" preload="none">

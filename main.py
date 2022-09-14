@@ -41,7 +41,6 @@ def mainfunction():
     threading.Thread(target=Workers.worker2,
                      args=(global_work_queue, ),
                      daemon=True).start()
-    print(app.url_map)
     app.run(host='0.0.0.0', debug=False, port=8060)
 
 

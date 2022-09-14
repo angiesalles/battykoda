@@ -16,6 +16,9 @@ def file_list(osfolder, path):
             continue
         if path.count('/') == 2 and item not in htmlGenerator.available_species(osfolder):
             continue
-        collect_files += '<li><a href="' + item + '/">' + item + '</a></li>'
+        if os.path.isdir('/' + path + item) or os.path.isfile('/' + path + item+'.pickle'):
+            collect_files += '<li><a href="' + item + '/">' + item + '</a></li>'
+        else:
+            collect_files += '<li>' + item + '</li>'
 
     return render_template('listBK.html', data={'listicle': Markup(collect_files)})
