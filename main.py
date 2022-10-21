@@ -15,6 +15,7 @@ from AppropriateFile import appropriate_file
 import Workers
 import Hwin
 import htmlGenerator
+import GetListing
 osfolder = '/'
 computer = platform.uname()
 if computer.system == 'Windows':
@@ -55,6 +56,8 @@ def handle_batty(path):
     user_setting = global_user_setting
     if os.path.isdir(osfolder + path):
         return FileList.file_list(osfolder, path)
+    if path.endswith('review.html'):
+        return GetListing.get_listing(path, osfolder, path)
     if request.method == 'POST':
         user_setting = request.form.copy()
         if 'submitbutton' in request.form:
