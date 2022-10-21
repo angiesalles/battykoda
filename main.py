@@ -87,6 +87,7 @@ def handle_image(path):
 
 @app.route('/audio/<path:path>')
 def handle_sound(path):
+    slowdown = 5
     if not exists(appropriate_file(path, request.args, osfolder)):
         SoftCreateFolders.soft_create_folders(appropriate_file(path, request.args, osfolder, folder_only=True))
         call_to_do = int(request.args['call'])
@@ -96,8 +97,8 @@ def handle_sound(path):
         thr_x1 = thr_x1[:, int(request.args['channel'])]
         assert request.args['hash'] == hashof
         scipy.io.wavfile.write(appropriate_file(path, request.args, osfolder),
-                               fs // 10,
-                               thr_x1.astype('float32').repeat(10) * float(request.args['loudness']))
+                               fs // slowdown,
+                               thr_x1.astype('float32').repeat(slowdown) * float(request.args['loudness']))
 
     return send_file(appropriate_file(path, request.args, osfolder))
 
