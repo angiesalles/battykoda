@@ -16,6 +16,9 @@ import Workers
 import Hwin
 import htmlGenerator
 import GetListing
+from datetime import datetime
+import pickle
+
 osfolder = '/'
 computer = platform.uname()
 if computer.system == 'Windows':
@@ -57,7 +60,13 @@ def handle_batty(path):
     if os.path.isdir(osfolder + path):
         return FileList.file_list(osfolder, path)
     if path.endswith('review.html'):
-        return GetListing.get_listing(path, osfolder, path)
+        if request.method == 'POST':
+            now = datetime.now()
+            with open('review_' + path.replace('/','_') + str(now).replace(':','_') + '.pickle', 'wb') as fo:
+                pickle.dump(request.form, fo)
+        return GetListing.get_listing(path_to_file=osfolder + path,
+                                      osfolder = osfolder,
+                                      path = path)
     if request.method == 'POST':
         user_setting = request.form.copy()
         if 'submitbutton' in request.form:
