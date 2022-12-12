@@ -18,7 +18,7 @@ import htmlGenerator
 import GetListing
 from datetime import datetime
 import pickle
-
+import csv
 osfolder = '/'
 computer = platform.uname()
 if computer.system == 'Windows':
@@ -61,12 +61,30 @@ def handle_batty(path):
         return FileList.file_list(osfolder, path)
     if path.endswith('review.html'):
         if request.method == 'POST':
-            now = datetime.now()
-            with open('review_' + path.replace('/','_') + str(now).replace(':','_') + '.pickle', 'wb') as fo:
-                pickle.dump(request.form, fo)
+            path_to_file = osfolder + '/'.join(path.split('/')[:-1])
+            with open(path_to_file + '.pickle', 'rb') as pfile:
+                segment_data = pickle.load(pfile)
+            type_c = path.split('/')[-1][:-12]
+            counter = 0
+            for idx in range(len(segment_data['labels'])):
+                if segment_data['labels'][idx]['type_call'] == type_c:
+                    if 'call_' + str(counter) in request.form:
+                        segment_data['labels'][idx] = dict(segment_data['labels'][idx])
+                        segment_data['labels'][idx]['type_call'] = 'Unclear'
+                    counter += 1
+            with open(path_to_file + '.pickle', 'wb') as pfile:
+                pickle.dump(segment_data, pfile)
+            data_pre = segment_data
+            data = []
+            for idx in range(len(data_pre['onsets'])):
+                data.append(
+                    [data_pre['onsets'][idx], data_pre['offsets'][idx], data_pre['labels'][idx]['type_call']])
+            with open(path_to_file + '.csv', 'w') as f:
+                writer = csv.writer(f)
+                writer.writerows(data)
         return GetListing.get_listing(path_to_file=osfolder + path,
-                                      osfolder = osfolder,
-                                      path = path)
+                                      osfolder=osfolder,
+                                      path=path)
     if request.method == 'POST':
         user_setting = request.form.copy()
         if 'submitbutton' in request.form:

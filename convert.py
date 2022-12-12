@@ -1,6 +1,5 @@
 import pickle
 import pandas
-import os
 import numpy as np
 import math
 from collections import defaultdict

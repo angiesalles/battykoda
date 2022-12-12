@@ -8,7 +8,7 @@ def file_list(osfolder, path):
     list_of_files.sort()
     collect_files = ''
     for item in list_of_files:
-        if item.endswith('.pickle'):
+        if '.git' in item:
             continue
         if path == 'home/' and item.endswith('lost+found'):
             continue
