@@ -7,8 +7,11 @@ def store_task(path_to_file, result):
     segment_data['labels'].append(result)
     with open(path_to_file+'.pickle', 'wb') as pfile:
         pickle.dump(segment_data, pfile)
+
     data = []
     data_pre = segment_data
+    if len(data_pre['onsets']) > len(data_pre['labels']):
+        return
     for idx in range(len(data_pre['onsets'])):
         data.append([data_pre['onsets'][idx], data_pre['offsets'][idx], data_pre['labels'][idx]['type_call']])
     with open(path_to_file + '.csv', 'w') as f:
