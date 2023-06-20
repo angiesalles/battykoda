@@ -69,7 +69,7 @@ def handle_batty(path):
                 if segment_data['labels'][idx]['type_call'] == type_c:
                     if 'call_' + str(idx) in request.form:
                         segment_data['labels'][idx] = dict(segment_data['labels'][idx])
-                        segment_data['labels'][idx]['type_call'] = 'Unclear'
+                        segment_data['labels'][idx]['type_call'] = 'Unsure'
             with open(path_to_file + '.pickle', 'wb') as pfile:
                 pickle.dump(segment_data, pfile)
             data_pre = segment_data
