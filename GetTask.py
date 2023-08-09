@@ -8,6 +8,8 @@ import random
 import numpy as np
 import subprocess
 
+R = False
+
 def get_task(path_to_file, path, user_setting, osfolder, undo=False):
     with open(path_to_file + '.pickle', 'rb') as pfile:
         segment_data = pickle.load(pfile)
@@ -19,16 +21,19 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
             pickle.dump(segment_data, pfile)
         confidence = -1
     else:
-        returnvalue = subprocess.run("/usr/bin/Rscript --vanilla Forwardpass.R "
-                                      + osfolder
-                                      + os.sep.join(path.split('/')[:-1])
-                                      + ' '
-                                      + str(segment_data['onsets'][call_to_do])
-                                      + ' '
-                                      + str(segment_data['offsets'][call_to_do]), shell=True,  capture_output=True)
-        assumed_answer = returnvalue.stdout.splitlines()[-3][4:].decode()
-        confidence = float(returnvalue.stdout.splitlines()[-1][4:])
-
+        if R:
+            returnvalue = subprocess.run("/usr/bin/Rscript --vanilla Forwardpass.R "
+                                          + osfolder
+                                          + os.sep.join(path.split('/')[:-1])
+                                          + ' '
+                                          + str(segment_data['onsets'][call_to_do])
+                                          + ' '
+                                          + str(segment_data['offsets'][call_to_do]), shell=True,  capture_output=True)
+            assumed_answer = returnvalue.stdout.splitlines()[-3][4:].decode()
+            confidence = float(returnvalue.stdout.splitlines()[-1][4:])
+        else:
+            assumed_answer = 'Echo'
+            confidence = 50.0
     if call_to_do == len(segment_data['offsets']):
         return render_template('endFile.html',
                                data={'filedirectory': '/battykoda/' + '/'.join(path.split('/')[:-2]) + '/'})
