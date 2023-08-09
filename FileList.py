@@ -18,7 +18,7 @@ def file_list(osfolder, path):
             continue
         if path.count('/') > 2 and path.split('/')[2] not in htmlGenerator.available_species(osfolder):
             continue
-        if os.path.isdir('/' + path + item) or os.path.isfile('/' + path + item+'.pickle'):
+        if os.path.isdir(osfolder + path + item) or os.path.isfile(osfolder + path + item+'.pickle'):
             collect_files += '<li><a href="' + item + '/">' + item + '</a></li>'
         else:
             collect_files += '<li>' + item + '</li>'

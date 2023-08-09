@@ -1,6 +1,6 @@
 import os
 
-static_folder = '/home/data/battykoda/static/'
+static_folder = 'home/data/battykoda/static/'
 
 
 def available_species(osfolder):
