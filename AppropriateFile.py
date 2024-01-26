@@ -3,7 +3,7 @@ import re
 
 
 def appropriate_file(path, args, osfolder, folder_only=False):
-    folder = osfolder + 'tempdata/' + '/'.join(path.split('/')[:-1])
+    folder = osfolder + '/home/data/battykoda/tempdata/' + '/'.join(path.split('/')[:-1])
 
     if folder_only:
         return folder

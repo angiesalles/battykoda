@@ -6,18 +6,34 @@ import os
 import urllib.parse
 import random
 import numpy as np
+import subprocess
 
+R = False
 
 def get_task(path_to_file, path, user_setting, osfolder, undo=False):
     with open(path_to_file + '.pickle', 'rb') as pfile:
         segment_data = pickle.load(pfile)
-    assumed_answer = 'Echo'
+    call_to_do = len(segment_data['labels'])
     if undo:
         popped = segment_data['labels'].pop()
         assumed_answer = popped['type_call']
         with open(path_to_file + '.pickle', 'wb') as pfile:
             pickle.dump(segment_data, pfile)
-    call_to_do = len(segment_data['labels'])
+        confidence = -1
+    else:
+        if R:
+            returnvalue = subprocess.run("/usr/bin/Rscript --vanilla Forwardpass.R "
+                                          + osfolder
+                                          + os.sep.join(path.split('/')[:-1])
+                                          + ' '
+                                          + str(segment_data['onsets'][call_to_do])
+                                          + ' '
+                                          + str(segment_data['offsets'][call_to_do]), shell=True,  capture_output=True)
+            assumed_answer = returnvalue.stdout.splitlines()[-3][4:].decode()
+            confidence = float(returnvalue.stdout.splitlines()[-1][4:])
+        else:
+            assumed_answer = 'Echo'
+            confidence = 50.0
     if call_to_do == len(segment_data['offsets']):
         return render_template('endFile.html',
                                data={'filedirectory': '/battykoda/' + '/'.join(path.split('/')[:-2]) + '/'})
@@ -50,7 +66,7 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
                   '</p>' for other in others]
     data = {'spectrogram': spectr_particle_fun(idx_main, _overview=False),
             'spectrogram_large': spectr_particle_fun(idx_main, _overview=True),
-            'confidence': random.randint(0, 100),  # this is bongo code
+            'confidence': confidence,
             'currentcall': call_to_do,
             'totalcalls': len(segment_data['offsets']),
             'backlink': backfragment,

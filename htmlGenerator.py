@@ -1,9 +1,21 @@
+import os
+
+static_folder = 'home/data/battykoda/static/'
+
+
+def available_species(osfolder):
+   prelist = os.listdir(osfolder + static_folder)
+   finallist = []
+   for item in prelist:
+      if item.endswith('.txt'):
+         finallist.append(item[:-4])
+   return finallist
 def spgather(wholepath,osfolder, assumed_answer):
    species=wholepath.split('/')[2]
    jpgname='/static/'+species+'.jpg'
 
-   f=open(osfolder+'static/'+species+'.txt')
-   lines=f.readlines()
+   f = open(osfolder + static_folder + species + '.txt')
+   lines = f.readlines()
    f.close()
    collectstrings=''
    for idx in range(len(lines)):

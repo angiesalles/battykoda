@@ -4,3 +4,5 @@ env/*
 *.pyc
 /data/*
 /tempdata/*
+*.pickle
+for_gabby/*

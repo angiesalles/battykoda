@@ -1,4 +1,5 @@
 import os
+import htmlGenerator
 from flask import render_template, Markup
 
 
@@ -7,8 +8,19 @@ def file_list(osfolder, path):
     list_of_files.sort()
     collect_files = ''
     for item in list_of_files:
-        if item.endswith('.pickle') or item.endswith('DS_Store'):
+        if '.git' in item:
             continue
-        collect_files += '<li><a href="' + item + '/">' + item + '</a></li>'
+        if path == 'home/' and item.endswith('lost+found'):
+            continue
+        if path == 'home/' and item.endswith('data'):
+            continue
+        if path.count('/') == 2 and item not in htmlGenerator.available_species(osfolder):
+            continue
+        if path.count('/') > 2 and path.split('/')[2] not in htmlGenerator.available_species(osfolder):
+            continue
+        if os.path.isdir(osfolder + path + item) or os.path.isfile(osfolder + path + item+'.pickle'):
+            collect_files += '<li><a href="' + item + '/">' + item + '</a></li>'
+        else:
+            collect_files += '<li>' + item + '</li>'
 
     return render_template('listBK.html', data={'listicle': Markup(collect_files)})

@@ -14,12 +14,17 @@ import GetTask
 from AppropriateFile import appropriate_file
 import Workers
 import Hwin
-osfolder = '/Users/angelessalles/Documents/data/'
+import htmlGenerator
+import GetListing
+from datetime import datetime
+import pickle
+import csv
+osfolder = '/'
 computer = platform.uname()
 if computer.system == 'Windows':
     osfolder = '.\\data\\'
 
-app = Flask(__name__, static_folder=osfolder + 'static')
+app = Flask(__name__, static_folder=osfolder + htmlGenerator.static_folder)
 global_user_setting = {'limit_confidence': '90',
                        'user_name': "",
                        'contrast': '4',
@@ -40,7 +45,6 @@ def mainfunction():
     threading.Thread(target=Workers.worker2,
                      args=(global_work_queue, ),
                      daemon=True).start()
-    print(app.url_map)
     app.run(host='0.0.0.0', debug=False, port=8060)
 
 
@@ -52,15 +56,40 @@ def mainpage():
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def handle_batty(path):
     global global_user_setting
+    user_setting = global_user_setting
     if os.path.isdir(osfolder + path):
         return FileList.file_list(osfolder, path)
+    if path.endswith('review.html'):
+        if request.method == 'POST':
+            path_to_file = osfolder + '/'.join(path.split('/')[:-1])
+            with open(path_to_file + '.pickle', 'rb') as pfile:
+                segment_data = pickle.load(pfile)
+            type_c = path.split('/')[-1][:-12]
+            for idx in range(len(segment_data['labels'])):
+                if segment_data['labels'][idx]['type_call'] == type_c:
+                    if 'call_' + str(idx) in request.form:
+                        segment_data['labels'][idx] = dict(segment_data['labels'][idx])
+                        segment_data['labels'][idx]['type_call'] = 'Unsure'
+            with open(path_to_file + '.pickle', 'wb') as pfile:
+                pickle.dump(segment_data, pfile)
+            data_pre = segment_data
+            data = []
+            for idx in range(len(data_pre['onsets'])):
+                data.append(
+                    [data_pre['onsets'][idx], data_pre['offsets'][idx], data_pre['labels'][idx]['type_call']])
+            with open(path_to_file + '.csv', 'w') as f:
+                writer = csv.writer(f)
+                writer.writerows(data)
+        return GetListing.get_listing(path_to_file=osfolder + path,
+                                      osfolder=osfolder,
+                                      path=path)
     if request.method == 'POST':
-        global_user_setting = request.form.copy()
+        user_setting = request.form.copy()
         if 'submitbutton' in request.form:
             StoreTask.store_task(osfolder + path[:-1], request.form)
     return GetTask.get_task(path_to_file=osfolder + path[:-1],
                             path=path,
-                            user_setting=global_user_setting,
+                            user_setting=user_setting,
                             osfolder=osfolder,
                             undo=('undobutton' in request.form))
 
@@ -83,6 +112,7 @@ def handle_image(path):
 
 @app.route('/audio/<path:path>')
 def handle_sound(path):
+    slowdown = 5
     if not exists(appropriate_file(path, request.args, osfolder)):
         SoftCreateFolders.soft_create_folders(appropriate_file(path, request.args, osfolder, folder_only=True))
         call_to_do = int(request.args['call'])
@@ -92,8 +122,8 @@ def handle_sound(path):
         thr_x1 = thr_x1[:, int(request.args['channel'])]
         assert request.args['hash'] == hashof
         scipy.io.wavfile.write(appropriate_file(path, request.args, osfolder),
-                               fs // 10,
-                               thr_x1.astype('float32').repeat(10) * float(request.args['loudness']))
+                               fs // slowdown,
+                               thr_x1.astype('float32').repeat(slowdown) * float(request.args['loudness']))
 
     return send_file(appropriate_file(path, request.args, osfolder))
 

@@ -46,7 +46,7 @@
 </div>
 </div>
 <div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:Black" align="center">
- <input id='submitbutton' type="submit" name='submitbutton' value="Next Call">
+ <input id='submitbutton_{{data.currentcall}}' type="submit_{{data.currentcall}}" name='submitbutton_{{data.currentcall}}' value="Next Call">
    <input id='updatebutton' type="submit" name="updatebutton" value="Update">
     <input id='undobutton' type="submit" name="undobutton" value="Undo">
 
@@ -69,8 +69,7 @@
 </div>
 
 <div class="container" style="position: absolute; top: 150px; left: 850px; width:500px;height:450px; background-color:Black" align="center">
-<p style="color:white; font-family:Helvetica"><i>Spectrogram</i> template</p>
-<img src="{{data.jpgname}}" alt="template" width="500" height="450" alight="left">
+<p><img id="image" src="{{data.spectrogram_large}}" /></p>
 </div>
 
 
@@ -88,8 +87,9 @@
             Your browser does not support the
             <code>audio</code> element.
     </audio></p>
+<p style="color:white; font-family:Helvetica"><i>Spectrogram</i> template</p>
+<img src="{{data.jpgname}}" alt="template" width="500" height="450" alight="left">
 
-<p><img id="image" src="{{data.spectrogram_large}}" /></p>
 <p><audio
         controls
         src="{{ data.long_audiolink }}" preload="none">
