@@ -63,4 +63,4 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
             'max_main': thr_x1.shape[1],
             'others': Markup(''.join(other_html)),
             }
-    return render_template('AngieBK.html', data=user_setting | data)
+    return render_template('AngieBK.html', data={**user_setting, **data})
