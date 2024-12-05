@@ -3,8 +3,8 @@ import urllib
 import GetAudioBit
 import os
 from flask import render_template, Markup
-
-
+import numpy as np
+import numpy
 def get_listing(path_to_file, osfolder, path):
     with open(os.sep + os.sep.join(path_to_file.split('/')[:-1]) + '.pickle', 'rb') as pfile:
         segment_data = pickle.load(pfile)

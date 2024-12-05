@@ -19,7 +19,7 @@ def spgather(wholepath,osfolder, assumed_answer):
    f.close()
    collectstrings=''
    for idx in range(len(lines)):
-      namecall= lines[idx].split(',')[0]
+      namecall= lines[idx].split(',')[0].strip()
       particle = ''
       if namecall == assumed_answer:
          particle = "checked='checked'"

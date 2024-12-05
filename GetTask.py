@@ -6,12 +6,12 @@ import os
 import urllib.parse
 import random
 import numpy as np
-
+import numpy
 
 def get_task(path_to_file, path, user_setting, osfolder, undo=False):
     with open(path_to_file + '.pickle', 'rb') as pfile:
         segment_data = pickle.load(pfile)
-    assumed_answer = 'Echo'
+    assumed_answer = 'aggressive warbles'
     if undo:
         popped = segment_data['labels'].pop()
         assumed_answer = popped['type_call']

@@ -11,7 +11,7 @@ library(warbleR)
 library(stringr)
 
 ### Setting directory to where sound files are located
-setwd("Z:\\battykoda\\for_gabby")
+setwd("/home/angie/battykoda/for_gabby")
 
 ### Import .wav file paths and create input table (wavtable) for WarbleR
 
@@ -57,13 +57,17 @@ library(mlr3)
 library(mlr3learners)
 library(kknn)
 library(mlr3tuning)
-
+library(digest)
 
 ###### Training the K-Nearest-Neighbor Classification Model in mlr3 ######
 
 # Feature Scaling
 
-ftable[2:27] = scale(ftable[2:27])
+#ftable[3:28] = scale(ftable[3:28])
+ftable = ftable[-1]
+levels <- unique(ftable$selec)
+ftable$selec=factor(ftable$selec, levels)
+
 
 # Create task 
 
@@ -102,4 +106,5 @@ typepredprob = max(predict(kknn_model, newdata = input, "prob"))
 typepred ### type predicted, to be exported back to battykoda
 typepredprob ### probability of type predicted, to be exported back to battykoda
 
+save(kknn_model,levels,file='../mymodel.RData')
 
