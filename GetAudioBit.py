@@ -8,4 +8,6 @@ def get_audio_bit(path_to_file, call_to_do, hwin):
     offset = int(segment_data['offsets'][call_to_do] * fs)
 
     thr_x1 = audiodata[max(0, onset - (fs * hwin // 1000)):min(offset + (fs * hwin // 1000), len(audiodata)), :]
+    if (offset-onset)*1.0/fs > 1.0 or offset <= onset:
+        fs = -fs
     return thr_x1, fs, hashof

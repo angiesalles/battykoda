@@ -18,6 +18,8 @@ def plotting(path, args, event, osfolder):
     call_to_do = int(args['call'])
     contrast = float(args['contrast'])
     thr_x1, fs, hashof = GetAudioBit.get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, hwin)
+    errorc = fs<0
+    fs = np.abs(fs)
     thr_x1 = thr_x1[:, int(args['channel'])]
     assert args['hash'] == hashof
     f, t, sxx = scipy.signal.spectrogram(thr_x1, fs, nperseg=2 ** 8, noverlap=254, nfft=2 ** 8)
@@ -32,8 +34,12 @@ def plotting(path, args, event, osfolder):
     ax.tick_params(axis='y', colors='white')
     ax.xaxis.label.set_color('white')
     ax.yaxis.label.set_color('white')
-    plt.ylabel('Frequency [Hz]')
-    plt.xlabel('Time [sec]')
+    if errorc:
+        plt.ylabel('kevinerror')
+        plt.xlabel('kevinerror')
+    else:
+        plt.ylabel('Frequency [Hz]')
+        plt.xlabel('Time [sec]')
     SoftCreateFolders.soft_create_folders(appropriate_file(path, args, osfolder, folder_only=True))
     plt.savefig(appropriate_file(path, args, osfolder))
     plt.close()
