@@ -19,6 +19,8 @@ import GetListing
 from datetime import datetime
 import pickle
 import csv
+import traceback
+
 osfolder = '/'
 computer = platform.uname()
 if computer.system == 'Windows':
@@ -34,6 +36,28 @@ global_user_setting = {'limit_confidence': '90',
 global_request_queue = queue.PriorityQueue()
 global_work_queue = queue.PriorityQueue()
 
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Create a timestamped filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    crash_file = f"crash_state_{timestamp}.pkl"
+
+    # Serialize relevant state to the file
+    state = {
+        "timestamp": timestamp,
+        "exception": str(e),
+        "stack_trace": traceback.format_exc(),
+        "env": dict(os.environ),  # Current environment variables
+        "request_data": request.get_json() if request.is_json else request.data.decode(),
+    }
+    with open(crash_file, "wb") as f:
+        pickle.dump(state, f)
+
+    # Log to console or any other logging mechanism
+    print(f"Crash data saved to {crash_file}")
+
+    return f"An error occurred. State has been saved to {crash_file}.", 500
 
 
 def mainfunction():
