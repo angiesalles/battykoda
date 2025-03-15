@@ -1,14 +1,9 @@
-run = "bash -c 'python3 init_db.py && python3 main.py'"
-entrypoint = "main.py"
+run = ["python3", "main.py"]
+language = "python3"
 
-# Specifies Python version
+# Add auto-install for packages
+entrypoint = "main.py"
+onBoot = ["pip install -r requirements.txt", "python3 init_db.py"]
+
 [env]
 PYTHON_VERSION = "3.10"
-
-# Configures the language server for code intelligence
-[language_server]
-start = "pylsp"
-
-# Configure the nix environment
-[nix]
-channel = "stable-22_11"
