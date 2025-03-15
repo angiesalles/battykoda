@@ -1,9 +1,2 @@
-run = "bash -c 'python ensure_db.py && python check_r_setup.py && python main.py'"
+run = "python setup.py"
 language = "python3"
-entrypoint = "main.py"
-onBoot = ["pip install -r requirements.txt"]
-
-[env]
-PYTHON_VERSION = "3.12"
-FLASK_DEBUG = "1"
-R_LIBS_USER = ".r_libs"
