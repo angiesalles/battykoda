@@ -137,17 +137,50 @@ global_work_queue = queue.PriorityQueue()
 
 def initialize_app():
     """Initialize the app by starting worker threads and creating necessary directories"""
-    # Verify database exists and is correctly initialized
+    # Check if database file exists
+    db_path = os.path.join(os.getcwd(), 'battycoda.db')
+    
+    # Special case for Replit - ensure parent directories exist
+    if os.environ.get('REPL_SLUG') or os.environ.get('REPL_ID'):
+        logger.info("Running in Replit environment, ensuring directories exist...")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
+    # If database doesn't exist, create it automatically
+    if not os.path.exists(db_path):
+        logger.info("Database file doesn't exist. Creating database from scratch...")
+        try:
+            import create_db
+            create_db.create_database()
+            logger.info("Initial database creation successful")
+        except Exception as e:
+            logger.error(f"Failed to create initial database: {str(e)}")
+    
+    # Try to verify the database
     try:
-        # Perform a quick database check within the app context
+        # Check database with the main app context
         with app.app_context():
-            # Try a simple query to verify database connection
             user_count = User.query.count()
             logger.info(f"Database check: Users table exists with {user_count} users")
     except Exception as e:
-        logger.error(f"Database check failed: {str(e)}")
-        logger.error("This might indicate the database wasn't properly initialized. Try running ensure_db.py first.")
-        # We'll continue anyway since ensure_db.py should have been run before main.py
+        logger.error(f"Database verification failed after initialization: {str(e)}")
+        
+        # Last resort: recreate the database
+        try:
+            logger.warning("Recreating database as last resort...")
+            if os.path.exists(db_path):
+                os.remove(db_path)
+                logger.info("Removed invalid database file")
+            
+            import create_db
+            create_db.create_database()
+            logger.info("Last-resort database creation completed")
+            
+            # Re-initialize the app with the database
+            with app.app_context():
+                db.create_all()
+        except Exception as final_error:
+            logger.error(f"Final database creation failed: {str(final_error)}")
+            logger.error("Unable to initialize database automatically. The application will likely fail.")
     
     # Create necessary directories if they don't exist
     os.makedirs('data/home', exist_ok=True)

@@ -52,15 +52,25 @@ def setup_environment():
     logger.info("Setting up environment variables...")
     
     # Set environment variables
-    os.environ['FLASK_DEBUG'] = '1'
-    os.environ['PYTHON_VERSION'] = '3.12'
-    os.environ['R_LIBS_USER'] = '.r_libs'
+    os.environ['FLASK_DEBUG'] = os.environ.get('FLASK_DEBUG', '1') 
+    os.environ['PYTHON_VERSION'] = os.environ.get('PYTHON_VERSION', '3.12')
+    
+    # Special setup for R libraries in Replit
+    if os.environ.get('REPL_SLUG') or os.environ.get('REPL_ID'):
+        logger.info("Running in Replit environment")
+        # Set R library path in the current directory for Replit
+        os.environ['R_LIBS_USER'] = os.path.join(os.getcwd(), '.r_libs')
+    else:
+        # For local development, use user's home directory
+        os.environ['R_LIBS_USER'] = os.path.expanduser('~/.r_libs')
     
     # Create R_LIBS_USER directory
-    r_libs_dir = os.environ.get('R_LIBS_USER', '.r_libs')
+    r_libs_dir = os.environ.get('R_LIBS_USER')
+    logger.info(f"Creating R libraries directory at: {r_libs_dir}")
     os.makedirs(r_libs_dir, exist_ok=True)
     
-    # Create required directories
+    # Create other required directories
+    logger.info("Creating required application directories")
     os.makedirs('data/home', exist_ok=True)
     os.makedirs('static/tempdata', exist_ok=True)
     
@@ -180,13 +190,43 @@ def setup_r_environment():
         
         if r_check.returncode == 0:
             logger.info("R is installed, setting up R environment...")
-            return run_command(
-                ['python', 'check_r_setup.py'],
-                'R setup',
-                check=False  # Don't fail if R setup fails
-            )
+            
+            # Check if we're on Replit
+            if os.environ.get('REPL_SLUG') or os.environ.get('REPL_ID'):
+                logger.info("Running R setup for Replit environment...")
+                
+                # First run the R package installation script
+                run_command(
+                    ['Rscript', 'install_r_packages.R'],
+                    'Install R packages',
+                    check=False
+                )
+                
+                # Then run the setup script for warbler
+                run_command(
+                    ['Rscript', 'setup_warbler.R'],
+                    'Setup warbleR package',
+                    check=False
+                )
+                
+                # Check if model file exists
+                if not os.path.exists('static/mymodel.RData'):
+                    logger.warning("Model file not found at static/mymodel.RData")
+                    logger.warning("Bat call classification may not work correctly")
+                else:
+                    logger.info("Model file found at static/mymodel.RData")
+                
+                return True
+            else:
+                # Use the check_r_setup.py script for non-Replit environments
+                return run_command(
+                    ['python', 'check_r_setup.py'],
+                    'R setup',
+                    check=False  # Don't fail if R setup fails
+                )
         else:
             logger.warning("R is not installed, skipping R setup")
+            logger.warning("Bat call classification will not work without R")
             return True  # Continue anyway
     except Exception as e:
         logger.warning(f"Error checking for R: {str(e)}")
