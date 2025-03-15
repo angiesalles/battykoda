@@ -133,23 +133,6 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
                     logger.error(f"R script failed with code {returnvalue.returncode}: {returnvalue.stderr}")
                     assumed_answer = 'Echo'
                     confidence = 50.0
-                    
-                    # Fall back to confidence calculator if R fails
-                    try:
-                        import ConfidenceCalculator
-                        path_parts = path.strip('/').split('/')
-                        species = path_parts[2] if len(path_parts) > 2 else "Efuscus"
-                        logger.info(f"Falling back to Python ConfidenceCalculator for species: {species}")
-                        confidence = ConfidenceCalculator.get_confidence(
-                            species, 
-                            assumed_answer, 
-                            osfolder + os.sep.join(path.split('/')[:-1]), 
-                            call_to_do
-                        )
-                        logger.info(f"ConfidenceCalculator returned: {confidence}")
-                    except Exception as calc_err:
-                        logger.error(f"ConfidenceCalculator error: {str(calc_err)}")
-                        confidence = 50.0
                 else:
                     # Parse output from R - the new classify_call.R script outputs in a standardized format
                     stdout_lines = returnvalue.stdout.splitlines()
