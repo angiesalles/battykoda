@@ -75,12 +75,97 @@ def install_python_requirements():
     )
 
 def initialize_database():
-    """Initialize the database"""
-    logger.info("Initializing database...")
-    return run_command(
-        ['python', 'ensure_db.py'],
-        'Database initialization'
-    )
+    """Initialize the database directly"""
+    logger.info("Initializing database directly...")
+    
+    # First, check if database file exists, if so, delete it to start fresh
+    db_path = os.path.join(os.getcwd(), 'battycoda.db')
+    logger.info(f"Using database at path: {db_path}")
+    
+    if os.path.exists(db_path):
+        logger.info(f"Removing existing database at {db_path}")
+        try:
+            os.remove(db_path)
+            logger.info("Removed old database file")
+        except Exception as e:
+            logger.error(f"Error removing database: {str(e)}")
+    
+    # Import necessary modules
+    try:
+        logger.info("Importing database modules...")
+        from flask import Flask
+        from database import db, User
+        from werkzeug.security import generate_password_hash
+        import sqlite3
+        
+        # Create a Flask app
+        app = Flask(__name__)
+        
+        # Configure the app
+        app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'battycoda-secret-key-development')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+        
+        # Initialize the database with the app
+        db.init_app(app)
+        
+        # Create all tables
+        with app.app_context():
+            logger.info("Creating database tables...")
+            db.create_all()
+            
+            # Verify tables
+            try:
+                count = User.query.count()
+                logger.info(f"Users table exists with {count} users")
+            except Exception as e:
+                logger.error(f"Error verifying users table: {str(e)}")
+                raise
+            
+            # Create admin user
+            logger.info("Creating admin user...")
+            admin = User(
+                username='admin',
+                email='admin@example.com',
+                password_hash=generate_password_hash('admin123'),
+                is_admin=True
+            )
+            db.session.add(admin)
+            
+            # Create demo user
+            logger.info("Creating demo user...")
+            demo = User(
+                username='demo',
+                email='demo@example.com',
+                password_hash=generate_password_hash('demo123'),
+                is_admin=True
+            )
+            db.session.add(demo)
+            
+            # Commit changes
+            try:
+                db.session.commit()
+                logger.info("Users created successfully")
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Error creating users: {str(e)}")
+                raise
+            
+            # Verify again
+            count = User.query.count()
+            logger.info(f"Database now has {count} users")
+        
+        logger.info("Database initialization completed successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        # Fall back to using ensure_db.py
+        logger.info("Trying ensure_db.py as fallback...")
+        return run_command(
+            ['python', 'ensure_db.py'],
+            'Database initialization (fallback)'
+        )
 
 def setup_r_environment():
     """Set up R environment if R is available"""
