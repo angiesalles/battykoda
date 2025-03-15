@@ -1,5 +1,5 @@
 { pkgs }: {
   deps = [
-    pkgs.python310
+    pkgs.python312
   ];
 }
