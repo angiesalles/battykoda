@@ -19,12 +19,20 @@ import GetListing
 from datetime import datetime
 import pickle
 import csv
-osfolder = '/'
-computer = platform.uname()
-if computer.system == 'Windows':
-    osfolder = '.\\data\\'
 
-app = Flask(__name__, static_folder=osfolder + htmlGenerator.static_folder)
+# Set appropriate OS folder and system-specific paths
+computer_system = platform.system()
+if computer_system == 'Windows':
+    osfolder = '.\\data\\'
+    home_path = 'home'  # Will be used for virtual path structure
+elif computer_system == 'Darwin':  # macOS
+    osfolder = '/'
+    home_path = 'Users'  # Use Users directory on macOS
+else:  # Linux or other Unix-like systems
+    osfolder = '/'
+    home_path = 'home'
+
+app = Flask(__name__, static_folder='static')
 global_user_setting = {'limit_confidence': '90',
                        'user_name': "",
                        'contrast': '4',
@@ -50,18 +58,72 @@ def mainfunction():
 
 @app.route('/')
 def mainpage():
-    return render_template('welcometoBK.html', data=dict())
+    # Get available species and generate links
+    available_species = htmlGenerator.available_species()
+    species_links = ""
+    
+    # Add a section for user directories
+    species_links += '<li><b>User Directories:</b></li>'
+    
+    # Get current username from the system
+    import getpass
+    import os
+    current_user = getpass.getuser()
+    
+    # Add a link to the current user's directory
+    species_links += f'<li><a href="/battykoda/home/{current_user}/"><strong>Your Directory</strong> ({current_user})</a></li>'
+    
+    # Get all user directories from the system
+    try:
+        if platform.system() == "Darwin":  # macOS
+            user_dir = "/Users"
+            users = os.listdir(user_dir)
+            # Filter out system directories
+            users = [u for u in users if not u.startswith('.') and u != 'Shared' and u != current_user]
+            users.sort()
+            
+            # Add other user directories
+            if users:
+                for user in users:
+                    if os.path.isdir(os.path.join(user_dir, user)):
+                        species_links += f'<li><a href="/battykoda/home/{user}/">{user}</a></li>'
+    except (FileNotFoundError, PermissionError):
+        pass
+    
+    # Add available species templates section
+    if available_species:
+        species_links += '<li><b>Available Species Templates:</b></li>'
+        for species in available_species:
+            species_links += f'<li><a href="/battykoda/home/{current_user}/{species}/">{species}</a></li>'
+    else:
+        species_links += '<li>No species templates available. Please check the static folder.</li>'
+    
+    return render_template('welcometoBK.html', species_links=species_links)
 
 
 @app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
 def handle_batty(path):
     global global_user_setting
     user_setting = global_user_setting
-    if os.path.isdir(osfolder + path):
-        return FileList.file_list(osfolder, path)
+    
+    try:
+        # Replace 'home/' with the appropriate system home path
+        if path == 'home/':
+            modified_path = home_path + '/'
+        else:
+            modified_path = path.replace('home/', home_path + '/')
+    except Exception as e:
+        # Handle any unexpected errors in path modification
+        print(f"Error processing path {path}: {str(e)}")
+        modified_path = path  # Fall back to original path if there's an error
+    
+    if os.path.isdir(osfolder + modified_path):
+        return FileList.file_list(osfolder, modified_path, path)
     if path.endswith('review.html'):
         if request.method == 'POST':
-            path_to_file = osfolder + '/'.join(path.split('/')[:-1])
+            # Replace 'home/' with the appropriate system home path
+            mod_path = path.replace('home/', home_path + '/')
+            path_to_file = osfolder + '/'.join(mod_path.split('/')[:-1])
             with open(path_to_file + '.pickle', 'rb') as pfile:
                 segment_data = pickle.load(pfile)
             type_c = path.split('/')[-1][:-12]
@@ -87,8 +149,10 @@ def handle_batty(path):
         user_setting = request.form.copy()
         if 'submitbutton' in request.form:
             StoreTask.store_task(osfolder + path[:-1], request.form)
-    return GetTask.get_task(path_to_file=osfolder + path[:-1],
-                            path=path,
+    # Replace 'home/' with the appropriate system home path for the task
+    mod_path = path.replace('home/', home_path + '/')
+    return GetTask.get_task(path_to_file=osfolder + mod_path[:-1],
+                            path=path,  # Keep original path for URLs
                             user_setting=user_setting,
                             osfolder=osfolder,
                             undo=('undobutton' in request.form))
@@ -96,15 +160,18 @@ def handle_batty(path):
 
 @app.route('/img/<path:path>', methods=['GET'])
 def handle_image(path):
+    # Replace 'home/' with the appropriate system home path
+    mod_path = path.replace('home/', home_path + '/')
+    
     priority_part = 0 if int(request.args['channel']) == int(global_user_setting['main'])-1 else 2
     overview_part = 1 if request.args['overview'] == '1' else 0
-    workload = {'path': path, 'args': request.args}
+    workload = {'path': mod_path, 'args': request.args}
     global_request_queue.put(Workers.PrioItem(priority_part + overview_part, workload))
     call_to_do = int(request.args['call'])
     if call_to_do + 1 < int(request.args['numcalls']):
         new_args = request.args.copy()
         new_args['call'] = str(call_to_do+1)
-        global_request_queue.put(Workers.PrioItem(4 + priority_part, {'path': path, 'args': new_args}))
+        global_request_queue.put(Workers.PrioItem(4 + priority_part, {'path': mod_path, 'args': new_args}))
     global_request_queue.join()
     workload['thread'].join()
     return send_file(appropriate_file(path, request.args, osfolder))
@@ -112,13 +179,20 @@ def handle_image(path):
 
 @app.route('/audio/<path:path>')
 def handle_sound(path):
+    # Replace 'home/' with the appropriate system home path
+    mod_path = path.replace('home/', home_path + '/')
+    
     slowdown = 5
     if not exists(appropriate_file(path, request.args, osfolder)):
         SoftCreateFolders.soft_create_folders(appropriate_file(path, request.args, osfolder, folder_only=True))
         call_to_do = int(request.args['call'])
         overview = request.args['overview'] == 'True'
         hwin = Hwin.overview_hwin if overview else Hwin.normal_hwin
-        thr_x1, fs, hashof = GetAudioBit.get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), call_to_do, hwin)
+        
+        # Use the modified path with correct home directory
+        audio_path = osfolder + os.sep.join(mod_path.split('/')[:-1])
+        thr_x1, fs, hashof = GetAudioBit.get_audio_bit(audio_path, call_to_do, hwin)
+        
         thr_x1 = thr_x1[:, int(request.args['channel'])]
         assert request.args['hash'] == hashof
         scipy.io.wavfile.write(appropriate_file(path, request.args, osfolder),

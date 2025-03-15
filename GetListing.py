@@ -2,7 +2,8 @@ import pickle
 import urllib
 import GetAudioBit
 import os
-from flask import render_template, Markup
+from flask import render_template
+from markupsafe import Markup
 
 
 def get_listing(path_to_file, osfolder, path):

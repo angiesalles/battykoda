@@ -1,5 +1,6 @@
 import pickle
-from flask import render_template, Markup
+from flask import render_template
+from markupsafe import Markup
 import htmlGenerator as hG
 import GetAudioBit
 import os

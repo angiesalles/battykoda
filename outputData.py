@@ -1,7 +1,16 @@
 import scipy.io
 import pickle
+import os
+import platform
 
-filename = '/home/angie/Efuscus/hungerGames/MicWavfiles/20210626/Pair_Trial1_1638_ch1.wav'
+# Determine home directory based on OS
+home_dir = "/home"
+if platform.system() == "Darwin":  # macOS
+    home_dir = "/Users"
+elif platform.system() == "Windows":
+    home_dir = "C:\\Users"
+
+filename = os.path.join(home_dir, 'angie', 'Efuscus', 'hungerGames', 'MicWavfiles', '20210626', 'Pair_Trial1_1638_ch1.wav')
 samplerate, data = scipy.io.wavfile.read(filename)
 with open(filename + '.pickle', 'rb') as f:
     p = pickle.load(f)
