@@ -1,9 +1,9 @@
 import os
 import platform
+import getpass
 import htmlGenerator
 from flask import render_template
 from markupsafe import Markup
-import getpass
 
 
 def file_list(osfolder, path, original_path=None):
@@ -15,6 +15,9 @@ def file_list(osfolder, path, original_path=None):
         path: The physical path on the current system
         original_path: The original path in the URL (for keeping URL structure consistent)
     """
+    # Get the home directory based on the OS using utility function
+    import utils
+    home_path = utils.get_home_directory()
     # If original_path is not provided, use path
     if original_path is None:
         original_path = path
@@ -26,6 +29,18 @@ def file_list(osfolder, path, original_path=None):
         
         # Get available species for reference
         available_species = htmlGenerator.available_species()
+        
+        # Check if this directory contains WAV files
+        has_wav_files = any(item.lower().endswith('.wav') for item in list_of_files)
+        if has_wav_files:
+            collect_files += '<div style="margin: 10px 0; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #3498db; border-radius: 3px;">'
+            collect_files += '<p><strong>WAV File Guide:</strong></p>'
+            collect_files += '<ul>'
+            collect_files += '<li><span style="color: green;">Green</span> items are clickable WAV files with paired pickle files containing call data.</li>'
+            collect_files += '<li>Pickle files contain the call starts, stops, and labels for the WAV files.</li>'
+            collect_files += '<li>To make a WAV file clickable, it needs a matching pickle file (filename.wav.pickle).</li>'
+            collect_files += '</ul>'
+            collect_files += '</div>'
         
         # Handle special case for user folders without species subfolders
         path_parts = original_path.strip('/').split('/')
@@ -40,11 +55,18 @@ def file_list(osfolder, path, original_path=None):
                 collect_files += '<li>Please select or create a species folder within this directory.</li>'
                 collect_files += '<li>BattyKoda requires folders organized by bat species containing the call data.</li>'
                 
-                # Show available species for this user path
-                if available_species:
+                # Show available species for this user path - only for user's own directory
+                if available_species and (username == getpass.getuser() or username.lower() == "shared"):
                     collect_files += '<li><b>Available species templates:</b></li>'
                     for species in available_species:
-                        collect_files += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a></li>'
+                        # For non-existent folders, only link to info and show a message
+                        species_path = f"{osfolder}{home_path}/{username}/{species}"
+                        if os.path.isdir(species_path):
+                            # The species folder exists, make it clickable
+                            collect_files += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a> [<a href="/species_info/{species}">Info</a>]</li>'
+                        else:
+                            # Only show info link for non-existent folders
+                            collect_files += f'<li>{species} (not created yet) [<a href="/species_info/{species}">Info</a>]</li>'
                 else:
                     collect_files += '<li>No species templates available. Please make sure data files are correctly installed in the static folder.</li>'
                 
@@ -62,7 +84,14 @@ def file_list(osfolder, path, original_path=None):
                     if available_species:
                         collect_files += '<li><b>Available species templates:</b></li>'
                         for species in available_species:
-                            collect_files += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a></li>'
+                            # For non-existent folders, only link to info and show a message
+                            species_path = f"{osfolder}{home_path}/{username}/{species}"
+                            if os.path.isdir(species_path):
+                                # The species folder exists, make it clickable
+                                collect_files += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a> [<a href="/species_info/{species}">Info</a>]</li>'
+                            else:
+                                # Only show info link for non-existent folders
+                                collect_files += f'<li>{species} (not created yet) [<a href="/species_info/{species}">Info</a>]</li>'
                     else:
                         collect_files += '<li>No species templates available. Please make sure data files are correctly installed in the static folder.</li>'
                     
@@ -71,7 +100,8 @@ def file_list(osfolder, path, original_path=None):
         
         # Process regular directory listing
         for item in list_of_files:
-            if '.git' in item:
+            # Skip dotfiles and dotfolders
+            if item.startswith('.'):
                 continue
                 
             # Check if we're in the home directory equivalent
@@ -96,8 +126,28 @@ def file_list(osfolder, path, original_path=None):
                     # Don't filter at this level - we want to show all folders
                     pass
                 
-            if os.path.isdir(osfolder + path + item) or os.path.isfile(osfolder + path + item+'.pickle'):
-                collect_files += '<li><a href="' + item + '/">' + item + '</a></li>'
+            # Check if it's a directory
+            if os.path.isdir(osfolder + path + item):
+                collect_files += '<li><a href="' + item + '/">' + item + '</a> (folder)</li>'
+            # Check for WAV files with paired pickle files
+            elif item.lower().endswith('.wav') and os.path.isfile(osfolder + path + item + '.pickle'):
+                collect_files += '<li><a href="' + item + '/">' + item + '</a> <span style="color: green;">(clickable: has paired pickle file with call data)</span></li>'
+            # Check for WAV files without paired pickle files
+            elif item.lower().endswith('.wav'):
+                collect_files += '<li>' + item + ' <span style="color: #888;">(not clickable: missing paired pickle file)</span></li>'
+            # Check for pickle files with paired wav files
+            elif item.lower().endswith('.pickle'):
+                if item.lower().endswith('.wav.pickle'):
+                    # This is a pickle file for a wav file
+                    wav_file = item[:-7]  # Remove .pickle from the end
+                    if os.path.isfile(osfolder + path + wav_file):
+                        collect_files += '<li>' + item + ' <span style="color: #0066cc;">(pickle file that defines call starts, stops, and labels for the WAV file)</span></li>'
+                    else:
+                        collect_files += '<li>' + item + ' <span style="color: #888;">(pickle file missing its paired WAV file)</span></li>'
+                else:
+                    # Other pickle files
+                    collect_files += '<li>' + item + ' <span style="color: #888;">(pickle file)</span></li>'
+            # Any other files
             else:
                 collect_files += '<li>' + item + '</li>'
         
@@ -119,7 +169,14 @@ def file_list(osfolder, path, original_path=None):
                 if available_species:
                     collect_files += '<li><b>Available species templates:</b></li>'
                     for species in available_species:
-                        collect_files += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a></li>'
+                        # For non-existent folders, only link to info and show a message
+                        species_path = f"{osfolder}{home_path}/{username}/{species}"
+                        if os.path.isdir(species_path):
+                            # The species folder exists, make it clickable
+                            collect_files += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a> [<a href="/species_info/{species}">Info</a>]</li>'
+                        else:
+                            # Only show info link for non-existent folders
+                            collect_files += f'<li>{species} (not created yet) [<a href="/species_info/{species}">Info</a>]</li>'
             elif len(path_parts) >= 3 and path_parts[0] == "home":
                 # Species or project directory
                 username = path_parts[1]
@@ -168,16 +225,16 @@ def file_list(osfolder, path, original_path=None):
                     # List available user directories
                     message += '<li><b>Available user directories:</b></li>'
                     
-                    if platform.system() == "Darwin":  # macOS
-                        user_dir = "/Users"
-                        users = os.listdir(user_dir)
-                        # Filter out system directories
-                        users = [u for u in users if not u.startswith('.') and u != 'Shared']
-                        users.sort()
-                        
-                        for user in users:
-                            if os.path.isdir(os.path.join(user_dir, user)):
-                                message += f'<li><a href="/battykoda/home/{user}/">{user}</a></li>'
+                    # Use utility functions to get user directories
+                    user_dir = f"/{utils.get_home_directory()}"
+                    users = os.listdir(user_dir)
+                    # Filter out system directories and dotfiles
+                    users = [u for u in users if not u.startswith('.') and u != 'Shared']
+                    users.sort()
+                    
+                    for user in users:
+                        if os.path.isdir(os.path.join(user_dir, user)):
+                            message += f'<li><a href="/battykoda/home/{user}/">{user}</a></li>'
                     
                 elif len(path_parts) >= 3:
                     # Species or project directory
@@ -187,7 +244,8 @@ def file_list(osfolder, path, original_path=None):
                     
                     if species_name in available:
                         message += '<li>This species template exists, but the folder has not been created.</li>'
-                        message += f'<li>You need to create the folder: <code>/Users/{username}/{species_name}</code></li>'
+                        home_directory = utils.get_home_directory()
+                        message += f'<li>You need to create the folder: <code>/{home_directory}/{username}/{species_name}</code></li>'
                     else:
                         message += '<li>This is not a recognized species template.</li>'
                     
@@ -195,7 +253,7 @@ def file_list(osfolder, path, original_path=None):
                     if available:
                         message += '<li><b>Available species templates:</b></li>'
                         for species in available:
-                            message += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a></li>'
+                            message += f'<li><a href="/battykoda/home/{username}/{species}/">{species}</a> [<a href="/species_info/{species}">Info</a>]</li>'
                 
                 return render_template('listBK.html', data={'listicle': Markup(message)})
             

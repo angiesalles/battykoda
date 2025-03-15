@@ -42,7 +42,7 @@
        name="main"
        value="{{data.main}}">
 
-    <img id="image" src="{{data.spectrogram}}" alt="spectrogram" width="600" height="250" alight="left">
+    {{ data.spectrogram|debug_image|safe }}
 </div>
 </div>
 <div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:Black" align="center">
@@ -69,7 +69,7 @@
 </div>
 
 <div class="container" style="position: absolute; top: 150px; left: 850px; width:500px;height:450px; background-color:Black" align="center">
-<p><img id="image" src="{{data.spectrogram_large}}" /></p>
+<p>{{ data.spectrogram_large|debug_image|safe }}</p>
 </div>
 
 
@@ -88,7 +88,7 @@
             <code>audio</code> element.
     </audio></p>
 <p style="color:white; font-family:Helvetica"><i>Spectrogram</i> template</p>
-<img src="{{data.jpgname}}" alt="template" width="500" height="450" alight="left">
+{{ data.jpgname|debug_image|safe }}
 
 <p><audio
         controls
@@ -100,8 +100,40 @@
  <script>
         window.onload = function() {
             document.getElementById("{{data.focused}}").focus();
+            
+            // Check for broken images and log them
+            var images = document.querySelectorAll('img');
+            var brokenCount = 0;
+            
+            images.forEach(function(img) {
+                img.addEventListener('error', function() {
+                    brokenCount++;
+                    console.error('Broken image: ' + img.src);
+                    document.getElementById('debug-status').textContent = 'Found ' + brokenCount + ' broken images';
+                    document.getElementById('debug-status').style.color = 'red';
+                });
+            });
+        }
+        
+        // Toggle debug mode
+        function toggleDebug() {
+            var debugInfo = document.querySelectorAll('.debug-info');
+            var isVisible = debugInfo[0] && debugInfo[0].style.display === 'block';
+            
+            debugInfo.forEach(function(info) {
+                info.style.display = isVisible ? 'none' : 'block';
+            });
+            
+            document.getElementById('debug-button').textContent = 
+                isVisible ? 'Show Debug Info' : 'Hide Debug Info';
         }
     </script>
+    
+    <!-- Debug controls -->
+    <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; z-index: 1000;">
+        <button id="debug-button" onclick="toggleDebug()">Show Debug Info</button>
+        <span id="debug-status" style="color: white; margin-left: 10px;">No broken images found</span>
+    </div>
 </body>
 </html>
 
