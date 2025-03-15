@@ -58,7 +58,7 @@ app = Flask(__name__, static_folder='static')
 
 # Configure the Flask app
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'battycoda-secret-key-development')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.getcwd(), 'battycoda.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///battycoda.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize SQLAlchemy with the app
@@ -162,11 +162,12 @@ def mainfunction():
     # Initialize the app
     initialize_app()
     
-    # Get port from environment variable for Replit compatibility
+    # Get port and debug settings from environment variables for Replit compatibility
     port = int(os.environ.get('PORT', 8060))
+    debug_mode = os.environ.get('FLASK_DEBUG', '0') == '1'
     
     # Start the server
-    app.run(host='0.0.0.0', debug=False, port=port)
+    app.run(host='0.0.0.0', debug=debug_mode, port=port)
 
 
 @app.route('/')
