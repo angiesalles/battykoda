@@ -8,8 +8,14 @@ import urllib.parse
 import random
 import numpy as np
 import subprocess
+import logging
+import re
 
-R = False
+# Set up logging
+logger = logging.getLogger('battykoda.gettask')
+
+# R is installed now, so set to True
+R = True
 
 def get_task(path_to_file, path, user_setting, osfolder, undo=False):
     # Import all required modules at the function level to avoid scoping issues
@@ -80,18 +86,135 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
         confidence = -1
     else:
         if R:
-            returnvalue = subprocess.run("/usr/bin/Rscript --vanilla Forwardpass.R "
-                                          + osfolder
-                                          + os.sep.join(path.split('/')[:-1])
-                                          + ' '
-                                          + str(segment_data['onsets'][call_to_do])
-                                          + ' '
-                                          + str(segment_data['offsets'][call_to_do]), shell=True,  capture_output=True)
-            assumed_answer = returnvalue.stdout.splitlines()[-3][4:].decode()
-            confidence = float(returnvalue.stdout.splitlines()[-1][4:])
+            try:
+                # Get the species from the path
+                path_parts = path.strip('/').split('/')
+                species = path_parts[2] if len(path_parts) > 2 else "Efuscus"
+                
+                # Use the new classify_call.R script
+                r_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "classify_call.R")
+                
+                # Get the full path to the WAV file
+                wav_file_path = os.path.join(osfolder + os.sep.join(path.split('/')[:-1]), path.split('/')[-1])
+                
+                # Log the command details
+                cmd = [
+                    "Rscript", 
+                    "--vanilla", 
+                    r_script_path,
+                    wav_file_path,
+                    str(segment_data['onsets'][call_to_do]),
+                    str(segment_data['offsets'][call_to_do]),
+                    species
+                ]
+                logger.info(f"Running R script: {' '.join(cmd)}")
+                
+                # Enhanced logging before running R script
+                logger.info(f"Running R script with command: {' '.join(cmd)}")
+                logger.info(f"Current working directory: {os.getcwd()}")
+                
+                # Run R script with proper argument handling
+                returnvalue = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=False  # Don't raise exception on non-zero exit
+                )
+                
+                # Detailed logging of R script execution
+                logger.info(f"R script return code: {returnvalue.returncode}")
+                logger.info(f"R script stdout: {returnvalue.stdout}")
+                
+                if returnvalue.stderr:
+                    logger.error(f"R script stderr: {returnvalue.stderr}")
+                
+                # Check return code
+                if returnvalue.returncode != 0:
+                    logger.error(f"R script failed with code {returnvalue.returncode}: {returnvalue.stderr}")
+                    assumed_answer = 'Echo'
+                    confidence = 50.0
+                    
+                    # Fall back to confidence calculator if R fails
+                    try:
+                        import ConfidenceCalculator
+                        path_parts = path.strip('/').split('/')
+                        species = path_parts[2] if len(path_parts) > 2 else "Efuscus"
+                        logger.info(f"Falling back to Python ConfidenceCalculator for species: {species}")
+                        confidence = ConfidenceCalculator.get_confidence(
+                            species, 
+                            assumed_answer, 
+                            osfolder + os.sep.join(path.split('/')[:-1]), 
+                            call_to_do
+                        )
+                        logger.info(f"ConfidenceCalculator returned: {confidence}")
+                    except Exception as calc_err:
+                        logger.error(f"ConfidenceCalculator error: {str(calc_err)}")
+                        confidence = 50.0
+                else:
+                    # Parse output from R - the new classify_call.R script outputs in a standardized format
+                    stdout_lines = returnvalue.stdout.splitlines()
+                    logger.debug(f"R script output lines: {stdout_lines}")
+                    
+                    # Extract the call type and confidence
+                    type_line = None
+                    conf_line = None
+                    
+                    # Log all lines for debugging
+                    for i, line in enumerate(stdout_lines):
+                        logger.debug(f"Line {i}: {line}")
+                    
+                    # Look for lines containing call type and confidence values
+                    # The new script outputs in a consistent format: "type: 'X'" and "confidence: Y.Z"
+                    for line in stdout_lines:
+                        if line.strip().startswith("type:"):
+                            type_line = line
+                            logger.debug(f"Found type line: {line}")
+                        elif line.strip().startswith("confidence:"):
+                            conf_line = line
+                            logger.debug(f"Found confidence line: {line}")
+                    
+                    if type_line and conf_line:
+                        # Extract values using regex with better matching patterns
+                        logger.debug(f"Extracting from type_line: {type_line}")
+                        logger.debug(f"Extracting from conf_line: {conf_line}")
+                        
+                        # Match any quoted string for type
+                        type_match = re.search(r"type:\s*['\"]([^'\"]+)['\"]", type_line)
+                        
+                        # Match any number for confidence
+                        conf_match = re.search(r"confidence:\s*(\d+\.?\d*)", conf_line)
+                        
+                        logger.debug(f"Type match: {type_match.groups() if type_match else 'None'}")
+                        logger.debug(f"Conf match: {conf_match.groups() if conf_match else 'None'}")
+                        
+                        if type_match:
+                            assumed_answer = type_match.group(1)
+                            logger.info(f"Extracted type: {assumed_answer}")
+                        else:
+                            assumed_answer = 'Echo'
+                            logger.warning("Could not extract type, using default 'Echo'")
+                            
+                        if conf_match:
+                            confidence = float(conf_match.group(1))
+                            logger.info(f"Extracted confidence: {confidence}")
+                        else:
+                            confidence = 50.0
+                            logger.warning("Could not extract confidence, using default 50.0")
+                    else:
+                        logger.warning("Could not parse R output correctly")
+                        assumed_answer = 'Echo'
+                        confidence = 50.0
+            except Exception as e:
+                logger.error(f"Error running R script: {str(e)}")
+                assumed_answer = 'Echo'
+                confidence = 50.0
         else:
+            # Fallback if R is disabled
             assumed_answer = 'Echo'
             confidence = 50.0
+        
+        # Make sure confidence is between 0 and 100
+        confidence = max(0, min(100, confidence))
     if call_to_do == len(segment_data['offsets']):
         return render_template('endFile.html',
                                data={'filedirectory': '/battykoda/' + '/'.join(path.split('/')[:-2]) + '/'})
