@@ -58,7 +58,9 @@ app = Flask(__name__, static_folder='static')
 
 # Configure the Flask app
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'battycoda-secret-key-development')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///battycoda.db'
+# Use absolute path for database location
+db_path = os.path.join(os.getcwd(), 'battycoda.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize SQLAlchemy with the app
@@ -135,7 +137,17 @@ global_work_queue = queue.PriorityQueue()
 
 def initialize_app():
     """Initialize the app by starting worker threads and creating necessary directories"""
-    # Note: Database initialization moved to init_db.py to avoid circular imports
+    # Verify database exists and is correctly initialized
+    try:
+        # Perform a quick database check within the app context
+        with app.app_context():
+            # Try a simple query to verify database connection
+            user_count = User.query.count()
+            logger.info(f"Database check: Users table exists with {user_count} users")
+    except Exception as e:
+        logger.error(f"Database check failed: {str(e)}")
+        logger.error("This might indicate the database wasn't properly initialized. Try running ensure_db.py first.")
+        # We'll continue anyway since ensure_db.py should have been run before main.py
     
     # Create necessary directories if they don't exist
     os.makedirs('data/home', exist_ok=True)

@@ -18,9 +18,67 @@ logging.basicConfig(
 )
 logger = logging.getLogger('battycoda-db-init')
 
+def verify_database_file(db_path):
+    """Verify that the database file exists and is a valid SQLite database"""
+    if os.path.exists(db_path):
+        logger.info(f"Database file exists at {db_path}")
+        try:
+            # Try to open the database and verify schema
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Check if it has a users table
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            if cursor.fetchone():
+                logger.info("Existing database has users table")
+                
+                # Check schema of users table
+                cursor.execute("PRAGMA table_info(users)")
+                columns = cursor.fetchall()
+                expected_columns = ["id", "username", "email", "password_hash", "is_admin"]
+                
+                column_names = [col[1] for col in columns]
+                missing_columns = [col for col in expected_columns if col not in column_names]
+                
+                if missing_columns:
+                    logger.warning(f"Users table is missing columns: {missing_columns}")
+                    logger.warning("The database schema is incomplete. Will recreate database.")
+                    conn.close()
+                    return False
+                else:
+                    logger.info("Users table schema is valid")
+                    conn.close()
+                    return True
+            else:
+                logger.warning("Database file exists but has no users table")
+                conn.close()
+                return False
+        except sqlite3.Error as e:
+            logger.error(f"Error verifying database: {str(e)}")
+            return False
+    else:
+        logger.info(f"Database file doesn't exist at {db_path}")
+        return False
+
 def ensure_db_initialized():
     """Make sure the database exists and has all required tables"""
-    db_path = 'battycoda.db'
+    # Use absolute path for the database to ensure consistency
+    db_path = os.path.join(os.getcwd(), 'battycoda.db')
+    logger.info(f"Using database at path: {db_path}")
+    
+    # Ensure parent directory exists
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
+    # Check if existing database is valid
+    if not verify_database_file(db_path):
+        logger.warning("Removing invalid database file")
+        try:
+            if os.path.exists(db_path):
+                os.remove(db_path)
+                logger.info("Removed invalid database file")
+        except Exception as e:
+            logger.error(f"Error removing database file: {str(e)}")
+    
     app = Flask(__name__)
     
     # Configure the app
@@ -61,7 +119,13 @@ def ensure_db_initialized():
                     if not cursor.fetchone():
                         logger.info("Recreating users table directly...")
                         # SQL for users table creation if needed
-                        cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                        # First, drop the table if it exists but is malformed
+                        logger.info("Dropping users table if it exists but is incomplete...")
+                        cursor.execute("DROP TABLE IF EXISTS users")
+                        
+                        # Create the users table with proper schema
+                        logger.info("Creating users table with correct schema...")
+                        cursor.execute('''CREATE TABLE users (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             username TEXT UNIQUE NOT NULL,
                             email TEXT UNIQUE NOT NULL,
@@ -86,6 +150,14 @@ def ensure_db_initialized():
                     # Now try creating all tables again via SQLAlchemy
                     db.create_all()
                     logger.info("Database tables recreation completed")
+                    
+                    # Verify tables again
+                    try:
+                        count = User.query.count()
+                        logger.info(f"Verification successful: Users table exists with {count} users")
+                    except Exception as verify_error:
+                        logger.error(f"Verification failed after recreation: {str(verify_error)}")
+                        raise
                 except Exception as repair_error:
                     logger.error(f"Database repair failed: {str(repair_error)}")
                     raise
