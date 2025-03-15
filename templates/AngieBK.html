@@ -1,139 +1,433 @@
 <!DOCTYPE html>
 <html>
-<body style="background-color:Black;">
-<div class="container" style="position: relative; background-color:Salmon" align="center">
-<h1 style="font-family:Helvetica">BattyKoda</h1>
-
-<p style="font-family:Helvetica">Current experiment: User / Species/ Date</p>
+<head>
+    <title>BattyKoda - Bat Call Analysis</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .header {
+            background-color: #e57373;
+            color: black;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .grid-container {
+            display: grid;
+            grid-template-columns: 32% 32% 32%;
+            grid-template-rows: auto auto auto;
+            grid-gap: 2%;
+            padding: 15px;
+            width: 96%;
+            max-width: 1200px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+        
+        .spectrogram-small {
+            grid-column: 1;
+            grid-row: 1;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .controls {
+            grid-column: 1;
+            grid-row: 2;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .call-type {
+            grid-column: 2;
+            grid-row: 1;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .spectrogram-large {
+            grid-column: 3;
+            grid-row: 1 / span 2;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .audio-section {
+            grid-column: 1 / span 2;
+            grid-row: 3;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .confidence {
+            grid-column: 2;
+            grid-row: 2;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .others {
+            grid-column: 3;
+            grid-row: 3;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .button-group {
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        input[type="submit"], button {
+            background-color: #e57373;
+            color: black;
+            border: none;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        input[type="submit"]:hover, button:hover {
+            background-color: #ef5350;
+        }
+        
+        input[type="text"], input[type="number"] {
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px;
+            border-radius: 3px;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        audio {
+            max-width: 100%;
+        }
+        
+        .other-channels-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .other-channels-content audio {
+            max-width: 100%;
+            display: block;
+            margin: 10px auto;
+        }
+        
+        .other-channels-content .channel-item {
+            margin-top: 20px;
+            margin-bottom: 5px;
+            border-top: 1px solid #333;
+            padding-top: 15px;
+        }
+        
+        .responsive-image {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .image-container {
+            position: relative;
+            display: block;
+            margin-bottom: 10px;
+        }
+        
+        .image-container.broken-image {
+            border: 2px solid red;
+        }
+        
+        .debug-info {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: rgba(255,0,0,0.7);
+            color: white;
+            padding: 2px;
+            font-size: 10px;
+        }
+        
+        .channel-audio {
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        label {
+            margin-right: 10px;
+        }
+        
+        .debug-controls {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        
+        /* Make layout more responsive at different screen sizes */
+        @media (max-width: 1200px) {
+            .grid-container {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .spectrogram-large {
+                grid-column: 1 / span 2;
+                grid-row: 3;
+            }
+            
+            .others {
+                grid-column: 1 / span 2;
+                grid-row: 4;
+            }
+            
+            .audio-section {
+                grid-column: 1 / span 2;
+                grid-row: 5;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+                width: 95%;
+            }
+            
+            .spectrogram-small,
+            .controls,
+            .call-type,
+            .confidence,
+            .spectrogram-large,
+            .audio-section,
+            .others {
+                grid-column: 1;
+            }
+            
+            .spectrogram-small { grid-row: 1; }
+            .controls { grid-row: 2; }
+            .call-type { grid-row: 3; }
+            .confidence { grid-row: 4; }
+            .spectrogram-large { grid-row: 5; }
+            .audio-section { grid-row: 6; }
+            .others { grid-row: 7; }
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>BattyKoda</h1>
+    <p>Current experiment: User / Species / Date</p>
 </div>
 
 <form method="post">
 
-<p style="color:white; font-family:Helvetica"><label for="user_name">User:</label>
-<input required type="text" id="user_name" name="user_name" value="{{data.user_name}}">
-
-
-
-<div class="container" style="position: absolute; top: 150px; left: 30px; width:600px;height:450px; background-color:Black" align="center">
-<p style="color:white; font-family:Helvetica">Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</p>
-<p style="color:white; font-family:Helvetica"><label for="contrast">Contrast:</label>
-<input required
-       type="text"
-       id="contrast"
-       name="contrast"
-       onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('contrast').value))"
-       value="{{data.contrast}}">
-
-<br><label for="loudness">Loudness:</label>
-    <input required
-       type="text"
-       id="loudness"
-       name="loudness"
-       onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('loudness').value))"
-       value="{{data.loudness}}">
-
-<br>
-    <label for="main">Main channel:</label>
-<input required
-       type="number"
-       min="1"
-       max="{{ data.max_main }}"
-       id="main"
-       name="main"
-       value="{{data.main}}">
-
-    {{ data.spectrogram|debug_image|safe }}
-</div>
-</div>
-<div class="container" style="position: absolute; top: 500px; left: 300px;  width:100px;height:25px; background-color:Black" align="center">
- <input id='submitbutton_{{data.currentcall}}' type="submit" name='submitbutton_{{data.currentcall}}' value="Next Call">
-   <input id='updatebutton' type="submit" name="updatebutton" value="Update">
-    <input id='undobutton' type="submit" name="undobutton" value="Undo">
-
+<div style="text-align: center; margin-bottom: 15px;">
+    <label for="user_name">User:</label>
+    <input required type="text" id="user_name" name="user_name" value="{{data.user_name}}">
 </div>
 
-
-<div class="container" style="position: absolute; top: 200px; left: 600px;  width:300px;height:250px; color:white; background-color:Black" align="left">
-
-<input type="radio" id="correct" name="type_call" value="correct">
-<label for="correctly classified" style="color:white; font-family:Helvetica">Correctly classified</label></br>
-
-    {{ data.species }}
-
-<input type="radio" id="Unsure" name="type_call" value="Unsure">
-<label for="Unsure" style="color:white; font-family:Helvetica">Unsure</label></br>
-
-<input type="radio" id="Other" name="type_call">
-<label for="Other" style="color:white; font-family:Helvetica">Other:</label>
-<input type="text" id="Other" name="type_call">
+<div class="grid-container">
+    <!-- Small spectrogram section -->
+    <div class="spectrogram-small">
+        <h3>Spectrogram: {{data.currentcall}} of {{data.totalcalls}} calls</h3>
+        {{ data.spectrogram|debug_image|safe }}
+    </div>
+    
+    <!-- Controls section -->
+    <div class="controls">
+        <div>
+            <label for="contrast">Contrast:</label>
+            <input required type="text" id="contrast" name="contrast" 
+                onchange="document.getElementById('submitbutton_{{data.currentcall}}').disabled=isNaN(Number(document.getElementById('contrast').value))"
+                value="{{data.contrast}}">
+        </div>
+        <div style="margin-top: 10px;">
+            <label for="loudness">Loudness:</label>
+            <input required type="text" id="loudness" name="loudness"
+                onchange="document.getElementById('submitbutton_{{data.currentcall}}').disabled=isNaN(Number(document.getElementById('loudness').value))"
+                value="{{data.loudness}}">
+        </div>
+        <div style="margin-top: 10px;">
+            <label for="main">Main channel:</label>
+            <input required type="number" min="1" max="{{ data.max_main }}" id="main" name="main" value="{{data.main}}">
+        </div>
+        
+        <div class="button-group">
+            <input id='submitbutton_{{data.currentcall}}' type="submit" name='submitbutton_{{data.currentcall}}' value="Next Call">
+            <input id='updatebutton' type="submit" name="updatebutton" value="Update">
+            <input id='undobutton' type="submit" name="undobutton" value="Undo">
+        </div>
+        
+        <div style="margin-top: 10px; text-align: center;">
+            {{ data.backlink }}
+        </div>
+    </div>
+    
+    <!-- Call type section -->
+    <div class="call-type">
+        <h3>Call Type Classification</h3>
+        
+        <div style="margin-bottom: 10px;">
+            <input type="radio" id="correct" name="type_call" value="correct">
+            <label for="correct">Correctly classified</label>
+        </div>
+        
+        <div>
+            {{ data.species }}
+        </div>
+        
+        <div style="margin-top: 10px;">
+            <input type="radio" id="Unsure" name="type_call" value="Unsure">
+            <label for="Unsure">Unsure</label>
+        </div>
+        
+        <div style="margin-top: 10px;">
+            <input type="radio" id="Other" name="type_call">
+            <label for="Other">Other:</label>
+            <input type="text" id="Other" name="type_call" style="margin-top: 5px;">
+        </div>
+    </div>
+    
+    <!-- Large spectrogram section -->
+    <div class="spectrogram-large">
+        <h3>Detailed View</h3>
+        {{ data.spectrogram_large|debug_image|safe }}
+    </div>
+    
+    <!-- Confidence section -->
+    <div class="confidence">
+        <h3>Classification Confidence</h3>
+        <p>Confidence: <strong>{{data.confidence}}</strong></p>
+        
+        <div style="margin-top: 15px;">
+            <label for="limit_confidence">If future confidence is below this ask:</label>
+            <input required type="number" min="0" max="100" step="1" id="limit_confidence" 
+                name="limit_confidence" value="{{data.limit_confidence}}">
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <p>Species template:</p>
+            {{ data.jpgname|debug_image|safe }}
+        </div>
+    </div>
+    
+    <!-- Audio section -->
+    <div class="audio-section">
+        <h3>Audio Playback</h3>
+        <div style="margin-top: 10px;">
+            <p>Short clip:</p>
+            <audio controls src="{{ data.audiolink }}" preload="none">
+                Your browser does not support the audio element.
+            </audio>
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <p>Long clip:</p>
+            <audio controls src="{{ data.long_audiolink }}" preload="none">
+                Your browser does not support the audio element.
+            </audio>
+        </div>
+    </div>
+    
+    <!-- Other channels section -->
+    <div class="others">
+        <h3>Other Channels</h3>
+        <div class="other-channels-content">
+            {{ data.others }}
+        </div>
+    </div>
 </div>
-
-<div class="container" style="position: absolute; top: 150px; left: 850px; width:500px;height:450px; background-color:Black" align="center">
-<p>{{ data.spectrogram_large|debug_image|safe }}</p>
-</div>
-
-
-<div class="container" style="position: absolute; top: 550px; left: 50px; width:400px;height:150px; background-color:Black" align="center">
-
-<p style="color:white; font-family:Helvetica">Confidence: {{data.confidence}} </p>
-<p style="color:white; font-family:Helvetica"><label for="limit_confidence">If future confidence is below this ask:</label>
-<input required type="number"  min="0" max="100" step="1" id="limit_confidence" name="limit_confidence" value="{{data.limit_confidence}}">
 
 </form>
-<p>{{ data.backlink }}</p>
-<p><audio
-        controls
-        src="{{ data.audiolink }}" preload="none">
-            Your browser does not support the
-            <code>audio</code> element.
-    </audio></p>
-<p style="color:white; font-family:Helvetica"><i>Spectrogram</i> template</p>
-{{ data.jpgname|debug_image|safe }}
-
-<p><audio
-        controls
-        src="{{ data.long_audiolink }}" preload="none">
-            Your browser does not support the
-            <code>audio</code> element.
-    </audio></p>
-{{ data.others }}
- <script>
-        window.onload = function() {
+<script>
+    window.onload = function() {
+        // Focus the radio button for the classified call type
+        if (document.getElementById("{{data.focused}}")) {
             document.getElementById("{{data.focused}}").focus();
-            
-            // Check for broken images and log them
-            var images = document.querySelectorAll('img');
-            var brokenCount = 0;
-            
-            images.forEach(function(img) {
-                img.addEventListener('error', function() {
-                    brokenCount++;
-                    console.error('Broken image: ' + img.src);
-                    document.getElementById('debug-status').textContent = 'Found ' + brokenCount + ' broken images';
-                    document.getElementById('debug-status').style.color = 'red';
-                });
-            });
+        } else {
+            console.warn("Element with ID '{{data.focused}}' not found");
         }
         
-        // Toggle debug mode
-        function toggleDebug() {
-            var debugInfo = document.querySelectorAll('.debug-info');
-            var isVisible = debugInfo[0] && debugInfo[0].style.display === 'block';
-            
-            debugInfo.forEach(function(info) {
-                info.style.display = isVisible ? 'none' : 'block';
+        // Check for broken images and log them
+        var images = document.querySelectorAll('img');
+        var brokenCount = 0;
+        
+        images.forEach(function(img) {
+            img.addEventListener('error', function() {
+                brokenCount++;
+                console.error('Broken image: ' + img.src);
+                document.getElementById('debug-status').textContent = 'Found ' + brokenCount + ' broken images';
+                document.getElementById('debug-status').style.color = 'red';
+                
+                // Add fallback image and apply class for styling
+                this.src = '/static/broken_image.png';
+                
+                // Add the broken-image class to the parent container
+                var container = this.closest('.image-container');
+                if (container) {
+                    container.classList.add('broken-image');
+                }
+                
+                // Show debug info for this image
+                var container = this.closest('.image-container');
+                if (container) {
+                    var debugInfo = container.querySelector('.debug-info');
+                    if (debugInfo) {
+                        debugInfo.style.display = 'block';
+                    }
+                }
             });
-            
-            document.getElementById('debug-button').textContent = 
-                isVisible ? 'Show Debug Info' : 'Hide Debug Info';
-        }
-    </script>
+        });
+    }
     
-    <!-- Debug controls -->
-    <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; z-index: 1000;">
-        <button id="debug-button" onclick="toggleDebug()">Show Debug Info</button>
-        <span id="debug-status" style="color: white; margin-left: 10px;">No broken images found</span>
-    </div>
+    // Toggle debug mode
+    function toggleDebug() {
+        var debugInfo = document.querySelectorAll('.debug-info');
+        var isVisible = debugInfo.length > 0 && debugInfo[0].style.display === 'block';
+        
+        debugInfo.forEach(function(info) {
+            info.style.display = isVisible ? 'none' : 'block';
+        });
+        
+        document.getElementById('debug-button').textContent = 
+            isVisible ? 'Show Debug Info' : 'Hide Debug Info';
+    }
+</script>
+
+<!-- Debug controls -->
+<div class="debug-controls">
+    <button id="debug-button" onclick="toggleDebug()">Show Debug Info</button>
+    <span id="debug-status" style="color: white; margin-left: 10px;">No broken images found</span>
+</div>
 </body>
 </html>
 

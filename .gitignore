@@ -6,3 +6,6 @@ env/*
 /tempdata/*
 *.pickle
 for_gabby/*
+*.sh
+*.log
+*.pid

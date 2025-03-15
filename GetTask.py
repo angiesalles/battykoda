@@ -237,20 +237,21 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
         img_src = spectr_particle_fun(other, _overview=False)
         audio_src = audio_particle_fun(other, _overview=False)
         
-        # Add each image with debug handling
+        # Add each image with debug handling - without inline styling
         other_html.append(f"""
-        <p>
-          <div class="image-container" style="position: relative; display: inline-block;">
-            <img src="{img_src}" width="600" height="250" 
-              onerror="this.onerror=null; this.src='/static/broken_image.png'; this.style.border='2px solid red'; this.parentNode.classList.add('broken-image'); console.log('Broken image: {img_src}');" />
-            <div class="debug-info" style="display: none; position: absolute; top: 0; left: 0; background: rgba(255,0,0,0.7); color: white; padding: 2px; font-size: 10px;">
+        <div class="channel-item">
+          <h4>Channel {other+1}</h4>
+          <div class="image-container">
+            <img src="{img_src}" class="responsive-image"
+              onerror="this.onerror=null; this.src='/static/broken_image.png'; this.parentNode.classList.add('broken-image'); console.log('Broken image: {img_src}');" />
+            <div class="debug-info">
                 Path: {img_src}
             </div>
           </div>
-          <audio controls src="{audio_src}" preload="none">
+          <audio controls src="{audio_src}" preload="none" class="channel-audio">
             Your browser does not support the audio element.
           </audio>
-        </p>
+        </div>
         """)
     # We have all required imports at the function start
     
