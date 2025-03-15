@@ -1,11 +1,8 @@
-run = ["bash", "-c", "python ensure_db.py && python check_r_setup.py && python main.py"]
+run = "bash -c 'python ensure_db.py && python check_r_setup.py && python main.py'"
 language = "python3"
-
-# Add auto-install for packages
 entrypoint = "main.py"
 onBoot = ["pip install -r requirements.txt"]
 
-# Environment configuration
 [env]
 PYTHON_VERSION = "3.12"
 FLASK_DEBUG = "1"
