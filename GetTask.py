@@ -71,13 +71,13 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
             <p>{error_desc}</p>
             {error_reason}
             <p>
-                <a href="/battykoda/home/" style="color: #0066cc;">Return to Home Directory</a> | 
-                <a href="/battykoda/home/{username}/" style="color: #0066cc;">Return to User Directory</a>
-                {f' | <a href="/battykoda/home/{username}/{species}/" style="color: #0066cc;">Return to Species Directory</a>' if species else ''}
+                <a href="/battycoda/home/" style="color: #0066cc;">Return to Home Directory</a> | 
+                <a href="/battycoda/home/{username}/" style="color: #0066cc;">Return to User Directory</a>
+                {f' | <a href="/battycoda/home/{username}/{species}/" style="color: #0066cc;">Return to Species Directory</a>' if species else ''}
             </p>
         </div>
         """
-        return render_template('listBK.html', data={'listicle': Markup(error_message)})
+        return render_template('listBC.html', data={'listicle': Markup(error_message)})
     if undo:
         popped = segment_data['labels'].pop()
         assumed_answer = popped['type_call']
@@ -200,10 +200,10 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
         confidence = max(0, min(100, confidence))
     if call_to_do == len(segment_data['offsets']):
         return render_template('endFile.html',
-                               data={'filedirectory': '/battykoda/' + '/'.join(path.split('/')[:-2]) + '/'})
+                               data={'filedirectory': '/battycoda/' + '/'.join(path.split('/')[:-2]) + '/'})
     backfragment = ''
     if call_to_do > 0:
-        backfragment = Markup('<a href="/battykoda/back/'+path+'">Undo</a>')
+        backfragment = Markup('<a href="/battycoda/back/'+path+'">Undo</a>')
     txtsp, jpgsp = hG.spgather(path, osfolder, assumed_answer)
     
     # Process path for audio access
@@ -270,4 +270,4 @@ def get_task(path_to_file, path, user_setting, osfolder, undo=False):
             'max_main': thr_x1.shape[1],
             'others': Markup(''.join(other_html)),
             }
-    return render_template('AngieBK.html', data={**user_setting, **data})
+    return render_template('classification_view.html', data={**user_setting, **data})

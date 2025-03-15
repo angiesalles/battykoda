@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BattyCoda - Register</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>BattyCoda</h1>
+        <p>Animal Vocalization Analysis Tool</p>
+    </div>
+    
+    <div class="auth-container">
+        <h2>Register</h2>
+        
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for message in messages %}
+            <div class="flash-message">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="{{ url_for('auth.register') }}">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div style="display: flex; align-items: center;">
+                    <input type="password" id="password" name="password" required style="flex-grow: 1; margin-right: 10px;">
+                    <button type="button" id="suggest-password" class="btn" style="white-space: nowrap; margin-right: 5px;">Suggest Strong Password</button>
+                    <button type="button" id="copy-password" class="btn" style="display: none; white-space: nowrap;">Copy</button>
+                </div>
+                <div id="password-strength" style="margin-top: 5px; font-size: 0.9em;"></div>
+                <div id="copy-notification" class="notification" style="display: none;">Password copied to clipboard!</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="btn btn-block">Register</button>
+            </div>
+            
+            <div class="login-link">
+                Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const suggestPasswordBtn = document.getElementById('suggest-password');
+            const copyPasswordBtn = document.getElementById('copy-password');
+            const passwordInput = document.getElementById('password');
+            const confirmPasswordInput = document.getElementById('confirm_password');
+            const passwordStrengthDiv = document.getElementById('password-strength');
+            const copyNotification = document.getElementById('copy-notification');
+            
+            // Generate a strong random password
+            function generateStrongPassword() {
+                const length = 16;
+                const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+';
+                let password = '';
+                
+                // Ensure at least one of each character type
+                password += getRandomChar('ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+                password += getRandomChar('abcdefghijklmnopqrstuvwxyz');
+                password += getRandomChar('0123456789');
+                password += getRandomChar('!@#$%^&*()-_=+');
+                
+                // Fill the rest with random characters
+                for (let i = 4; i < length; i++) {
+                    const randomIndex = Math.floor(Math.random() * charset.length);
+                    password += charset[randomIndex];
+                }
+                
+                // Shuffle the password characters
+                return shuffleString(password);
+            }
+            
+            function getRandomChar(charset) {
+                const randomIndex = Math.floor(Math.random() * charset.length);
+                return charset[randomIndex];
+            }
+            
+            function shuffleString(str) {
+                const array = str.split('');
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array.join('');
+            }
+            
+            // Check password strength
+            function checkPasswordStrength(password) {
+                let strength = 0;
+                
+                // Length check
+                if (password.length >= 12) {
+                    strength += 25;
+                } else if (password.length >= 8) {
+                    strength += 10;
+                }
+                
+                // Character type checks
+                if (/[A-Z]/.test(password)) strength += 20;
+                if (/[a-z]/.test(password)) strength += 15;
+                if (/[0-9]/.test(password)) strength += 20;
+                if (/[^A-Za-z0-9]/.test(password)) strength += 20;
+                
+                // Variety check
+                const uniqueChars = new Set(password).size;
+                if (uniqueChars > 12) strength += 20;
+                else if (uniqueChars > 8) strength += 10;
+                
+                return strength;
+            }
+            
+            function updatePasswordStrengthIndicator(password) {
+                const strength = checkPasswordStrength(password);
+                let message = '';
+                let color = '';
+                
+                if (strength >= 90) {
+                    message = 'Very Strong';
+                    color = '#22c55e'; // Green
+                } else if (strength >= 70) {
+                    message = 'Strong';
+                    color = '#16a34a'; // Light green
+                } else if (strength >= 50) {
+                    message = 'Moderate';
+                    color = '#f59e0b'; // Yellow
+                } else if (strength >= 30) {
+                    message = 'Weak';
+                    color = '#f97316'; // Orange
+                } else {
+                    message = 'Very Weak';
+                    color = '#ef4444'; // Red
+                }
+                
+                passwordStrengthDiv.textContent = `Password Strength: ${message}`;
+                passwordStrengthDiv.style.color = color;
+            }
+            
+            // Copy password to clipboard
+            function copyToClipboard(text) {
+                navigator.clipboard.writeText(text).then(
+                    function() {
+                        // Success
+                        copyNotification.style.display = 'block';
+                        setTimeout(function() {
+                            copyNotification.style.display = 'none';
+                        }, 3000);
+                    },
+                    function() {
+                        // Failed
+                        alert('Failed to copy password. Please copy it manually.');
+                    }
+                );
+            }
+            
+            // Event listeners
+            suggestPasswordBtn.addEventListener('click', function() {
+                const newPassword = generateStrongPassword();
+                passwordInput.value = newPassword;
+                confirmPasswordInput.value = newPassword;
+                passwordInput.type = "text"; // Show the password
+                confirmPasswordInput.type = "text";
+                
+                // Show copy button
+                copyPasswordBtn.style.display = 'inline-block';
+                
+                // Hide password after 8 seconds
+                setTimeout(function() {
+                    passwordInput.type = "password";
+                    confirmPasswordInput.type = "password";
+                }, 8000);
+                
+                updatePasswordStrengthIndicator(newPassword);
+            });
+            
+            copyPasswordBtn.addEventListener('click', function() {
+                copyToClipboard(passwordInput.value);
+            });
+            
+            passwordInput.addEventListener('input', function() {
+                updatePasswordStrengthIndicator(this.value);
+                
+                // Show/hide copy button based on whether there's a password
+                if (this.value.length > 0) {
+                    copyPasswordBtn.style.display = 'inline-block';
+                } else {
+                    copyPasswordBtn.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

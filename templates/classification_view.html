@@ -1,252 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>BattyKoda - Bat Call Analysis</title>
+    <title>BattyCoda - Vocalization Classification</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {
-            background-color: #121212;
-            color: white;
-            font-family: Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+        html, body {
+            max-width: 100%;
             overflow-x: hidden;
-        }
-        
-        img {
-            max-width: 100%;
-            height: auto;
-        }
-        
-        .header {
-            background-color: #e57373;
-            color: black;
-            padding: 15px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        .grid-container {
-            display: grid;
-            grid-template-columns: 32% 32% 32%;
-            grid-template-rows: auto auto auto;
-            grid-gap: 2%;
-            padding: 15px;
-            width: 96%;
-            max-width: 1200px;
-            margin: 0 auto;
-            box-sizing: border-box;
-        }
-        
-        .spectrogram-small {
-            grid-column: 1;
-            grid-row: 1;
-            background-color: #1e1e1e;
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        
-        .controls {
-            grid-column: 1;
-            grid-row: 2;
-            background-color: #1e1e1e;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        
-        .call-type {
-            grid-column: 2;
-            grid-row: 1;
-            background-color: #1e1e1e;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        
-        .spectrogram-large {
-            grid-column: 3;
-            grid-row: 1 / span 2;
-            background-color: #1e1e1e;
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        
-        .audio-section {
-            grid-column: 1 / span 2;
-            grid-row: 3;
-            background-color: #1e1e1e;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        
-        .confidence {
-            grid-column: 2;
-            grid-row: 2;
-            background-color: #1e1e1e;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        
-        .others {
-            grid-column: 3;
-            grid-row: 3;
-            background-color: #1e1e1e;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        
-        .button-group {
-            margin-top: 15px;
-            text-align: center;
-        }
-        
-        input[type="submit"], button {
-            background-color: #e57373;
-            color: black;
-            border: none;
-            padding: 8px 15px;
-            margin: 5px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        
-        input[type="submit"]:hover, button:hover {
-            background-color: #ef5350;
-        }
-        
-        input[type="text"], input[type="number"] {
-            background-color: #333;
-            color: white;
-            border: 1px solid #555;
-            padding: 5px;
-            border-radius: 3px;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-        
-        audio {
-            max-width: 100%;
-        }
-        
-        .other-channels-content img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-        }
-        
-        .other-channels-content audio {
-            max-width: 100%;
-            display: block;
-            margin: 10px auto;
-        }
-        
-        .other-channels-content .channel-item {
-            margin-top: 20px;
-            margin-bottom: 5px;
-            border-top: 1px solid #333;
-            padding-top: 15px;
-        }
-        
-        .responsive-image {
-            max-width: 100%;
-            height: auto;
-        }
-        
-        .image-container {
-            position: relative;
-            display: block;
-            margin-bottom: 10px;
-        }
-        
-        .image-container.broken-image {
-            border: 2px solid red;
-        }
-        
-        .debug-info {
-            display: none;
-            position: absolute;
-            top: 0;
-            left: 0;
-            background: rgba(255,0,0,0.7);
-            color: white;
-            padding: 2px;
-            font-size: 10px;
-        }
-        
-        .channel-audio {
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        label {
-            margin-right: 10px;
-        }
-        
-        .debug-controls {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
-        }
-        
-        /* Make layout more responsive at different screen sizes */
-        @media (max-width: 1200px) {
-            .grid-container {
-                grid-template-columns: 1fr 1fr;
-            }
-            
-            .spectrogram-large {
-                grid-column: 1 / span 2;
-                grid-row: 3;
-            }
-            
-            .others {
-                grid-column: 1 / span 2;
-                grid-row: 4;
-            }
-            
-            .audio-section {
-                grid-column: 1 / span 2;
-                grid-row: 5;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .grid-container {
-                grid-template-columns: 1fr;
-                width: 95%;
-            }
-            
-            .spectrogram-small,
-            .controls,
-            .call-type,
-            .confidence,
-            .spectrogram-large,
-            .audio-section,
-            .others {
-                grid-column: 1;
-            }
-            
-            .spectrogram-small { grid-row: 1; }
-            .controls { grid-row: 2; }
-            .call-type { grid-row: 3; }
-            .confidence { grid-row: 4; }
-            .spectrogram-large { grid-row: 5; }
-            .audio-section { grid-row: 6; }
-            .others { grid-row: 7; }
         }
     </style>
 </head>
 <body>
 <div class="header">
-    <h1>BattyKoda</h1>
-    <p>Current experiment: User / Species / Date</p>
+    <h1>BattyCoda</h1>
+    <p>Animal Vocalization Analysis Tool</p>
 </div>
+
+{% if current_user.is_authenticated %}
+<div class="nav-container">
+    <div class="nav-links">
+        <a href="{{ url_for('home') }}">Home</a>
+        <a href="/battycoda/home/{{ current_user.username }}/">My Files</a>
+    </div>
+    <div class="user-info">
+        <span>Logged in as: <strong>{{ current_user.username }}</strong></span>
+        <a href="{{ url_for('auth.profile') }}" style="margin-left: 15px; margin-right: 15px;">Profile</a>
+        <a href="/logout" class="button">Logout</a>
+    </div>
+</div>
+{% endif %}
 
 <form method="post">
 
@@ -294,7 +77,7 @@
     
     <!-- Call type section -->
     <div class="call-type">
-        <h3>Call Type Classification</h3>
+        <h3>Vocalization Classification</h3>
         
         <div style="margin-bottom: 10px;">
             <input type="radio" id="correct" name="type_call" value="correct">
@@ -428,6 +211,15 @@
     <button id="debug-button" onclick="toggleDebug()">Show Debug Info</button>
     <span id="debug-status" style="color: white; margin-left: 10px;">No broken images found</span>
 </div>
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<div class="flash-messages">
+    {% for message in messages %}
+    <div class="flash-message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
 </body>
 </html>
-

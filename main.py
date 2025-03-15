@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 import traceback
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, url_for, redirect, flash, session
 from markupsafe import Markup
 import scipy.signal
 import scipy.io
@@ -24,9 +24,14 @@ from datetime import datetime
 import pickle
 import csv
 import getpass
+from flask_login import LoginManager, current_user, login_required, logout_user
 
 # Import utility functions
 import utils
+
+# Import auth module and database models
+from auth import auth_bp
+from database import db, User
 
 # Configure logging
 logging.basicConfig(
@@ -50,11 +55,45 @@ else:  # macOS or Linux
 home_path = utils.get_home_directory()
 
 app = Flask(__name__, static_folder='static')
-global_user_setting = {'limit_confidence': '90',
-                       'user_name': "",
-                       'contrast': '4',
-                       'loudness': '0.5',
-                       'main': '1'}
+
+# Configure the Flask app
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'battycoda-secret-key-development')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.getcwd(), 'battycoda.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize SQLAlchemy with the app
+db.init_app(app)
+
+# Initialize LoginManager
+login_manager = LoginManager()
+login_manager.login_view = 'auth.login'  # Flask-Login knows to prepend the blueprint URL prefix
+login_manager.init_app(app)
+
+# Register auth blueprint
+app.register_blueprint(auth_bp, url_prefix='/auth')
+
+# User loader for Flask-Login
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# Default settings for non-authenticated users
+default_user_setting = {
+    'limit_confidence': '90',
+    'user_name': "",
+    'contrast': '4',
+    'loudness': '0.5',
+    'main': '1'
+}
+
+# Function to get settings for the current user
+def get_user_settings():
+    if current_user.is_authenticated:
+        return current_user.get_settings_dict()
+    return default_user_setting.copy()
+
+# Global user setting (retained for backward compatibility)
+global_user_setting = default_user_setting.copy()
 
 # Create a custom filter to handle image paths and add debugging
 @app.template_filter('debug_image')
@@ -96,6 +135,8 @@ global_work_queue = queue.PriorityQueue()
 
 def initialize_app():
     """Initialize the app by starting worker threads"""
+    # Note: Database initialization moved to init_db.py to avoid circular imports
+    
     # Start worker threads
     threading.Thread(target=Workers.worker,
                      args=(global_request_queue, global_work_queue, osfolder),
@@ -115,6 +156,53 @@ def mainfunction():
 
 @app.route('/')
 def mainpage():
+    """Main landing page"""
+    # Redirect to login if not authenticated
+    if not current_user.is_authenticated:
+        return redirect(url_for('auth.login'))
+    
+    # If authenticated, proceed to home page
+    return redirect(url_for('home'))
+
+@app.route('/login')
+def main_login():
+    """Direct login route for compatibility with legacy logout"""
+    print("MAIN LOGIN: Direct access")
+    # Force session clear if coming from logout
+    if request.referrer and '/logout' in request.referrer:
+        print("MAIN LOGIN: Coming from logout, clearing session")
+        session.clear()
+    
+    # Redirect to auth login
+    return redirect(url_for('auth.login'))
+
+# Direct logout route for legacy compatibility
+@app.route('/logout')
+def legacy_logout():
+    """Legacy direct logout route for compatibility"""
+    print("LEGACY LOGOUT: Accessed directly")
+    
+    # Force session end
+    if hasattr(current_user, 'id'):
+        print(f"LEGACY LOGOUT: Current user ID: {current_user.id}")
+    else:
+        print("LEGACY LOGOUT: No current user ID")
+    
+    # Clear all session vars
+    session.clear()
+    logout_user()
+    
+    # Add a message
+    flash('You have been logged out via legacy route.')
+    print("LEGACY LOGOUT: Redirecting to login")
+    
+    # Direct redirect
+    return redirect('/login')
+
+@app.route('/home')
+@login_required
+def home():
+    """Home page with user directories and species info"""
     # Get available species and generate links
     available_species = htmlGenerator.available_species()
     species_links = ""
@@ -122,30 +210,16 @@ def mainpage():
     # Add a section for user directories
     species_links += '<li><b>User Directories:</b></li>'
     
-    # Get current username from the system
-    import getpass
-    import os
-    current_user = getpass.getuser()
-    
     # Add a link to the current user's directory
-    species_links += f'<li><a href="/battykoda/home/{current_user}/"><strong>Your Directory</strong> ({current_user})</a></li>'
+    username = current_user.username
+    species_links += f'<li><a href="/battycoda/home/{username}/"><strong>Your Directory</strong> ({username})</a></li>'
     
-    # Get all user directories from the system
-    try:
-        if platform.system() == "Darwin":  # macOS
-            user_dir = "/Users"
-            users = os.listdir(user_dir)
-            # Filter out system directories and dotfiles
-            users = [u for u in users if not u.startswith('.') and u != 'Shared' and u != current_user]
-            users.sort()
-            
-            # Add other user directories
-            if users:
-                for user in users:
-                    if os.path.isdir(os.path.join(user_dir, user)):
-                        species_links += f'<li><a href="/battykoda/home/{user}/">{user}</a></li>'
-    except (FileNotFoundError, PermissionError):
-        pass
+    # If user is admin, show all users' directories
+    if current_user.is_admin:
+        all_users = User.query.filter(User.username != username).order_by(User.username).all()
+        if all_users:
+            for user in all_users:
+                species_links += f'<li><a href="/battycoda/home/{user.username}/">{user.username}</a></li>'
     
     # Add available species templates section
     if available_species:
@@ -156,13 +230,16 @@ def mainpage():
     else:
         species_links += '<li>No species templates available. Please check the static folder.</li>'
     
-    return render_template('welcometoBK.html', species_links=species_links)
+    return render_template('welcometoBC.html', species_links=species_links, user=current_user)
 
 
-@app.route('/battykoda/<path:path>', methods=['POST', 'GET'])
+@app.route('/battycoda/<path:path>', methods=['POST', 'GET'])
+@login_required
 def handle_batty(path):
     global global_user_setting
-    user_setting = global_user_setting
+    
+    # Get user settings from authenticated user or default
+    user_setting = get_user_settings()
     
     try:
         # Use utility function to convert path to OS-specific format
@@ -171,6 +248,15 @@ def handle_batty(path):
         # Handle any unexpected errors in path modification
         print(f"Error processing path {path}: {str(e)}")
         modified_path = path  # Fall back to original path if there's an error
+    
+    # Check if user has access to this path
+    path_parts = path.strip('/').split('/')
+    if path_parts[0] == 'home' and len(path_parts) > 1:
+        path_username = path_parts[1]
+        # Only allow access to user's own directory or admin access to all
+        if path_username != current_user.username and not current_user.is_admin:
+            flash("You don't have permission to access this directory", "error")
+            return redirect(url_for('home'))
     
     
     if os.path.isdir(osfolder + modified_path):
@@ -222,6 +308,7 @@ def handle_batty(path):
 
 
 @app.route('/img/<path:path>', methods=['GET'])
+@login_required
 def handle_image(path):
     """
     Handle image generation and serving for bat call spectrograms.
@@ -401,6 +488,7 @@ def create_error_image(error_message):
 
 
 @app.route('/audio/<path:path>')
+@login_required
 def handle_sound(path):
     # Convert path to OS-specific format
     mod_path = utils.convert_path_to_os_specific(path)
@@ -433,7 +521,7 @@ def species_info(species_name):
     all_species = htmlGenerator.available_species()
     if species_name not in all_species:
         # Species not found
-        return render_template('listBK.html', 
+        return render_template('listBC.html', 
                               data={'listicle': Markup(f'<li>Species template "{species_name}" not found</li><li><a href="/">Return to home page</a></li>')})
     
     # Read the species text file
@@ -454,7 +542,7 @@ def species_info(species_name):
                     })
     except Exception as e:
         # Error reading species file
-        return render_template('listBK.html', 
+        return render_template('listBC.html', 
                               data={'listicle': Markup(f'<li>Error reading species data: {str(e)}</li><li><a href="/">Return to home page</a></li>')})
     
     # Check if image exists
@@ -518,7 +606,7 @@ def species_info(species_name):
     
     content += f"""
             <p>Click below to navigate to this species template in your user directory:</p>
-            <p><a href="/battykoda/home/{current_user}/{species_name}/" class="button" style="display: inline-block; padding: 12px 20px; background-color: #2ecc71; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">Open in Your Directory ({current_user})</a></p>
+            <p><a href="/battycoda/home/{current_user}/{species_name}/" class="button" style="display: inline-block; padding: 12px 20px; background-color: #2ecc71; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">Open in Your Directory ({current_user})</a></p>
     """
     
     if other_users:
@@ -529,7 +617,7 @@ def species_info(species_name):
         
         for user in other_users:
             content += f"""
-                <a href="/battykoda/home/{user}/{species_name}/" style="display: inline-block; padding: 8px 15px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-bottom: 10px;">{user}</a>
+                <a href="/battycoda/home/{user}/{species_name}/" style="display: inline-block; padding: 8px 15px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-bottom: 10px;">{user}</a>
             """
             
         content += """
@@ -541,12 +629,12 @@ def species_info(species_name):
         
         <div style="margin-top: 30px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
             <a href="/" style="display: inline-block; padding: 10px 20px; background-color: #95a5a6; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px;">Return to Home Page</a>
-            <a href="/battykoda/home/" style="display: inline-block; padding: 10px 20px; background-color: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Browse All Users</a>
+            <a href="/battycoda/home/" style="display: inline-block; padding: 10px 20px; background-color: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Browse All Users</a>
         </div>
     </div>
     """
     
-    return render_template('listBK.html', data={'listicle': Markup(content)})
+    return render_template('listBC.html', data={'listicle': Markup(content)})
 
 
 if __name__ == '__main__':

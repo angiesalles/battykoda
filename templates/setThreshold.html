@@ -1,41 +1,78 @@
 <!DOCTYPE html>
 <html>
-<body style="background-color:PeachPuff;">
-<div class="container" style="position: relative; background-color:Salmon" align="center">
-<h1 style="font-family:Helvetica">Welcome to BattyKoda</h1>
+<head>
+    <title>BattyCoda - Set Threshold</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .images-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .radio-group {
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>BattyCoda</h1>
+    <p>Animal Vocalization Analysis Tool</p>
 </div>
 
-
-<div>
-    <div class="container" style="position: relative; background-color:Salmon" align="center">
-    <table><tr><td><img src="{{data.images[0]}}" /></td>
+<div class="container">
+    <div class="images-container">
+        <div class="image-wrapper">
+            <img src="{{data.images[0]}}" alt="Threshold Example 1" />
+        </div>
+        <div class="image-wrapper">
+            <img src="{{data.images[1]}}" alt="Threshold Example 2" />
+        </div>
+        <div class="image-wrapper">
+            <img src="{{data.images[2]}}" alt="Threshold Example 3" />
+        </div>
     </div>
-    <div class="container" style="position: relative; background-color:Salmon" align="center">
-        <td><img src="{{data.images[1]}}" /></td>
+    
+    <div class="form-container">
+        <h2>Set Detection Threshold</h2>
+        <form method="post">
+            <div class="form-group">
+                <label for="threshold_nb">Threshold Value:</label>
+                <input required
+                   type="text"
+                   onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('threshold_nb').value))"
+                   id="threshold_nb"
+                   name="threshold_nb"
+                   value="{{data.threshold}}">
+            </div>
+            
+            <div class="radio-group">
+                <div>
+                    <input type="radio" id="correct" name="threshold" value="correct">
+                    <label for="correct">Use current threshold</label>
+                </div>
+                
+                <div>
+                    <input type="radio" id="change" name="threshold" value="change" checked="checked">
+                    <label for="change">Update threshold</label>
+                </div>
+            </div>
+            
+            <button id="submitbutton" type="submit" class="btn">Apply Threshold</button>
+        </form>
     </div>
-    <div class="container" style="position: relative; background-color:Salmon" align="center">
-        <td><img src="{{data.images[2]}}" /></td>
-    </div>
-    </tr></table>
-    <form method="post">
-
-<p style="font-family:Helvetica"><label for="threshold_nb">Threshold:</label>
-<input required
-       type="text"
-       onchange="document.getElementById('submitbutton').disabled=isNaN(Number(document.getElementById('threshold_nb').value))"
-       id="threshold_nb"
-       name="threshold_nb"
-       value="{{data.threshold}}">
-<br>
-<input type="radio" id="correct" name="threshold" value="correct">
-<label for="correct" style="font-family:Helvetica">Use threshold</label></br>
-
-<input type="radio" id="change" name="threshold" value="change" checked="checked">
-<label for="change" style="font-family:Helvetica">Update threshold</label></br>
-<input id="submitbutton" type="submit" value="Submit">
-</form>
-
 </div>
 
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<div class="flash-messages">
+    {% for message in messages %}
+    <div class="flash-message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
 </body>
 </html>

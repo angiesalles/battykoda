@@ -1,8 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>BattyCoda - Processing Complete</title>
+    <title>BattyCoda - Review Classifications</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
@@ -11,10 +10,18 @@
     <p>Animal Vocalization Analysis Tool</p>
 </div>
 
-<div class="content-container">
-    <div class="success-message">Processing Complete!</div>
-    <p>You have finished analyzing all vocalizations in this file.</p>
-    <a href="{{ data.filedirectory }}" class="btn">Return to Directory</a>
+<div class="container">
+    <h2>Review Classifications: {{data.title}}</h2>
+    
+    <form method="post">
+        <table>
+            <tr>
+                {{ data.output }}
+            </tr>
+        </table>
+        
+        <input id='submitbutton' type="submit" name='submitbutton' value="Save" class="btn">
+    </form>
 </div>
 
 {% with messages = get_flashed_messages() %}

@@ -47,11 +47,18 @@ def spgather(wholepath, osfolder, assumed_answer):
       return "", jpgname
    collectstrings=''
    for idx in range(len(lines)):
-      namecall= lines[idx].split(',')[0]
+      line_parts = lines[idx].split(',', 1)
+      namecall = line_parts[0].strip()
+      description = line_parts[1].strip() if len(line_parts) > 1 else ""
+      
       particle = ''
       if namecall == assumed_answer:
          particle = "checked='checked'"
-      radiobutton=f'<input {particle} type="radio" id="{namecall}" name="type_call" value="{namecall}"><label for="{namecall}" style="font-family:Helvetica">{namecall}</label></br>'
+      
+      # Include the description in a span with appropriate styling
+      desc_html = f'<span style="color: #a0a0a0; margin-left: 5px; font-size: 0.9em;">{description}</span>' if description else ''
+      
+      radiobutton=f'<input {particle} type="radio" id="{namecall}" name="type_call" value="{namecall}"><label for="{namecall}" style="font-family:Helvetica">{namecall}</label> {desc_html}</br>'
       collectstrings+=radiobutton
 
    return collectstrings, jpgname

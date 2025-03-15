@@ -1,5 +1,5 @@
 """
-Utility functions for BattyKoda application.
+Utility functions for BattyCoda application.
 Contains common functions used across multiple files.
 """
 import os

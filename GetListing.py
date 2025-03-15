@@ -44,7 +44,7 @@ def get_listing(path_to_file, osfolder, path):
                          + particle\
                          + "'><br /></td>"
                          
-        return render_template('AngieBK_review.html', data={'title': path_to_file.split('/')[-1][:-12],
+        return render_template('classification_review.html', data={'title': path_to_file.split('/')[-1][:-12],
                                                           'output': Markup(collector)})
                                                           
     except (FileNotFoundError, IOError) as e:
@@ -66,10 +66,10 @@ def get_listing(path_to_file, osfolder, path):
                 <li>You may be trying to navigate to a folder that doesn't contain call data</li>
             </ul>
             <p>
-                <a href="/battykoda/home/" style="color: #0066cc;">Return to Home Directory</a> | 
-                <a href="/battykoda/home/{username}/" style="color: #0066cc;">Return to User Directory</a>
-                {f' | <a href="/battykoda/home/{username}/{species}/" style="color: #0066cc;">Return to Species Directory</a>' if species else ''}
+                <a href="/battycoda/home/" style="color: #0066cc;">Return to Home Directory</a> | 
+                <a href="/battycoda/home/{username}/" style="color: #0066cc;">Return to User Directory</a>
+                {f' | <a href="/battycoda/home/{username}/{species}/" style="color: #0066cc;">Return to Species Directory</a>' if species else ''}
             </p>
         </div>
         """
-        return render_template('listBK.html', data={'listicle': Markup(error_message)})
+        return render_template('listBC.html', data={'listicle': Markup(error_message)})
