@@ -13,7 +13,10 @@ def get_home_directory():
     Returns:
         str: The home directory path segment ("Users" for macOS, "home" for Linux/Others)
     """
-    if platform.system() == "Darwin":  # macOS
+    # Check if running on Replit
+    if os.environ.get('REPL_SLUG') or os.environ.get('REPL_ID'):
+        return "home"  # Always use "home" on Replit
+    elif platform.system() == "Darwin":  # macOS
         return "Users"
     elif platform.system() == "Windows":
         return "home"  # Use 'home' for URL paths on Windows

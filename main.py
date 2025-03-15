@@ -134,8 +134,20 @@ global_work_queue = queue.PriorityQueue()
 
 
 def initialize_app():
-    """Initialize the app by starting worker threads"""
+    """Initialize the app by starting worker threads and creating necessary directories"""
     # Note: Database initialization moved to init_db.py to avoid circular imports
+    
+    # Create necessary directories if they don't exist
+    os.makedirs('data/home', exist_ok=True)
+    os.makedirs('static/tempdata', exist_ok=True)
+    
+    # Check if this is Replit and create sample data if needed
+    if os.environ.get('REPL_SLUG') or os.environ.get('REPL_ID'):
+        # Copy example species file if it doesn't exist in the right location
+        if os.path.exists('static/Efuscus.jpg') and os.path.exists('static/Efuscus.txt'):
+            logger.info("Sample species files found. Replit setup complete.")
+        else:
+            logger.warning("Sample species files not found in static directory. Check repository contents.")
     
     # Start worker threads
     threading.Thread(target=Workers.worker,
@@ -150,8 +162,11 @@ def mainfunction():
     # Initialize the app
     initialize_app()
     
+    # Get port from environment variable for Replit compatibility
+    port = int(os.environ.get('PORT', 8060))
+    
     # Start the server
-    app.run(host='0.0.0.0', debug=False, port=8060)
+    app.run(host='0.0.0.0', debug=False, port=port)
 
 
 @app.route('/')

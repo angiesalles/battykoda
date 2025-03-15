@@ -1,11 +1,27 @@
 env/*
+.venv/
+venv/
 .DS_Store
 .idea/*
-*.pyc
+.vscode/
+__pycache__/
+*.py[cod]
+*$py.class
 /data/*
 /tempdata/*
 *.pickle
 for_gabby/*
-*.sh
 *.log
 *.pid
+instance/
+*.db
+*.db-journal
+*.sqlite
+
+# All shell scripts should be ignored
+*.sh
+
+# Replit-specific files (but keep .replit and replit.nix)
+.config/
+.cache/
+.upm/
