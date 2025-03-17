@@ -15,6 +15,7 @@ import utils
 import GetListing
 from file_management import file_list
 from task_management import get_task
+from auth.utils import cloudflare_access_required
 
 # Configure logging
 logger = logging.getLogger('battykoda.routes.path')
@@ -39,6 +40,7 @@ def get_user_settings():
         return current_user.get_settings_dict()
     return default_user_setting.copy()
 
+@cloudflare_access_required
 def handle_back(path):
     """Handle back navigation (undo)"""
     # Add a flag to request.form to indicate this is an undo operation
@@ -53,6 +55,7 @@ def handle_back(path):
     
     return handle_batty(path)
 
+@cloudflare_access_required
 def handle_batty(path):
     """Main content handler for all paths"""
     # Get user settings from authenticated user or default

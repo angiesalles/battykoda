@@ -6,14 +6,79 @@ import os
 import secrets
 import string
 import logging
-from flask import current_app
+import requests
+import jwt
+from functools import wraps
+from flask import current_app, request, redirect, url_for, g
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.exceptions import Forbidden
 
 from database import db, User
 from email_service import email_service
 
 # Set up logging
-logger = logging.getLogger('battykoda.auth.utils')
+logger = logging.getLogger('battability.auth.utils')
+
+def validate_cloudflare_token(token, audience):
+    """
+    Validate a Cloudflare Access JWT token
+    
+    Args:
+        token (str): JWT token from Cloudflare Access
+        audience (str): The audience claim to validate
+        
+    Returns:
+        dict or None: Decoded token payload if valid, None otherwise
+    """
+    try:
+        # Fetch the Cloudflare Access certificates
+        cf_certs_url = "https://battycoda.cloudflareaccess.com/cdn-cgi/access/certs"
+        response = requests.get(cf_certs_url)
+        jwks = response.json()
+        
+        # Decode and validate the JWT
+        decoded = jwt.decode(
+            token,
+            jwks,
+            algorithms=["RS256"],
+            audience=audience,
+            options={"verify_exp": True}
+        )
+        
+        # Return the decoded token
+        return decoded
+    except Exception as e:
+        logger.error(f"Error validating Cloudflare token: {str(e)}")
+        return None
+
+def cloudflare_access_required(f):
+    """
+    Decorator to require Cloudflare Access authentication
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip if Cloudflare Access is not enabled
+        if not current_app.config.get('CLOUDFLARE_ACCESS_ENABLED', False):
+            return f(*args, **kwargs)
+        
+        # Get the Cloudflare Access JWT from the CF-Access-Jwt-Assertion header
+        cf_token = request.headers.get('CF-Access-Jwt-Assertion')
+        if not cf_token:
+            logger.warning("Missing Cloudflare Access token")
+            raise Forbidden("Cloudflare Access authentication required")
+        
+        # Validate the token
+        audience = current_app.config.get('CLOUDFLARE_AUDIENCE', '')
+        decoded_token = validate_cloudflare_token(cf_token, audience)
+        if not decoded_token:
+            logger.warning("Invalid Cloudflare Access token")
+            raise Forbidden("Invalid Cloudflare Access token")
+        
+        # Store the token data for use in the view
+        g.cf_user = decoded_token.get('email', '')
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 def create_user_account(username, email, password):
     """

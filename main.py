@@ -7,6 +7,23 @@ from flask import Flask, render_template, url_for
 from markupsafe import Markup
 from flask_login import LoginManager, current_user, login_required
 
+# Setup PyCharm debugger if needed
+def enable_pycharm_debugging():
+    """Configure PyCharm remote debugging if available"""
+    try:
+        import pydevd_pycharm
+        # Replace these parameters with your PyCharm debugging configuration
+        pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True)
+        print("PyCharm debugger connected successfully")
+        return True
+    except (ImportError, Exception) as e:
+        print(f"PyCharm debugger connection failed: {str(e)}")
+        print("Make sure you've installed 'pydevd-pycharm' package and configured the correct port.")
+        return False
+
+# Try enabling PyCharm debugging
+enable_pycharm_debugging()
+
 # Import utility functions
 import utils
 
@@ -49,6 +66,10 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'battycoda-secret-key-de
 db_path = os.path.join(os.getcwd(), 'battycoda.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Cloudflare Access configuration
+app.config['CLOUDFLARE_ACCESS_ENABLED'] = os.environ.get('CLOUDFLARE_ACCESS_ENABLED', 'False').lower() == 'true'
+app.config['CLOUDFLARE_AUDIENCE'] = os.environ.get('CLOUDFLARE_AUDIENCE', '')
 
 # Configure Celery integration
 app.config.update(

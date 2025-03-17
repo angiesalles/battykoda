@@ -33,7 +33,7 @@ def spgather(wholepath, assumed_answer):
    jpgname = '/static/'+species+'.jpg'
    
    try:
-      with open(static_folder + species + '.txt') as f:
+      with open(os.path.join(static_folder, species + '.txt')) as f:
          lines = f.readlines()
    except FileNotFoundError:
       # Return empty data if species file doesn't exist

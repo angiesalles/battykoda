@@ -4,7 +4,7 @@ Directory and navigation routes for the application.
 import os
 import platform
 import getpass
-from flask import render_template, redirect, url_for, session, request, flash
+from flask import render_template, redirect, url_for, session, request, flash, g, current_app
 from flask_login import current_user, login_required, logout_user
 from markupsafe import Markup
 import logging
@@ -12,12 +12,35 @@ import logging
 import htmlGenerator
 import utils
 from file_management import file_list
+from auth.utils import cloudflare_access_required
 
 # Configure logging
 logger = logging.getLogger('battykoda.routes.directory')
 
+@cloudflare_access_required
 def mainpage():
     """Main landing page"""
+    # Check if Cloudflare Access provides user info and auto-login is enabled
+    if hasattr(g, 'cf_user') and g.cf_user and current_app.config.get('CLOUDFLARE_ACCESS_ENABLED'):
+        # Auto-login based on Cloudflare user
+        email = g.cf_user
+        
+        # If the user is already authenticated, check if the emails match
+        if current_user.is_authenticated:
+            if current_user.email == email:
+                # Emails match, proceed to home page
+                return redirect(url_for('home'))
+        
+        # Try to find user by email
+        from database import User
+        user = User.query.filter_by(email=email).first()
+        if user:
+            # Auto login user (flask_login)
+            from flask_login import login_user
+            login_user(user)
+            logger.info(f"Auto-logged in user {user.username} via Cloudflare Access")
+            return redirect(url_for('home'))
+    
     # Redirect to login if not authenticated
     if not current_user.is_authenticated:
         return redirect(url_for('auth.login'))
