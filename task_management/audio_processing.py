@@ -15,7 +15,7 @@ R = True
 
 def run_r_classification(wav_file_path, onset, offset, species):
     """
-    Run the R script to classify a bat call.
+    Classify a bat call using either the R server API or fallback to direct R script.
     
     Args:
         wav_file_path (str): Path to the WAV file
@@ -30,14 +30,115 @@ def run_r_classification(wav_file_path, onset, offset, species):
     default_call_type = 'Echo'
     default_confidence = 50.0
     
+    # First, try using the R server API if available
     try:
-        # Use the classify_call.R script
+        import requests
+        import json
+        
+        # The URL of the R server - first try the direct KNN version, then fallback to the regular one
+        r_server_urls = ["http://localhost:8000", "http://localhost:8001"]
+        r_server_url = r_server_urls[0]  # Default to the first server
+        
+        # Try to ping the server to see if it's available
+        try:
+            # Try each server URL in order
+            server_connected = False
+            
+            for server_url in r_server_urls:
+                try:
+                    logger.info(f"Trying R server at {server_url}")
+                    response = requests.get(f"{server_url}/ping", timeout=2)
+                    
+                    if response.status_code == 200:
+                        server_status = response.json()
+                        if server_status.get('model_loaded', False):
+                            logger.info(f"R server is running with model loaded: {server_url}")
+                            r_server_url = server_url
+                            server_connected = True
+                            break
+                        else:
+                            logger.warning(f"R server is running but model is not loaded: {server_url}")
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"Could not connect to R server at {server_url}: {str(e)}")
+            
+            if not server_connected:
+                logger.error("Could not connect to any R server, falling back to direct R script")
+                raise Exception("No R server available")
+                    
+            # Send classification request to the server
+            data = {
+                'wav_path': wav_file_path,
+                'onset': onset,
+                'offset': offset,
+                'species': species
+            }
+            
+            logger.info(f"Sending classification request to R server: {r_server_url}")
+            classify_response = requests.post(f"{r_server_url}/classify", data=data, timeout=10)
+            
+            if classify_response.status_code == 200:
+                # Parse the response
+                result = classify_response.json()
+                logger.info(f"R server classification result: {json.dumps(result)}")
+                
+                if result.get('status')[0] == 'success':
+                    call_type = result.get('call_type', default_call_type)[0]
+                    confidence = result.get('confidence', default_confidence)[0]
+                    logger.info(f"R server classification: {call_type}, confidence: {confidence}")
+                    return call_type, confidence
+                else:
+                    # Server error, log the error message
+                    error_message = result.get('message', 'Unknown server error')
+                    logger.error(f"R server classification error: {error_message}")
+                    # Fall back to direct R script
+            else:
+                logger.error(f"R server classification failed with status code: {classify_response.status_code}")
+                # Fall back to direct R script
+        except requests.exceptions.RequestException as e:
+            # Connection error, server probably not running
+            logger.warning(f"Could not connect to R server: {str(e)}")
+            # Fall back to direct R script
+    except ImportError:
+        # Requests library not available
+        logger.warning("Python requests library not available, falling back to direct R script")
+        # Fall back to direct R script
+    
+    # If we get here, the R server approach failed, so fall back to using the R script directly
+    logger.info("Falling back to direct R script for classification")
+    
+    try:
+        # Use the classify_call.R script - get absolute path to ensure we can find it
         r_script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "classify_call.R")
+        
+        # Verify the model file exists
+        model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static/mymodel.RData")
+        if os.path.exists(model_path):
+            logger.info(f"Model file found at: {model_path}")
+        else:
+            logger.error(f"Model file not found at: {model_path}")
         
         # Remove trailing slash if it exists
         if wav_file_path.endswith('/'):
             wav_file_path = wav_file_path.rstrip('/')
             logger.info(f"Removed trailing slash: {wav_file_path}")
+            
+        # Verify the WAV file exists
+        if os.path.exists(wav_file_path):
+            logger.info(f"WAV file found at: {wav_file_path}")
+        else:
+            logger.error(f"WAV file not found at: {wav_file_path}")
+            
+        # Check if R is available
+        try:
+            r_version = subprocess.run(
+                ["Rscript", "--version"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            logger.info(f"R version: {r_version.stderr.strip() if r_version.stderr else 'unknown'}")
+        except Exception as e:
+            logger.error(f"Error checking R version: {str(e)}")
         
         # Log the command details
         cmd = [
@@ -57,7 +158,8 @@ def run_r_classification(wav_file_path, onset, offset, species):
             cmd,
             capture_output=True,
             text=True,
-            check=False  # Don't raise exception on non-zero exit
+            check=False,  # Don't raise exception on non-zero exit
+            env=dict(os.environ, R_LIBS_USER=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".r_libs"))
         )
         
         # Detailed logging of R script execution
@@ -80,12 +182,24 @@ def run_r_classification(wav_file_path, onset, offset, species):
         type_line = None
         conf_line = None
         
+        # Check for the specific default confidence value (60.0 or 85.0) to diagnose model loading issues
+        if "confidence: 60.0" in returnvalue.stdout or "confidence: 85.0" in returnvalue.stdout:
+            logger.warning("Detected default confidence value - model loading likely failed")
+            
+            # Check for model loading errors
+            for line in stdout_lines:
+                if "Unable to load model" in line or "Error loading model" in line:
+                    logger.error(f"Model loading error detected: {line}")
+                    
+                if "Error making prediction" in line:
+                    logger.error(f"Prediction error detected: {line}")
+        
         # Log all lines for debugging
         for i, line in enumerate(stdout_lines):
             logger.debug(f"Line {i}: {line}")
         
         # Look for lines containing call type and confidence values
-        # The new script outputs in a consistent format: "type: 'X'" and "confidence: Y.Z"
+        # The script outputs in a consistent format: "type: 'X'" and "confidence: Y.Z"
         for line in stdout_lines:
             if line.strip().startswith("type:"):
                 type_line = line
@@ -118,6 +232,9 @@ def run_r_classification(wav_file_path, onset, offset, species):
                 
             if conf_match:
                 logger.info(f"Extracted confidence: {confidence}")
+                # Check if we're getting the default 60.0 value that indicates model loading issues
+                if confidence == 60.0:
+                    logger.warning("Default confidence value detected - model may not be loading properly")
             else:
                 logger.warning("Could not extract confidence, using default 50.0")
         else:
