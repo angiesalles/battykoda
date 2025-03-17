@@ -24,6 +24,7 @@ def mainpage():
     if hasattr(g, 'cf_user') and g.cf_user and current_app.config.get('CLOUDFLARE_ACCESS_ENABLED'):
         # Auto-login based on Cloudflare user
         email = g.cf_user
+        cloudflare_user_id = g.cf_user_id if hasattr(g, 'cf_user_id') else None
         
         # If the user is already authenticated, check if the emails match
         if current_user.is_authenticated:
@@ -32,14 +33,71 @@ def mainpage():
                 return redirect(url_for('home'))
         
         # Try to find user by email
-        from database import User
+        from database import User, db
         user = User.query.filter_by(email=email).first()
+        
         if user:
+            # Update Cloudflare user ID if not already set
+            if cloudflare_user_id and not user.cloudflare_user_id:
+                user.cloudflare_user_id = cloudflare_user_id
+                user.is_cloudflare_user = True
+                db.session.commit()
+                logger.info(f"Updated user {user.username} with Cloudflare user ID")
+                
             # Auto login user (flask_login)
             from flask_login import login_user
             login_user(user)
+            user.update_last_login()
             logger.info(f"Auto-logged in user {user.username} via Cloudflare Access")
             return redirect(url_for('home'))
+        else:
+            # Auto-provision new user based on Cloudflare information
+            from auth.utils import create_user_account
+            
+            # Generate username from email if name not available
+            suggested_username = None
+            if hasattr(g, 'cf_user_name') and g.cf_user_name:
+                # Use the first part of the name from Cloudflare
+                suggested_username = g.cf_user_name.lower()
+            else:
+                # Use email prefix as username
+                suggested_username = email.split('@')[0]
+            
+            # Make username unique if needed
+            base_username = suggested_username
+            suffix = 1
+            while User.query.filter_by(username=suggested_username).first():
+                suggested_username = f"{base_username}{suffix}"
+                suffix += 1
+            
+            # Create the user account
+            success, message, new_user = create_user_account(
+                username=suggested_username, 
+                email=email, 
+                is_cloudflare_user=True
+            )
+            
+            if success and new_user:
+                # Set Cloudflare user ID
+                if cloudflare_user_id:
+                    new_user.cloudflare_user_id = cloudflare_user_id
+                    db.session.commit()
+                
+                # Auto login the new user
+                from flask_login import login_user
+                login_user(new_user)
+                new_user.update_last_login()
+                logger.info(f"Auto-provisioned and logged in new user {new_user.username} via Cloudflare Access")
+                
+                # Display welcome message
+                flash(f"Welcome to BattyCoda! Your account has been automatically created with username: {new_user.username}")
+                
+                return redirect(url_for('home'))
+            else:
+                # Failed to create account
+                logger.error(f"Failed to auto-provision user with email {email}: {message}")
+                flash("We couldn't automatically create your account. Please contact support.")
+                return redirect(url_for('auth.login'))
     
     # Redirect to login if not authenticated
     if not current_user.is_authenticated:

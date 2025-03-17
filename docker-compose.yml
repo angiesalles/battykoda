@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  web:
+    build: 
+      context: .
+      dockerfile: dockerfile.web
+    ports:
+      - "8060:8000"
+    volumes:
+      - .:/app
+      - data-volume:/app/data
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CLOUDFLARE_ACCESS_ENABLED=True
+      - CLOUDFLARE_AUDIENCE=${CLOUDFLARE_AUDIENCE}
+    depends_on:
+      - redis
+      - r-server-direct
+      - r-server-original
+    restart: unless-stopped
+    command: gunicorn --workers=3 --bind=0.0.0.0:8000 --timeout=120 wsgi:application
+
+  celery:
+    build: 
+      context: .
+      dockerfile: dockerfile.web
+    volumes:
+      - .:/app
+      - data-volume:/app/data
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+    command: celery -A celery_app.celery worker --loglevel=info
+
+  flower:
+    build: 
+      context: .
+      dockerfile: dockerfile.web
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery
+    restart: unless-stopped
+    command: celery -A celery_app.celery flower --port=5555
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  r-server-direct:
+    build:
+      context: .
+      dockerfile: dockerfile.r
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - r-libs:/usr/local/lib/R/site-library
+    restart: unless-stopped
+    command: Rscript r_server_direct.R
+
+  r-server-original:
+    build:
+      context: .
+      dockerfile: dockerfile.r
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/app
+      - r-libs:/usr/local/lib/R/site-library
+    restart: unless-stopped
+    command: Rscript r_prediction_server.R --port 8001
+
+volumes:
+  data-volume:
+  redis-data:
+  r-libs:

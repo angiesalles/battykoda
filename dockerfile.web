@@ -1,0 +1,36 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt gunicorn gevent
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p data/home logs static/tempdata
+
+# Set proper permissions
+RUN chmod +x *.sh
+
+# Create a non-root user
+RUN useradd -m battycoda
+RUN chown -R battycoda:battycoda /app
+USER battycoda
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV FLASK_ENV=production
+ENV FLASK_DEBUG=0
+
+# Default command
+CMD ["gunicorn", "--workers=3", "--bind=0.0.0.0:8000", "wsgi:application"]

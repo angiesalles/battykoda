@@ -1,0 +1,147 @@
+#!/bin/bash
+# Master control script for BattyCoda
+
+# Set up colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Determine the current directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
+
+# Functions
+show_help() {
+    echo -e "${BLUE}BattyCoda Control Script${NC}"
+    echo -e "${BLUE}======================${NC}"
+    echo
+    echo -e "${YELLOW}Usage:${NC}"
+    echo -e "  ./battycoda [command]"
+    echo
+    echo -e "${YELLOW}Commands:${NC}"
+    echo -e "  ${GREEN}start${NC}               Start using legacy shell scripts (dev mode)"
+    echo -e "  ${GREEN}stop${NC}                Stop using legacy shell scripts"
+    echo -e "  ${GREEN}docker-start${NC}        Start using Docker Compose"
+    echo -e "  ${GREEN}docker-stop${NC}         Stop Docker Compose services"
+    echo -e "  ${GREEN}docker-logs${NC}         Show Docker Compose logs"
+    echo -e "  ${GREEN}systemd-install${NC}     Install systemd services (requires sudo)"
+    echo -e "  ${GREEN}systemd-start${NC}       Start systemd services (requires sudo)"
+    echo -e "  ${GREEN}systemd-stop${NC}        Stop systemd services (requires sudo)"
+    echo -e "  ${GREEN}systemd-status${NC}      Show status of systemd services"
+    echo -e "  ${GREEN}logs${NC}                Show logs from log files"
+    echo -e "  ${GREEN}update${NC}              Update dependencies"
+    echo -e "  ${GREEN}secure${NC}              Add security hardening (requires sudo)"
+    echo -e "  ${GREEN}help${NC}                Show this help message"
+    echo
+    echo -e "${YELLOW}Examples:${NC}"
+    echo -e "  ./battycoda start"
+    echo -e "  ./battycoda docker-start"
+    echo -e "  sudo ./battycoda systemd-install"
+}
+
+# Handle command
+case "$1" in
+    "start")
+        echo -e "${BLUE}Starting BattyCoda with legacy scripts${NC}"
+        ./start_system.sh
+        ;;
+    "stop")
+        echo -e "${BLUE}Stopping BattyCoda${NC}"
+        ./stop_system.sh
+        ;;
+    "docker-start")
+        echo -e "${BLUE}Starting BattyCoda with Docker Compose${NC}"
+        ./start_production.sh
+        ;;
+    "docker-stop")
+        echo -e "${BLUE}Stopping BattyCoda Docker services${NC}"
+        ./stop_production.sh $2
+        ;;
+    "docker-logs")
+        echo -e "${BLUE}Showing Docker logs${NC}"
+        if docker info &>/dev/null; then
+            docker-compose logs -f
+        else
+            echo -e "${YELLOW}► Need elevated privileges for Docker. Using sudo...${NC}"
+            sudo docker-compose logs -f
+        fi
+        ;;
+    "systemd-install")
+        echo -e "${BLUE}Installing systemd services${NC}"
+        if [ "$(id -u)" -ne 0 ]; then
+            echo -e "${RED}Error: This command must be run as root (sudo)${NC}"
+            exit 1
+        fi
+        ./systemd/install-services.sh
+        ;;
+    "systemd-start")
+        echo -e "${BLUE}Starting systemd services${NC}"
+        if [ "$(id -u)" -ne 0 ]; then
+            echo -e "${RED}Error: This command must be run as root (sudo)${NC}"
+            exit 1
+        fi
+        systemctl start battycoda-web battycoda-celery battycoda-flower battycoda-r-direct battycoda-r-original
+        echo -e "${GREEN}Services started. Check status with: ./battycoda systemd-status${NC}"
+        ;;
+    "systemd-stop")
+        echo -e "${BLUE}Stopping systemd services${NC}"
+        if [ "$(id -u)" -ne 0 ]; then
+            echo -e "${RED}Error: This command must be run as root (sudo)${NC}"
+            exit 1
+        fi
+        systemctl stop battycoda-web battycoda-celery battycoda-flower battycoda-r-direct battycoda-r-original
+        echo -e "${GREEN}Services stopped${NC}"
+        ;;
+    "systemd-status")
+        echo -e "${BLUE}Systemd services status${NC}"
+        systemctl status battycoda-web battycoda-celery battycoda-flower battycoda-r-direct battycoda-r-original
+        ;;
+    "logs")
+        echo -e "${BLUE}Showing logs${NC}"
+        if [ -d "logs" ]; then
+            tail -f logs/*.log
+        else
+            echo -e "${RED}Log directory not found${NC}"
+        fi
+        ;;
+    "update")
+        echo -e "${BLUE}Updating dependencies${NC}"
+        pip install -r requirements.txt
+        pip install gunicorn gevent
+        ;;
+    "secure")
+        echo -e "${BLUE}Adding security hardening${NC}"
+        if [ "$(id -u)" -ne 0 ]; then
+            echo -e "${RED}Error: This command must be run as root (sudo)${NC}"
+            exit 1
+        fi
+        
+        # Basic security setup
+        echo -e "${YELLOW}Installing fail2ban for SSH protection...${NC}"
+        apt-get update && apt-get install -y fail2ban
+        
+        # Set up firewall if not already
+        echo -e "${YELLOW}Setting up firewall...${NC}"
+        apt-get install -y ufw
+        ufw default deny incoming
+        ufw default allow outgoing
+        # Allow SSH
+        ufw allow ssh
+        # Allow web server
+        ufw allow 8060/tcp  # Flask app
+        ufw allow 5555/tcp  # Flower
+        # Allow R servers
+        ufw allow 8000/tcp
+        ufw allow 8001/tcp
+        
+        echo -e "${YELLOW}Enabling firewall...${NC}"
+        echo "y" | ufw enable
+        
+        echo -e "${GREEN}Security hardening completed${NC}"
+        ;;
+    *)
+        show_help
+        ;;
+esac

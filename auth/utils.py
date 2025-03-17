@@ -31,15 +31,36 @@ def validate_cloudflare_token(token, audience):
         dict or None: Decoded token payload if valid, None otherwise
     """
     try:
+        # Extract domain from audience or use default
+        domain = audience.split('.')[0] if '.' in audience else 'battycoda'
+        
         # Fetch the Cloudflare Access certificates
-        cf_certs_url = "https://battycoda.cloudflareaccess.com/cdn-cgi/access/certs"
+        cf_certs_url = f"https://{domain}.cloudflareaccess.com/cdn-cgi/access/certs"
         response = requests.get(cf_certs_url)
         jwks = response.json()
         
+        # Parse header to get the key ID (kid)
+        header = jwt.get_unverified_header(token)
+        kid = header.get('kid')
+        if not kid:
+            logger.error("No 'kid' found in JWT header")
+            return None
+            
+        # Find the correct key in the JWKS
+        rsa_key = None
+        for key in jwks['keys']:
+            if key['kid'] == kid:
+                rsa_key = key
+                break
+                
+        if not rsa_key:
+            logger.error(f"No matching key found for kid: {kid}")
+            return None
+            
         # Decode and validate the JWT
         decoded = jwt.decode(
             token,
-            jwks,
+            rsa_key,
             algorithms=["RS256"],
             audience=audience,
             options={"verify_exp": True}
@@ -76,18 +97,22 @@ def cloudflare_access_required(f):
         
         # Store the token data for use in the view
         g.cf_user = decoded_token.get('email', '')
+        g.cf_user_id = decoded_token.get('sub', '')
+        g.cf_user_name = decoded_token.get('name', '').split()[0] if decoded_token.get('name') else ''
+        g.cf_user_data = decoded_token
         
         return f(*args, **kwargs)
     return decorated_function
 
-def create_user_account(username, email, password):
+def create_user_account(username, email, password=None, is_cloudflare_user=False):
     """
     Create a new user account.
     
     Args:
         username (str): The username
         email (str): The email address
-        password (str): The password
+        password (str, optional): The password. Not required for Cloudflare users.
+        is_cloudflare_user (bool): Whether this user is authenticated via Cloudflare
     
     Returns:
         tuple: (success, message, user_obj)
@@ -103,10 +128,20 @@ def create_user_account(username, email, password):
         # Create new user
         new_user = User(
             username=username,
-            email=email
+            email=email,
+            is_cloudflare_user=is_cloudflare_user
         )
-        new_user.password = password  # This will hash the password
         
+        # Set password if provided (not needed for Cloudflare users)
+        if password:
+            new_user.password = password  # This will hash the password
+        elif not is_cloudflare_user:
+            # Generate a random secure password for non-Cloudflare users if none provided
+            import secrets
+            import string
+            random_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+            new_user.password = random_password
+            
         # Add user to database
         db.session.add(new_user)
         db.session.commit()

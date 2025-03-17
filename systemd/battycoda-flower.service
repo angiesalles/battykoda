@@ -1,0 +1,19 @@
+[Unit]
+Description=BattyCoda Flower Monitoring
+After=network.target redis.service battycoda-celery.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/battycoda
+Environment=FLASK_ENV=production
+Environment=FLASK_DEBUG=0
+ExecStart=/usr/local/bin/celery -A celery_app.celery flower --port=5555
+Restart=always
+RestartSec=5
+
+# Limit resources
+MemoryLimit=512M
+CPUQuota=10%
+
+[Install]
+WantedBy=multi-user.target

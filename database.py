@@ -26,6 +26,10 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     
+    # Authentication source
+    is_cloudflare_user = db.Column(db.Boolean, default=False)
+    cloudflare_user_id = db.Column(db.String(100), nullable=True, index=True)
+    
     # Password reset fields
     reset_token = db.Column(db.String(100), nullable=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)

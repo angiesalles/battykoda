@@ -1,0 +1,17 @@
+[Unit]
+Description=BattyCoda R Original Server
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/battycoda
+ExecStart=/usr/bin/Rscript r_prediction_server.R --port 8001
+Restart=always
+RestartSec=5
+
+# Limit resources
+MemoryLimit=1G
+CPUQuota=30%
+
+[Install]
+WantedBy=multi-user.target

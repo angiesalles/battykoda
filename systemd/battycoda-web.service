@@ -1,0 +1,20 @@
+[Unit]
+Description=BattyCoda Web Application
+After=network.target redis.service
+Wants=battycoda-celery.service battycoda-flower.service battycoda-r-direct.service battycoda-r-original.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/battycoda
+Environment=FLASK_ENV=production
+Environment=FLASK_DEBUG=0
+ExecStart=/usr/local/bin/gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 wsgi:application
+Restart=always
+RestartSec=5
+
+# Limit resources
+MemoryLimit=1G
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

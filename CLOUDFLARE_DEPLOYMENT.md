@@ -77,12 +77,35 @@ The `CLOUDFLARE_AUDIENCE` value can be found in your Cloudflare Access applicati
 pip install pyjwt cryptography
 ```
 
-3. **Test the integration**:
+3. **Update your database with new Cloudflare fields**:
+
+```bash
+# Run the migration script to add Cloudflare user fields
+python add_cloudflare_fields.py
+```
+
+This script will:
+- Add `is_cloudflare_user` boolean column to the users table
+- Add `cloudflare_user_id` string column to the users table
+- Create an index for efficient lookups
+
+4. **Test the integration**:
 
    - Start your BattyCoda application
    - Access it through your Cloudflare domain (e.g., https://battycoda.com)
    - You should be prompted to authenticate through Cloudflare's login screen
    - After authentication, you'll be redirected to BattyCoda's interface
+
+5. **User Auto-Provisioning**:
+
+The system now supports automatic user provisioning when someone logs in via Cloudflare Access:
+
+- If a user already exists with the same email address as their Cloudflare identity, they will be automatically logged in
+- If no matching user exists, a new account will be created using:
+  - Username derived from their Cloudflare name or email
+  - Email from their Cloudflare identity
+  - No password (they'll authenticate exclusively through Cloudflare)
+  - Default user directories and settings
 
 ## Security Considerations
 
