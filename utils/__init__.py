@@ -7,6 +7,9 @@ import platform
 from functools import wraps
 from flask import redirect, url_for
 
+# Import the debug utility for easy access
+from utils.debug import try_connect_debugger
+
 
 def find_case_insensitive_path(path):
     """

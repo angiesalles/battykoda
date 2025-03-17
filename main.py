@@ -7,28 +7,11 @@ from flask import Flask, render_template, url_for, request
 from markupsafe import Markup
 from flask_login import LoginManager, current_user, login_required
 
-# Setup PyCharm debugger if needed
-def enable_pycharm_debugging():
-    """Configure PyCharm remote debugging if available"""
-    # Only try to connect if explicitly enabled
-    if os.environ.get('ENABLE_PYCHARM_DEBUG') == 'true':
-        try:
-            import pydevd_pycharm
-            # Replace these parameters with your PyCharm debugging configuration
-            pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True)
-            print("PyCharm debugger connected successfully")
-            return True
-        except (ImportError, Exception) as e:
-            print(f"PyCharm debugger connection failed: {str(e)}")
-            print("Make sure you've installed 'pydevd-pycharm' package and configured the correct port.")
-            return False
-    return False
-
-# Don't automatically try enabling PyCharm debugging in production
-# enable_pycharm_debugging()
-
-# Import utility functions
+# Import utility functions - this needs to be before other imports
 import utils
+
+# Always try to connect to PyCharm debugger at startup
+utils.try_connect_debugger()
 
 # Import auth module and database models 
 from auth import auth_bp
