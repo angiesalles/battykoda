@@ -18,8 +18,6 @@ instance/
 *.db-journal
 *.sqlite
 
-# All shell scripts should be ignored
-*.sh
 
 # Replit-specific files (but keep .replit and replit.nix)
 .config/
