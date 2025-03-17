@@ -16,10 +16,11 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn gevent
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p data/home logs static/tempdata
+RUN mkdir -p data/home logs static/tempdata /home
 
 # Set proper permissions
 RUN chmod +x *.sh
+RUN chmod 777 /home
 
 # Create a non-root user
 RUN useradd -m battycoda

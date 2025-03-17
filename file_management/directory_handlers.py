@@ -5,6 +5,7 @@ import os
 import platform
 import getpass
 import logging
+import shutil
 from flask import render_template
 from markupsafe import Markup
 
@@ -215,6 +216,72 @@ def list_project_directory(path: str, username: str, species: str) -> str:
     except Exception as e:
         logger.error(f"Error in list_project_directory: {str(e)}")
         raise
+
+
+def create_user_home_directory(username: str, template_dir: str = None) -> bool:
+    """
+    Create a user's home directory (/home/username) and populate it with template content.
+    
+    Args:
+        username: Username to create directory for
+        template_dir: Path to template directory (defaults to /home/ubuntu/template if None)
+        
+    Returns:
+        bool: True if directory was created successfully, False otherwise
+    """
+    import utils
+    
+    # Determine paths
+    if template_dir is None:
+        template_dir = '/template' if os.path.exists('/template') else '/app/template'
+    
+    # Ensure template directory exists
+    if not os.path.exists(template_dir):
+        logger.error(f"Template directory not found: {template_dir}")
+        return False
+    
+    try:
+        # Create base user directory in /home
+        user_home_path = os.path.join('/home', username)
+        
+        # Check if the directory already exists
+        if os.path.exists(user_home_path):
+            logger.info(f"User home directory already exists: {user_home_path}")
+            return True
+        
+        # Create the user directory
+        os.makedirs(user_home_path, exist_ok=True)
+        logger.info(f"Created user home directory: {user_home_path}")
+        
+        # Copy template content recursively
+        for item in os.listdir(template_dir):
+            source = os.path.join(template_dir, item)
+            destination = os.path.join(user_home_path, item)
+            
+            if os.path.isdir(source):
+                shutil.copytree(source, destination)
+                logger.info(f"Copied directory: {source} -> {destination}")
+            else:
+                shutil.copy2(source, destination)
+                logger.info(f"Copied file: {source} -> {destination}")
+        
+        # Set proper ownership
+        # We can't use os.chown in Docker as the Python process doesn't have permission
+        # to change ownership, so we'll use subprocess to run chmod/chown if needed
+        try:
+            import subprocess
+            subprocess.run(['chmod', '-R', '755', user_home_path])
+            # Try to set ownership to the username if it exists as a user
+            subprocess.run(['chown', '-R', f'{username}:{username}', user_home_path])
+        except Exception as e:
+            logger.warning(f"Could not set permissions/ownership for {user_home_path}: {str(e)}")
+            # This is not critical, so we continue
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error creating user home directory: {str(e)}")
+        return False
 
 
 def handle_file_not_found_error(path: str) -> str:

@@ -104,6 +104,12 @@ def cloudflare_access_required(f):
         g.cf_user_name = decoded_token.get('name', '').split()[0] if decoded_token.get('name') else ''
         g.cf_user_data = decoded_token
         
+        # Check if user has a home directory and create it if needed
+        if g.cf_user_name:
+            # Import the utility function
+            import utils
+            utils.create_user_home_path(g.cf_user_name)
+        
         return f(*args, **kwargs)
     return decorated_function
 
@@ -149,7 +155,7 @@ def create_user_account(username, email, password=None, is_cloudflare_user=False
         db.session.add(new_user)
         db.session.commit()
         
-        # Create user directory if it doesn't exist
+        # Create user directory if it doesn't exist (this is the in-app data directory)
         user_dir = os.path.join('data', 'home', username)
         if not os.path.exists(user_dir):
             os.makedirs(user_dir, exist_ok=True)
@@ -158,6 +164,13 @@ def create_user_account(username, email, password=None, is_cloudflare_user=False
         species_dir = os.path.join(user_dir, 'Efuscus')
         if not os.path.exists(species_dir):
             os.makedirs(species_dir, exist_ok=True)
+        
+        # Also create a Docker container user home directory with template content
+        # if this is a Cloudflare user
+        if is_cloudflare_user:
+            # Import the utility function
+            import utils
+            utils.create_user_home_path(username)
         
         return True, "Registration successful!", new_user
     except Exception as e:

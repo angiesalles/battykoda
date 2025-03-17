@@ -9,6 +9,7 @@ from flask import redirect, url_for
 
 # Import the debug utility for easy access
 from utils.debug import try_connect_debugger
+from utils.user_home_utils import create_user_home_path, verify_user_home_path
 
 
 def find_case_insensitive_path(path):

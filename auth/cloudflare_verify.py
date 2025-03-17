@@ -238,6 +238,44 @@ def require_cloudflare_access(f):
             
             # Store user info in request object for later use
             request.cloudflare_user = jwt_payload
+            
+            # Also use Flask-Login to automatically log in the user
+            from flask_login import login_user, current_user
+            from database import User
+            from auth.utils import create_user_account
+            from flask import g
+            
+            # Only attempt auto-login if not already logged in
+            if not current_user.is_authenticated:
+                # Get user email from JWT
+                email = jwt_payload.get('email')
+                if email:
+                    # Find or create user by email
+                    user = User.query.filter_by(email=email).first()
+                    
+                    # Create the user if they don't exist
+                    if not user:
+                        logger.info(f"Creating new user account for Cloudflare user: {email}")
+                        username = email.split('@')[0].replace('.', '_')  # Simple username from email
+                        success, _, user = create_user_account(
+                            username=username, 
+                            email=email, 
+                            is_cloudflare_user=True
+                        )
+                        if not success or not user:
+                            logger.error(f"Failed to create user account for Cloudflare user: {email}")
+                            # Continue without auto-login
+                        else:
+                            # Log the user in with Flask-Login
+                            login_user(user)
+                    else:
+                        # Log the user in with Flask-Login
+                        login_user(user)
+                    
+                    # Store Cloudflare user info for this request
+                    g.cf_user = email
+                    g.cf_user_id = jwt_payload.get('sub')
+                    g.cf_user_data = jwt_payload
         
         return f(*args, **kwargs)
     return decorated_function

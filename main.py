@@ -6,6 +6,11 @@ import queue
 from flask import Flask, render_template, url_for, request
 from markupsafe import Markup
 from flask_login import LoginManager, current_user, login_required
+from dotenv import load_dotenv
+
+# Load environment variables from .env.local if it exists
+if os.path.exists('.env.local'):
+    load_dotenv('.env.local', override=True)
 
 # Import utility functions - this needs to be before other imports
 import utils
@@ -469,6 +474,12 @@ def species_info(species_name):
     """Display information about a specific species template"""
     return directory_routes.species_info(species_name)
 
+@app.route('/home/<username>/verify')
+@login_required
+def user_home_verify(username):
+    """Verify a user's home directory"""
+    return directory_routes.verify_user_home(username)
+
 @app.route('/debug/queue_status')
 def debug_queue_status():
     """Debug endpoint to check queue registration status"""
@@ -499,6 +510,12 @@ def debug_celery_status():
         status = {'error': str(e)}
         
     return json.dumps(status, default=str), 200, {'Content-Type': 'application/json'}
+
+@app.route('/debug/user-home/<username>')
+@login_required
+def debug_user_home(username):
+    """Debug endpoint to verify a user's home directory"""
+    return directory_routes.verify_user_home(username)
 
 if __name__ == '__main__':
     mainfunction()

@@ -1,6 +1,7 @@
 version: '3.8'
 
-# Use .env.local file for environment variables
+# Use .env and .env.local files for environment variables
+# This will automatically load .env, and with the env_file below, .env.local will override those values
 services:
   web:
     build: 
@@ -9,17 +10,18 @@ services:
     network_mode: "host"
     # When using host networking, the ports section is not needed
     # as the container uses the host's network directly
+    env_file:
+      - .env.local
     volumes:
       - .:/app
       - data-volume:/app/data
+      - /home/ubuntu/template:/template
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=0
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - CLOUDFLARE_ACCESS_ENABLED=${CLOUDFLARE_ACCESS_ENABLED}
-      - CLOUDFLARE_AUDIENCE=${CLOUDFLARE_AUDIENCE}
     depends_on:
       - redis
       - r-server-direct
@@ -31,9 +33,12 @@ services:
     build: 
       context: .
       dockerfile: dockerfile.web
+    env_file:
+      - .env.local
     volumes:
       - .:/app
       - data-volume:/app/data
+      - /home/ubuntu/template:/template
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=0
@@ -51,6 +56,8 @@ services:
       dockerfile: dockerfile.web
     ports:
       - "5555:5555"
+    env_file:
+      - .env.local
     volumes:
       - .:/app
     environment:

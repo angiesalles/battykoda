@@ -289,3 +289,27 @@ def species_info(species_name):
     """
     
     return render_template('listBC.html', data={'listicle': Markup(content)})
+
+@login_required
+def verify_user_home(username):
+    """
+    Verify a user's home directory (/home/username) is properly set up
+    with template content.
+    
+    Args:
+        username: Username whose directory should be verified
+        
+    Returns:
+        JSON object with the status of the user's home directory
+    """
+    from flask import jsonify, abort
+    
+    # Only allow admin users or the current user to check their own home
+    if not (current_user.is_admin or current_user.username == username):
+        abort(403)
+    
+    # Use the utility function
+    import utils
+    status = utils.verify_user_home_path(username)
+    
+    return jsonify(status)
