@@ -129,7 +129,7 @@
 <div class="nav-container">
     <div class="nav-links">
         <a href="{{ url_for('home') }}">Home</a>
-        <a href="/battycoda/home/{{ user.username }}/">My Files</a>
+        <a href="/home/{{ user.username }}/">My Files</a>
         {% if user.is_admin %}
         <a href="/admin">Admin</a>
         {% endif %}
@@ -166,7 +166,7 @@
     <div class="section">
         <h2>Data Structure</h2>
         <p>BattyCoda organizes data in the following way:</p>
-        <div class="code-block">/battycoda/home/              (List of user directories)
+        <div class="code-block">/home/                       (List of user directories)
   └── username/               (User's personal directory)
      └── species_name/        (Bat species folder)
         └── project_folder/   (Project-specific data)

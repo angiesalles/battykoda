@@ -1,21 +1,19 @@
 import urllib.parse
 import re
 import os
-import platform
 import logging
 import utils
 
 # Set up logging
 logger = logging.getLogger('battykoda.appropriate_file')
 
-def appropriate_file(path, args, osfolder, folder_only=False):
+def appropriate_file(path, args, folder_only=False):
     """
     Create an appropriate file path for temporary files.
     
     Args:
-        path: Original path from URL
+        path: Path to WAV file (from wav_path parameter)
         args: URL arguments
-        osfolder: OS folder prefix
         folder_only: If True, return only the folder path
         
     Returns:
@@ -53,14 +51,23 @@ def appropriate_file(path, args, osfolder, folder_only=False):
         logger.debug(f"Converted path from '{path}' to '{corrected_path}'")
         path = corrected_path
     
-    # Build the folder path in the temp directory  
-    folder = os.path.join(temp_dir, *path.split('/')[:-1])
+    # Build the folder path in the temp directory
+    folder = os.path.join(temp_dir, *path.split('/'))
     
     if folder_only:
         return folder
+    
+    # Determine file extension based on arguments
+    file_extension = '.png'  # Default for spectrograms
+    if 'loudness' in args:
+        file_extension = '.wav'  # For audio files
         
-    # Create the full file path with arguments encoded in the filename
-    file_path = os.path.join(folder, re.sub('[?&=]', '_', urllib.parse.urlencode(args)) + path.split('/')[-1])
+    # Create a unique filename based on the provided arguments
+    args_encoded = re.sub('[?&=]', '_', urllib.parse.urlencode(args))
+    filename = f"{args_encoded}{file_extension}"
+    
+    # Create the full file path
+    file_path = os.path.join(folder, filename)
     
     return file_path
 

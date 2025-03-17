@@ -6,7 +6,7 @@ from flask import render_template
 from markupsafe import Markup
 
 
-def get_listing(path_to_file, osfolder, path):
+def get_listing(path_to_file, path):
     pickle_path = os.sep + os.sep.join(path_to_file.split('/')[:-1]) + '.pickle'
     try:
         with open(pickle_path, 'rb') as pfile:
@@ -19,16 +19,18 @@ def get_listing(path_to_file, osfolder, path):
             if not segment_data['labels'][idx]['type_call'] == path_to_file.split('/')[-1][:-12]:
                 continue
                 
-            thr_x1, _, hashof = GetAudioBit.get_audio_bit(osfolder + os.sep.join(path.split('/')[:-1]), idx, 0)
+            thr_x1, _, hashof = GetAudioBit.get_audio_bit(os.sep.join(path.split('/')[:-1]), idx, 0)
 
             def spectr_particle_fun(_channel, _overview):
-                args = {'hash': hashof,
+                # Use the new API with wav_path parameter
+                args = {'wav_path': path.strip('/'),
+                        'hash': hashof,
                         'call': idx,
                         'channel': _channel,
-                        'overview': _overview,
+                        'overview': '1' if _overview else '0',  # Use numeric values for consistency
                         'contrast': 1,
                         'numcalls': len(segment_data['offsets'])}
-                return '/img/' + path_to_file + 'spectrogram.png?' + urllib.parse.urlencode(args)
+                return '/spectrogram?' + urllib.parse.urlencode(args)
 
             if counter % 3 == 0 and counter > 0:
                 collector += '</tr><tr>'
@@ -66,9 +68,9 @@ def get_listing(path_to_file, osfolder, path):
                 <li>You may be trying to navigate to a folder that doesn't contain call data</li>
             </ul>
             <p>
-                <a href="/battycoda/home/" style="color: #0066cc;">Return to Home Directory</a> | 
-                <a href="/battycoda/home/{username}/" style="color: #0066cc;">Return to User Directory</a>
-                {f' | <a href="/battycoda/home/{username}/{species}/" style="color: #0066cc;">Return to Species Directory</a>' if species else ''}
+                <a href="/home/" style="color: #0066cc;">Return to Home Directory</a> | 
+                <a href="/home/{username}/" style="color: #0066cc;">Return to User Directory</a>
+                {f' | <a href="/home/{username}/{species}/" style="color: #0066cc;">Return to Species Directory</a>' if species else ''}
             </p>
         </div>
         """

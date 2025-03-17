@@ -2,20 +2,14 @@ import os
 import platform
 
 # Use a local static folder in the project directory
-if platform.system() == "Darwin":  # macOS
-    static_folder = 'static/'
-elif platform.system() == "Windows":
-    static_folder = 'static\\'
-else:
-    static_folder = 'static/'
+static_folder = "static"
 
 
-def available_species(osfolder=None):
+def available_species():
    """
    Get list of available species based on .txt files in the static folder.
    
-   Args:
-      osfolder: Optional folder prefix (no longer used with local static folder)
+
    """
    try:
       prelist = os.listdir(static_folder)
@@ -27,13 +21,12 @@ def available_species(osfolder=None):
    except FileNotFoundError:
       # Return empty list if static folder doesn't exist
       return []
-def spgather(wholepath, osfolder, assumed_answer):
+def spgather(wholepath, assumed_answer):
    """
    Gather species information for display
    
    Args:
       wholepath: The URL path
-      osfolder: Optional folder prefix (no longer used with local static folder)
       assumed_answer: The currently selected answer
    """
    species = wholepath.split('/')[2]

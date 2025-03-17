@@ -11,15 +11,18 @@ class PrioItem:
     item: Any = field(compare=False)
 
 
-def worker(request_queue, work_queue, osfolder):
+def worker(request_queue, work_queue):
     mythreadstorage = {}
     while True:
         pi = request_queue.get()
-        key = appropriate_file(pi.item['path'], pi.item['args'], osfolder)
+        # Get the WAV path from args if it exists, otherwise use the path
+        wav_path = pi.item['args'].get('wav_path', pi.item['path'])
+        key = appropriate_file(wav_path, pi.item['args'])
+        
         if key not in mythreadstorage:
             event = threading.Event()
             thread = threading.Thread(target=plotting,
-                                      args=(pi.item['path'], pi.item['args'], event, osfolder),
+                                      args=(wav_path, pi.item['args'], event),
                                       daemon=True)
             thread.start()
             mythreadstorage[key] = thread

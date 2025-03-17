@@ -19,7 +19,7 @@ logger = logging.getLogger('battykoda.plotting')
 # https://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
 matplotlib.use('Agg')
 
-def plotting(path, args, event, osfolder):
+def plotting(path, args, event):
     logger.info(f"Starting plotting for path: {path}")
     file_path = None
     
@@ -27,8 +27,8 @@ def plotting(path, args, event, osfolder):
         event.wait()
         
         # Get the paths we need to work with early, so we can log errors properly
-        folder_path = appropriate_file(path, args, osfolder, folder_only=True)
-        file_path = appropriate_file(path, args, osfolder)
+        folder_path = appropriate_file(path, args, folder_only=True)
+        file_path = appropriate_file(path, args)
         
         # Log debugging info for temp files
         logger.info(f"Generating spectrogram image:")
@@ -41,15 +41,19 @@ def plotting(path, args, event, osfolder):
             return
 
         # Getting audio data
-        logger.info(f"Getting audio data for path: {osfolder + os.sep.join(path.split('/')[:-1])}")
+        # Use wav_path if provided, otherwise use path
+        audio_path_param = args.get('wav_path', path)
+        logger.info(f"Getting audio data from param: {audio_path_param}")
         
         try:
-            overview = args['overview'] == 'True'
+            # Handle both formats of overview parameter (0/1 or True/False)
+            overview = args['overview'] == '1' or args['overview'] == 'True'
             hwin = Hwin.overview_hwin if overview else Hwin.normal_hwin
             call_to_do = int(args['call'])
             contrast = float(args['contrast'])
             
-            audio_path = osfolder + os.sep.join(path.split('/')[:-1])
+            # Construct the audio path
+            audio_path = os.sep.join(audio_path_param.split('/'))
             logger.debug(f"Audio file path: {audio_path}")
             
             thr_x1, fs, hashof = GetAudioBit.get_audio_bit(audio_path, call_to_do, hwin)

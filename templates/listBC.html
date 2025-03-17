@@ -14,7 +14,7 @@
 <div class="nav-container">
     <div class="nav-links">
         <a href="{{ url_for('home') }}">Home</a>
-        <a href="/battycoda/home/{{ current_user.username }}/">My Files</a>
+        <a href="/home/{{ current_user.username }}/">My Files</a>
     </div>
     <div class="user-info">
         <span>Logged in as: <strong>{{ current_user.username }}</strong></span>
