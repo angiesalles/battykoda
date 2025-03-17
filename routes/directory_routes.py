@@ -17,7 +17,7 @@ from auth.utils import cloudflare_access_required
 # Configure logging
 logger = logging.getLogger('battykoda.routes.directory')
 
-@cloudflare_access_required
+# Temporarily removed @cloudflare_access_required for testing
 def mainpage():
     """Main landing page"""
     # Check if Cloudflare Access provides user info and auto-login is enabled

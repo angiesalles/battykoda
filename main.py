@@ -3,26 +3,29 @@ import sys
 import logging
 import threading
 import queue
-from flask import Flask, render_template, url_for
+from flask import Flask, render_template, url_for, request
 from markupsafe import Markup
 from flask_login import LoginManager, current_user, login_required
 
 # Setup PyCharm debugger if needed
 def enable_pycharm_debugging():
     """Configure PyCharm remote debugging if available"""
-    try:
-        import pydevd_pycharm
-        # Replace these parameters with your PyCharm debugging configuration
-        pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True)
-        print("PyCharm debugger connected successfully")
-        return True
-    except (ImportError, Exception) as e:
-        print(f"PyCharm debugger connection failed: {str(e)}")
-        print("Make sure you've installed 'pydevd-pycharm' package and configured the correct port.")
-        return False
+    # Only try to connect if explicitly enabled
+    if os.environ.get('ENABLE_PYCHARM_DEBUG') == 'true':
+        try:
+            import pydevd_pycharm
+            # Replace these parameters with your PyCharm debugging configuration
+            pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True)
+            print("PyCharm debugger connected successfully")
+            return True
+        except (ImportError, Exception) as e:
+            print(f"PyCharm debugger connection failed: {str(e)}")
+            print("Make sure you've installed 'pydevd-pycharm' package and configured the correct port.")
+            return False
+    return False
 
-# Try enabling PyCharm debugging
-enable_pycharm_debugging()
+# Don't automatically try enabling PyCharm debugging in production
+# enable_pycharm_debugging()
 
 # Import utility functions
 import utils
@@ -62,9 +65,13 @@ app = Flask(__name__, static_folder='static')
 
 # Configure the Flask app
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'battycoda-secret-key-development')
-# Use absolute path for database location
-db_path = os.path.join(os.getcwd(), 'battycoda.db')
+# Use data volume for better permissions
+if os.path.exists('/app/data'):
+    db_path = '/app/data/battycoda.db'
+else:
+    db_path = os.path.join(os.getcwd(), 'battycoda.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+logger.info(f"Using database at: {db_path}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Cloudflare Access configuration
@@ -89,8 +96,35 @@ login_manager = LoginManager()
 login_manager.login_view = 'auth.login'  # Flask-Login knows to prepend the blueprint URL prefix
 login_manager.init_app(app)
 
+# Import Cloudflare verification
+from auth.cloudflare_verify import require_cloudflare, require_cloudflare_access
+
 # Register auth blueprint
 app.register_blueprint(auth_bp, url_prefix='/auth')
+
+# Cloudflare verification middleware
+@app.before_request
+def verify_cloudflare_request():
+    # Skip for development environment unless explicitly enabled
+    if app.config.get('FLASK_ENV') == 'development' and not os.environ.get('ENFORCE_CLOUDFLARE_IN_DEV'):
+        return None
+    
+    # Skip for local health check endpoints
+    if request.path in ['/health', '/ping']:
+        return None
+    
+    # Skip verification if Cloudflare is not enabled
+    if not os.environ.get('CLOUDFLARE_ACCESS_ENABLED') == 'True':
+        return None
+    
+    # Verify Cloudflare headers are present
+    cf_connecting_ip = request.headers.get('CF-Connecting-IP')
+    cf_ray = request.headers.get('CF-Ray')
+    
+    # If these headers aren't present, connection is likely not from Cloudflare
+    if not cf_connecting_ip or not cf_ray:
+        app.logger.warning(f"Blocking direct access attempt from {request.remote_addr}")
+        return "Direct access to this server is not allowed", 403
 
 # Default settings for non-authenticated users
 default_user_setting = {
@@ -113,6 +147,88 @@ global_work_queue = queue.PriorityQueue()
 def load_user(user_id):
     """Load user by ID for Flask-Login"""
     return User.query.get(int(user_id))
+
+# Custom login_required that accounts for Cloudflare Access
+@app.before_request
+def check_cloudflare_auth():
+    """
+    Check if the user is authenticated through Cloudflare Access and set up the user
+    session accordingly for Flask-Login if needed.
+    """
+    # Skip for endpoints that don't require authentication
+    if request.endpoint in ['static', 'health_check', 'cloudflare_test'] or \
+       request.path.startswith('/static/') or \
+       request.path in ['/health', '/ping', '/'] or \
+       request.blueprint == 'auth':
+        return None
+    
+    # Check if the user is already logged in through Flask-Login
+    from flask_login import current_user
+    if current_user.is_authenticated:
+        return None
+    
+    # Allow a bypass for development and debugging
+    if os.environ.get('CLOUDFLARE_BYPASS', 'False').lower() == 'true':
+        app.logger.warning("⚠️ Cloudflare authentication bypass is enabled - this should not be used in production!")
+        if request.args.get('admin_bypass') == 'true':
+            # Auto-login as admin for testing
+            user = User.query.filter_by(username='admin').first()
+            if user:
+                from flask_login import login_user
+                login_user(user)
+                app.logger.warning(f"⚠️ Auto-login as {user.username} via bypass")
+                return None
+            
+    # If Cloudflare Access is enabled, check for Cloudflare authentication
+    if os.environ.get('CLOUDFLARE_ACCESS_ENABLED') == 'True':
+        # Import here to avoid circular imports
+        from auth.cloudflare_verify import verify_cloudflare_jwt
+        
+        try:
+            # Verify JWT token
+            jwt_payload = verify_cloudflare_jwt()
+            if jwt_payload:
+                # Get user email from JWT
+                email = jwt_payload.get('email')
+                if email:
+                    # Find or create user by email
+                    user = User.query.filter_by(email=email).first()
+                    if not user:
+                        # Create a new user account for this Cloudflare user
+                        from auth.utils import create_user_account
+                        username = email.split('@')[0].replace('.', '_')  # Simple username from email
+                        success, _, user = create_user_account(
+                            username=username, 
+                            email=email, 
+                            is_cloudflare_user=True
+                        )
+                        if not success or not user:
+                            app.logger.error(f"Failed to create user account for Cloudflare user: {email}")
+                            return "Failed to create user account", 500
+                    
+                    # Update Cloudflare user information
+                    if not user.is_cloudflare_user:
+                        user.is_cloudflare_user = True
+                        user.cloudflare_user_id = jwt_payload.get('sub')
+                        db.session.commit()
+                    
+                    # Log the user in with Flask-Login
+                    from flask_login import login_user
+                    login_user(user)
+                    
+                    # Store Cloudflare user info for this request
+                    g.cf_user = email
+                    g.cf_user_id = jwt_payload.get('sub')
+                    g.cf_user_data = jwt_payload
+                    
+                    app.logger.info(f"✅ Successful Cloudflare authentication for: {email}")
+                    return None
+        except Exception as e:
+            app.logger.error(f"Error during Cloudflare authentication: {str(e)}")
+            
+            # If we're in production with Cloudflare Access required, don't fall through to normal auth
+            if os.environ.get('ENFORCE_CLOUDFLARE_STRICT', 'False').lower() == 'true':
+                return "Cloudflare Access authentication required", 401
 
 # Simple template filter for basic image rendering
 @app.template_filter('render_image')
@@ -213,6 +329,105 @@ def mainfunction():
     app.run(host='0.0.0.0', debug=debug_mode, port=port)
 
 # Route definitions
+# Health check endpoint (accessible directly for monitoring)
+@app.route('/health')
+def health_check():
+    return {"status": "ok", "version": "1.0"}
+
+# Cloudflare test route
+@app.route('/cloudflare-test')
+def cloudflare_test():
+    # Import here to avoid circular imports
+    from auth.utils import cloudflare_access_required
+    from flask import current_app, g, jsonify
+    from flask_login import current_user
+    
+    # Check if Cloudflare Access is enabled
+    enabled = current_app.config.get('CLOUDFLARE_ACCESS_ENABLED', False)
+    audience = current_app.config.get('CLOUDFLARE_AUDIENCE', '')
+    bypass_enabled = os.environ.get('CLOUDFLARE_BYPASS', 'False').lower() == 'true'
+    strict_mode = os.environ.get('ENFORCE_CLOUDFLARE_STRICT', 'False').lower() == 'true'
+    
+    # Get all possible Cloudflare headers and cookies for debugging
+    cf_headers = {key: value for key, value in request.headers.items() if key.lower().startswith('cf-')}
+    
+    cf_cookies = {
+        'CF_Authorization': request.cookies.get('CF_Authorization')
+    }
+    
+    # Check certificate fetch status
+    cert_status = None
+    try:
+        from auth.cloudflare_verify import get_cloudflare_certs
+        certs = get_cloudflare_certs(audience)
+        if certs:
+            cert_status = {
+                'success': True,
+                'keys_count': len(certs.get('keys', [])),
+                'certs_source': 'cached' if hasattr(get_cloudflare_certs, '_cf_certs_last_updated') else 'fresh'
+            }
+        else:
+            cert_status = {
+                'success': False,
+                'message': 'Failed to fetch certificates'
+            }
+    except Exception as e:
+        cert_status = {
+            'success': False,
+            'error': str(e)
+        }
+    
+    # Check token validation if available
+    token_validation = None
+    if cf_headers.get('CF-Access-Jwt-Assertion') or cf_cookies.get('CF_Authorization'):
+        try:
+            from auth.cloudflare_verify import verify_cloudflare_jwt
+            jwt_payload = verify_cloudflare_jwt()
+            token_validation = {
+                'valid': jwt_payload is not None,
+                'user_info': jwt_payload if jwt_payload else 'Token validation failed'
+            }
+        except Exception as e:
+            token_validation = {
+                'valid': False,
+                'error': str(e)
+            }
+    
+    # Get user information
+    cf_user = getattr(g, 'cf_user', None)
+    flask_user = {
+        'is_authenticated': current_user.is_authenticated,
+        'username': current_user.username if current_user.is_authenticated else None,
+        'email': current_user.email if current_user.is_authenticated else None,
+        'is_cloudflare_user': current_user.is_cloudflare_user if current_user.is_authenticated else None
+    }
+    
+    # Get environment information
+    env_info = {
+        'CLOUDFLARE_ACCESS_ENABLED': os.environ.get('CLOUDFLARE_ACCESS_ENABLED'),
+        'CLOUDFLARE_AUDIENCE': os.environ.get('CLOUDFLARE_AUDIENCE'),
+        'CLOUDFLARE_DOMAIN': os.environ.get('CLOUDFLARE_DOMAIN'),
+        'CLOUDFLARE_BYPASS': os.environ.get('CLOUDFLARE_BYPASS'),
+        'ENFORCE_CLOUDFLARE_STRICT': os.environ.get('ENFORCE_CLOUDFLARE_STRICT'),
+        'FLASK_ENV': os.environ.get('FLASK_ENV')
+    }
+    
+    return jsonify({
+        "status": "ok" if enabled else "warning", 
+        "message": "Cloudflare Access is enabled" if enabled else "Cloudflare Access is currently disabled",
+        "audience": audience,
+        "bypass_mode": bypass_enabled,
+        "strict_mode": strict_mode,
+        "cf_user": cf_user,
+        "flask_user": flask_user,
+        "cf_headers": cf_headers,
+        "cf_cookies": cf_cookies,
+        "cert_status": cert_status,
+        "token_validation": token_validation,
+        "env_info": env_info,
+        "help": "Add ?admin_bypass=true to URL to bypass Cloudflare auth if CLOUDFLARE_BYPASS=True"
+    })
+
 # Main routes
 @app.route('/')
 def mainpage():

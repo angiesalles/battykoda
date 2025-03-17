@@ -116,6 +116,11 @@ The system now supports automatic user provisioning when someone logs in via Clo
 2. **Firewall Rules**:
    - Restrict direct access to your server by configuring your server firewall to only accept connections from Cloudflare's IP ranges
    - Cloudflare publishes their IP ranges at: https://www.cloudflare.com/ips/
+   - BattyCoda includes a script to automatically set up firewall rules for Cloudflare-only access:
+     ```bash
+     sudo ./cloudflare_firewall.sh
+     ```
+   - This script will configure iptables to only allow web traffic from Cloudflare's IP ranges
 
 3. **Origin Server**:
    - Ensure your origin server is properly secured

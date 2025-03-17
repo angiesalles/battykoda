@@ -13,17 +13,29 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def check_db_path():
-    """Find the correct database path"""
-    instance_db_path = os.path.join('instance', 'battycoda.db')
-    root_db_path = 'battycoda.db'
-    
-    if os.path.exists(instance_db_path):
-        return instance_db_path
-    elif os.path.exists(root_db_path):
-        return root_db_path
+    """Find the correct database path - match main.py"""
+    # Use data volume for better permissions
+    if os.path.exists('/app/data'):
+        db_path = '/app/data/battycoda.db'
     else:
-        logger.error("No database file found!")
-        sys.exit(1)
+        db_path = os.path.join(os.getcwd(), 'battycoda.db')
+    
+    if os.path.exists(db_path):
+        return db_path
+    else:
+        logger.error(f"No database file found at {db_path}!")
+        
+        # Check alternative locations as fallback
+        instance_db_path = os.path.join('instance', 'battycoda.db')
+        root_db_path = 'battycoda.db'
+        
+        if os.path.exists(instance_db_path):
+            return instance_db_path
+        elif os.path.exists(root_db_path):
+            return root_db_path
+        else:
+            logger.error("No database file found in any location!")
+            sys.exit(1)
 
 def add_cloudflare_fields():
     """Add Cloudflare authentication fields to the users table"""

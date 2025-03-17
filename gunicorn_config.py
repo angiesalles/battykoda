@@ -3,8 +3,8 @@
 import multiprocessing
 import os
 
-# Bind to 0.0.0.0:8000 by default, but allow overrides from environment
-bind = os.environ.get("GUNICORN_BIND", "0.0.0.0:8000")
+# Bind to 0.0.0.0:8060 by default, but allow overrides from environment
+bind = os.environ.get("GUNICORN_BIND", "0.0.0.0:8060")
 
 # Use the number of CPU cores for worker processes
 workers = int(os.environ.get("GUNICORN_WORKERS", multiprocessing.cpu_count() * 2 + 1))
@@ -14,6 +14,16 @@ worker_class = "gevent"
 
 # Timeout for worker processes (increase if you have long-running tasks)
 timeout = 120
+
+# Add more resilient settings
+keepalive = 5
+worker_connections = 1000
+graceful_timeout = 30
+
+# Handle connection issues more gracefully
+forwarded_allow_ips = '*'
+proxy_protocol = True
+proxy_allow_ips = '*'
 
 # Restart workers after serving this many requests
 max_requests = 1000

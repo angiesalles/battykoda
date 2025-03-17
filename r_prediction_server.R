@@ -1011,7 +1011,7 @@ if (!interactive()) {
   args <- commandArgs(trailingOnly = TRUE)
   
   # Check for command line port argument
-  port <- 8000
+  port <- 8101  # Updated default port to match Docker configuration
   if (length(args) > 0 && startsWith(args[1], "--port=")) {
     port_arg <- sub("--port=", "", args[1])
     port <- as.numeric(port_arg)

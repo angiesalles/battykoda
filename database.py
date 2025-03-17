@@ -10,6 +10,15 @@ import os
 # Initialize SQLAlchemy
 db = SQLAlchemy()
 
+# Define database path based on environment
+def get_db_path():
+    """Return the appropriate database URI based on environment"""
+    # Try data volume first (should be writable)
+    if os.path.exists('/app/data'):
+        return 'sqlite:////app/data/battycoda.db'
+    # Fall back to instance folder
+    return 'sqlite:///instance/battycoda.db'
+
 # Function to check if we're in testing mode
 def is_testing():
     return os.environ.get('TESTING', 'False').lower() == 'true'

@@ -18,6 +18,12 @@ instance/
 *.db-journal
 *.sqlite
 
+# Environment variables - don't commit sensitive information
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env
 
 # Replit-specific files (but keep .replit and replit.nix)
 .config/

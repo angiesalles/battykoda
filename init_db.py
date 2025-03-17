@@ -12,9 +12,16 @@ def init_db():
     # Create a Flask app for database initialization
     app = Flask(__name__)
     
-    # Configure the app
+    # Configure the app with the same database path as main.py
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'battycoda-secret-key-development')
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///battycoda.db'
+    
+    # Use data volume for better permissions
+    if os.path.exists('/app/data'):
+        db_path = '/app/data/battycoda.db'
+    else:
+        db_path = os.path.join(os.getcwd(), 'battycoda.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    print(f"Using database at: {db_path}")
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize the database with the app

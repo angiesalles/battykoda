@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libcurl4-openssl-dev \
     libxml2-dev \
+    libsodium-dev \
+    libfftw3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install R packages

@@ -545,7 +545,7 @@ create_api <- function() {
 
 # Function to start the server programmatically
 # This can be called from RStudio for debugging
-start_server <- function(port = 8000, host = "0.0.0.0", debug = TRUE) {
+start_server <- function(port = 8100, host = "0.0.0.0", debug = TRUE) {
   DEBUG_MODE <<- debug  # Update global debug mode
   debug_log("Starting R prediction server on", host, "port", port)
   
@@ -565,7 +565,7 @@ if (!interactive()) {
   args <- commandArgs(trailingOnly = TRUE)
   
   # Check for command line port argument
-  port <- 8000
+  port <- 8100  # Updated default port to match Docker configuration
   if (length(args) > 0 && startsWith(args[1], "--port=")) {
     port_arg <- sub("--port=", "", args[1])
     port <- as.numeric(port_arg)

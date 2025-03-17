@@ -1,12 +1,14 @@
 version: '3.8'
 
+# Use .env.local file for environment variables
 services:
   web:
     build: 
       context: .
       dockerfile: dockerfile.web
-    ports:
-      - "8060:8000"
+    network_mode: "host"
+    # When using host networking, the ports section is not needed
+    # as the container uses the host's network directly
     volumes:
       - .:/app
       - data-volume:/app/data
@@ -16,14 +18,14 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - CLOUDFLARE_ACCESS_ENABLED=True
+      - CLOUDFLARE_ACCESS_ENABLED=${CLOUDFLARE_ACCESS_ENABLED}
       - CLOUDFLARE_AUDIENCE=${CLOUDFLARE_AUDIENCE}
     depends_on:
       - redis
       - r-server-direct
       - r-server-original
     restart: unless-stopped
-    command: gunicorn --workers=3 --bind=0.0.0.0:8000 --timeout=120 wsgi:application
+    command: gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 --log-level debug --capture-output --access-logfile - --error-logfile - wsgi:application
 
   celery:
     build: 
@@ -76,7 +78,7 @@ services:
       context: .
       dockerfile: dockerfile.r
     ports:
-      - "8000:8000"
+      - "8100:8100"
     volumes:
       - .:/app
       - r-libs:/usr/local/lib/R/site-library
@@ -88,12 +90,12 @@ services:
       context: .
       dockerfile: dockerfile.r
     ports:
-      - "8001:8001"
+      - "8101:8101"
     volumes:
       - .:/app
       - r-libs:/usr/local/lib/R/site-library
     restart: unless-stopped
-    command: Rscript r_prediction_server.R --port 8001
+    command: Rscript r_prediction_server.R --port 8101
 
 volumes:
   data-volume:

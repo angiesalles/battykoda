@@ -30,47 +30,46 @@ def validate_cloudflare_token(token, audience):
     Returns:
         dict or None: Decoded token payload if valid, None otherwise
     """
+    # Simply delegate to the function in cloudflare_verify.py
+    # to keep the code in one place and avoid duplication
+    from auth.cloudflare_verify import verify_cloudflare_jwt
+    
+    # Make the function act like it was called with the token
+    # by temporarily modifying the request object
+    import flask
+    
+    # Save the original state
+    original_cookies = dict(flask.request.cookies)
+    original_headers = dict(flask.request.headers)
+    
     try:
-        # Extract domain from audience or use default
-        domain = audience.split('.')[0] if '.' in audience else 'battycoda'
-        
-        # Fetch the Cloudflare Access certificates
-        cf_certs_url = f"https://{domain}.cloudflareaccess.com/cdn-cgi/access/certs"
-        response = requests.get(cf_certs_url)
-        jwks = response.json()
-        
-        # Parse header to get the key ID (kid)
-        header = jwt.get_unverified_header(token)
-        kid = header.get('kid')
-        if not kid:
-            logger.error("No 'kid' found in JWT header")
-            return None
-            
-        # Find the correct key in the JWKS
-        rsa_key = None
-        for key in jwks['keys']:
-            if key['kid'] == kid:
-                rsa_key = key
-                break
+        # Create a modified environment with the token in both places
+        # to maximize chances of it being found
+        class TokenHeaders(dict):
+            def get(self, key, default=None):
+                if key == 'CF-Access-Jwt-Assertion':
+                    return token
+                return original_headers.get(key, default)
                 
-        if not rsa_key:
-            logger.error(f"No matching key found for kid: {kid}")
-            return None
-            
-        # Decode and validate the JWT
-        decoded = jwt.decode(
-            token,
-            rsa_key,
-            algorithms=["RS256"],
-            audience=audience,
-            options={"verify_exp": True}
-        )
+        class TokenCookies(dict):
+            def get(self, key, default=None):
+                if key == 'CF_Authorization':
+                    return token
+                return original_cookies.get(key, default)
         
-        # Return the decoded token
-        return decoded
+        # Temporarily patch the request object
+        flask.request.headers = TokenHeaders(original_headers)
+        flask.request.cookies = TokenCookies(original_cookies)
+        
+        # Call the standard verification function
+        return verify_cloudflare_jwt()
     except Exception as e:
-        logger.error(f"Error validating Cloudflare token: {str(e)}")
+        logger.error(f"Error in validate_cloudflare_token adapter: {str(e)}")
         return None
+    finally:
+        # Restore the original state
+        flask.request.headers = original_headers
+        flask.request.cookies = original_cookies
 
 def cloudflare_access_required(f):
     """
@@ -82,10 +81,14 @@ def cloudflare_access_required(f):
         if not current_app.config.get('CLOUDFLARE_ACCESS_ENABLED', False):
             return f(*args, **kwargs)
         
-        # Get the Cloudflare Access JWT from the CF-Access-Jwt-Assertion header
-        cf_token = request.headers.get('CF-Access-Jwt-Assertion')
+        # Try to get token from both possible locations
+        cf_token = request.cookies.get('CF_Authorization')
         if not cf_token:
-            logger.warning("Missing Cloudflare Access token")
+            # Fallback to header
+            cf_token = request.headers.get('CF-Access-Jwt-Assertion')
+        
+        if not cf_token:
+            logger.warning("Missing Cloudflare Access token in both cookies and headers")
             raise Forbidden("Cloudflare Access authentication required")
         
         # Validate the token

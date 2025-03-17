@@ -1,4 +1,3 @@
-import h5py
 import numpy as np
 from scipy.io import wavfile
 import time
@@ -8,6 +7,8 @@ import logging
 
 # Set up logging
 logger = logging.getLogger('battykoda.datareader')
+
+# Explicitly avoid importing h5py as it's not needed and causes issues
 
 class DataReader:
     cache = dict()
@@ -49,15 +50,9 @@ class DataReader:
                 with open(path_to_file, 'rb') as f:
                     hashof = hashlib.md5(f.read()).hexdigest()
                 
-                # Read data based on file type
-                if path_to_file.endswith('.mat'):
-                    logger.debug(f"Reading .mat file")
-                    datafile = h5py.File(path_to_file)
-                    audiodata = np.array(datafile['sig']).T
-                    fs = 250000
-                else:
-                    logger.debug(f"Reading WAV file")
-                    fs, audiodata = wavfile.read(path_to_file)
+                # Read WAV file
+                logger.debug(f"Reading WAV file")
+                fs, audiodata = wavfile.read(path_to_file)
                 
                 # Validate audio data
                 if audiodata is None or audiodata.size == 0:

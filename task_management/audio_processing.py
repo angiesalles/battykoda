@@ -36,7 +36,7 @@ def run_r_classification(wav_file_path, onset, offset, species):
         import json
         
         # The URL of the R server - first try the direct KNN version, then fallback to the regular one
-        r_server_urls = ["http://localhost:8000", "http://localhost:8001"]
+        r_server_urls = ["http://localhost:8100", "http://localhost:8101"]
         r_server_url = r_server_urls[0]  # Default to the first server
         
         # Try to ping the server to see if it's available
