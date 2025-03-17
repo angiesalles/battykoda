@@ -1,12 +1,15 @@
 """
 Routes for spectrogram and audio snippet generation and serving.
+Uses Celery for asynchronous processing.
 """
 import os
+import time
 import traceback
 import logging
-from flask import request, send_file, url_for
+import tempfile
+from flask import request, send_file, url_for, jsonify
 from flask_login import login_required
-import queue
+from celery.result import AsyncResult
 
 from AppropriateFile import appropriate_file
 import Workers
@@ -17,6 +20,7 @@ import utils
 import scipy.io
 from routes.spectrogram_utils import create_error_image
 import routes.spectrogram_utils as utils_module
+from tasks import generate_spectrogram_task, prefetch_spectrograms
 
 # Configure logging
 logger = logging.getLogger('battykoda.spectrogram_routes')
@@ -24,7 +28,7 @@ logger = logging.getLogger('battykoda.spectrogram_routes')
 
 def handle_spectrogram():
     """
-    Handle spectrogram generation and serving for bat calls.
+    Handle spectrogram generation and serving for bat calls using Celery.
     
     Required URL parameters:
     - wav_path: Path to the WAV file
@@ -35,8 +39,12 @@ def handle_spectrogram():
     - overview: Whether to generate overview (0 or 1)
     - contrast: Contrast setting
     
+    Optional parameters:
+    - async: If 'true', returns a task ID instead of waiting for the image
+    - prefetch: If 'true', prefetches the next few images in the sequence
+    
     Returns:
-        Flask response with the spectrogram image
+        Flask response with the spectrogram image or task status
     """
     # Validate required parameters
     required_args = ['wav_path', 'channel', 'call', 'numcalls', 'hash', 'overview']
@@ -45,145 +53,160 @@ def handle_spectrogram():
             logger.error(f"Missing required argument: {arg}")
             return create_error_image(f"Missing required argument: {arg}")
     
-    # Extract and convert path
+    # Extract path and args
     path = request.args.get('wav_path')
     mod_path = utils.convert_path_to_os_specific(path)
+    args_dict = request.args.to_dict()
+    
+    # Check for async mode
+    async_mode = request.args.get('async', 'false').lower() == 'true'
+    prefetch_mode = request.args.get('prefetch', 'false').lower() == 'true'
     
     # Log the request details for debugging
-    logger.info(f"Spectrogram request received: {path}")
+    logger.info(f"Spectrogram request received: {path} (async={async_mode}, prefetch={prefetch_mode})")
     logger.debug(f"Original path: {path}, Modified path: {mod_path}")
-    logger.debug(f"Arguments: {request.args}")
     
     try:
         # Create unique file paths for caching based on the parameters
         args_for_file = request.args.copy()
-        # Remove wav_path from args to avoid duplicating it in the file name
         file_args = {k: v for k, v in args_for_file.items() if k != 'wav_path'}
         
-        # Generate file paths for caching
+        # Generate file paths
         file_path = appropriate_file(path, file_args)
-
-        # Log paths being checked
-        logger.debug(f"Checking main path: {file_path}")
-
-        # Check if either path exists
-        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-            logger.info(f"Cache hit! Using existing image at primary path: {file_path}")
-            return send_file(file_path)
-
-        # Ensure directories exist for both paths
-        folder_path = appropriate_file(mod_path, file_args, folder_only=True)
-        if not os.path.exists(folder_path):
-            logger.info(f"Creating cache directory: {folder_path}")
-            os.makedirs(folder_path, exist_ok=True)
-            
-        # Image doesn't exist, need to generate it
-        logger.info(f"Cache miss. Need to generate image: {file_path}")
+        alt_file_path = appropriate_file(mod_path, file_args)
         
-        # Set priority based on channel and overview status
-        try:
-            # Debug logging for global_user_setting
-            logger.debug(f"Global user setting: {utils_module.global_user_setting}")
-            
-            # Default to priority 2 if there's an issue with global_user_setting
-            if utils_module.global_user_setting is None:
-                logger.error("Global user setting is None! Using default priority.")
-                priority_part = 2
-            else:
-                priority_part = 0 if int(request.args['channel']) == int(utils_module.global_user_setting.get('main', 1))-1 else 2
-                
-            overview_part = 1 if request.args['overview'] == '1' else 0
-            workload = {'path': mod_path, 'args': request.args}
-        except Exception as e:
-            logger.error(f"Error setting priority: {str(e)}")
-            # Use defaults if there's an error
-            priority_part = 2
-            overview_part = 0
-            workload = {'path': mod_path, 'args': request.args}
-        
-        # Log the workload
-        logger.debug(f"Putting into request queue: {mod_path}")
-        
-        # Add to processing queue
-        try:
-            if utils_module.global_request_queue is None:
-                logger.error("Request queue is None! Queue not initialized correctly.")
-                return create_error_image("Internal server error: Queue not initialized correctly.")
-                
-            # Add to the queue with priority
-            utils_module.global_request_queue.put(Workers.PrioItem(priority_part + overview_part, workload))
-            
-            # Preload next call if needed
-            call_to_do = int(request.args['call'])
-            if call_to_do + 1 < int(request.args['numcalls']):
-                new_args = request.args.copy()
-                new_args['call'] = str(call_to_do+1)
-                utils_module.global_request_queue.put(Workers.PrioItem(4 + priority_part, {'path': mod_path, 'args': new_args}))
-                
-            # Wait for image generation to complete
-            try:
-                logger.debug("Waiting for image generation to complete...")
-                utils_module.global_request_queue.join()
-                if 'thread' in workload:
-                    workload['thread'].join(timeout=10.0)  # Add a timeout to prevent hanging
-                else:
-                    logger.warning("No thread in workload to join")
-                logger.debug("Queue processing completed")
-            except Exception as e:
-                logger.error(f"Error waiting for image generation: {str(e)}")
-        except Exception as queue_error:
-            logger.error(f"Error with request queue: {str(queue_error)}")
-            return create_error_image(f"Internal server error: {str(queue_error)}")
-            
-        # Try both paths again after generation
-        paths_to_check = [file_path]
+        # Check if image already exists
+        paths_to_check = [file_path, alt_file_path]
         for check_path in paths_to_check:
             if os.path.exists(check_path) and os.path.getsize(check_path) > 0:
-                logger.info(f"Successfully generated image: {check_path}")
+                logger.info(f"Cache hit! Using existing image: {check_path}")
+                
+                # If prefetch is enabled, launch background task for next calls
+                if prefetch_mode:
+                    current_call = int(request.args['call'])
+                    total_calls = int(request.args['numcalls'])
+                    if current_call + 1 < total_calls:
+                        # Prefetch next 3 calls or remaining calls, whichever is smaller
+                        prefetch_count = min(3, total_calls - current_call - 1)
+                        prefetch_range = (current_call + 1, current_call + prefetch_count)
+                        
+                        # Launch prefetch task in background
+                        prefetch_spectrograms.delay(path, args_dict, prefetch_range)
+                        logger.info(f"Prefetching calls {prefetch_range[0]} to {prefetch_range[1]}")
+                
                 return send_file(check_path)
-                
-        # If we get here, image generation failed
-        logger.error(f"Failed to generate image at path: {file_path}")
         
-        # Check source audio files
-        audio_path = os.sep.join(mod_path.split('/'))
-        audio_path_alt = os.sep.join(path.split('/'))
+        # Create directories if needed
+        folder_path = os.path.dirname(file_path)
+        os.makedirs(folder_path, exist_ok=True)
         
-        # Check both possible audio paths
-        audio_paths = [audio_path, audio_path_alt]
-        audio_exists = False
-        pickle_exists = False
+        # Image doesn't exist, need to generate it
+        logger.info(f"Cache miss. Generating image: {file_path}")
         
-        for check_audio_path in audio_paths:
-            if os.path.exists(check_audio_path):
-                audio_exists = True
-                if os.path.exists(check_audio_path + '.pickle'):
-                    pickle_exists = True
-                    break
-                    
-        if not audio_exists:
-            return create_error_image(f"Audio file not found. Tried:\n{audio_path}\n{audio_path_alt}")
-        if not pickle_exists:
-            return create_error_image(f"Metadata file not found. Tried:\n{audio_path}.pickle\n{audio_path_alt}.pickle")
-                
-        # Try to list the temp directory to help with debugging
-        try:
-            import tempfile
-            temp_dir = os.path.join(tempfile.gettempdir(), "battykoda_temp")
-            if os.path.exists(temp_dir):
-                temp_contents = os.listdir(temp_dir)
-                logger.debug(f"Temp directory {temp_dir} contents: {temp_contents}")
-        except Exception as temp_e:
-            logger.error(f"Error listing temp directory: {str(temp_e)}")
+        # Launch Celery task to generate the image
+        task = generate_spectrogram_task.delay(path, args_dict, file_path)
+        
+        # If async mode, return task ID immediately
+        if async_mode:
+            return jsonify({
+                'status': 'queued',
+                'task_id': task.id,
+                'poll_url': url_for('task_status', task_id=task.id)
+            })
             
-        # General error message
-        return create_error_image(f"Failed to generate image. Please check the server logs.")
+        # Otherwise, wait for task to complete with timeout
+        try:
+            # Wait for task to complete (with timeout)
+            result = task.get(timeout=15.0)  # 15 second timeout
+            
+            if result.get('status') == 'success':
+                # Prefetch next call if needed
+                if prefetch_mode:
+                    current_call = int(request.args['call'])
+                    total_calls = int(request.args['numcalls'])
+                    if current_call + 1 < total_calls:
+                        next_args = args_dict.copy()
+                        next_args['call'] = str(current_call + 1)
+                        generate_spectrogram_task.delay(path, next_args)
+                        logger.info(f"Prefetching next call: {current_call + 1}")
+                
+                # Check both possible file paths
+                for check_path in paths_to_check:
+                    if os.path.exists(check_path) and os.path.getsize(check_path) > 0:
+                        logger.info(f"Successfully generated image: {check_path}")
+                        return send_file(check_path)
+                
+                # If we get here but task reported success, something went wrong
+                return create_error_image("Task reported success but image was not found.")
+            else:
+                # Task failed
+                error_msg = result.get('error', 'Unknown error')
+                logger.error(f"Task failed to generate image: {error_msg}")
+                return create_error_image(f"Failed to generate image: {error_msg}")
+                
+        except Exception as e:
+            logger.error(f"Error waiting for task: {str(e)}")
+            return create_error_image(f"Error waiting for task completion: {str(e)}")
             
     except Exception as e:
         logger.error(f"Error in handle_spectrogram: {str(e)}")
         logger.debug(traceback.format_exc())
-        # Return empty response
-        return "", 404
+        return create_error_image(f"Server error: {str(e)}")
+
+
+def task_status(task_id):
+    """
+    Check the status of a task.
+    
+    Args:
+        task_id: ID of the Celery task
+        
+    Returns:
+        JSON response with task status
+    """
+    task_result = AsyncResult(task_id)
+    
+    if task_result.state == 'PENDING':
+        response = {
+            'status': 'pending',
+            'message': 'Task is pending'
+        }
+    elif task_result.state == 'FAILURE':
+        response = {
+            'status': 'error',
+            'message': str(task_result.info)
+        }
+    elif task_result.state == 'PROCESSING':
+        response = {
+            'status': 'processing',
+            'progress': task_result.info.get('progress', 0),
+            'message': 'Task is processing'
+        }
+    elif task_result.state == 'SUCCESS':
+        if task_result.info and 'status' in task_result.info:
+            if task_result.info['status'] == 'success':
+                response = {
+                    'status': 'success',
+                    'file_path': task_result.info.get('file_path'),
+                    'message': 'Task completed successfully'
+                }
+            else:
+                response = {
+                    'status': 'error',
+                    'message': task_result.info.get('error', 'Unknown error')
+                }
+        else:
+            response = {
+                'status': 'success',
+                'message': 'Task completed, but no details available'
+            }
+    else:
+        response = {
+            'status': 'unknown',
+            'message': f'Unknown task state: {task_result.state}'
+        }
+    
+    return jsonify(response)
 
 
 # Audio snippet handling moved to audio_routes.py

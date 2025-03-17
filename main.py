@@ -50,6 +50,16 @@ db_path = os.path.join(os.getcwd(), 'battycoda.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Configure Celery integration
+app.config.update(
+    CELERY_BROKER_URL=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
+    CELERY_RESULT_BACKEND=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+)
+
+# Initialize Celery with the app
+from celery_app import make_celery
+celery = make_celery(app)
+
 # Initialize SQLAlchemy with the app
 db.init_app(app)
 
@@ -222,6 +232,12 @@ def handle_batty(path):
 def handle_spectrogram():
     """Handle spectrogram generation and serving"""
     return spectrogram_routes.handle_spectrogram()
+    
+@app.route('/status/task/<task_id>')
+@login_required
+def task_status(task_id):
+    """Check the status of a celery task"""
+    return spectrogram_routes.task_status(task_id)
 
 @app.route('/audio/snippet', methods=['GET'])
 @login_required
@@ -240,6 +256,29 @@ def debug_queue_status():
     from routes.spectrogram_utils import get_queue_status
     import json
     status = get_queue_status()
+    return json.dumps(status, default=str), 200, {'Content-Type': 'application/json'}
+
+@app.route('/debug/celery_status')
+def debug_celery_status():
+    """Debug endpoint to check Celery status"""
+    from celery.task.control import inspect
+    from tasks import celery
+    import json
+    
+    try:
+        i = inspect()
+        status = {
+            'active': i.active(),
+            'scheduled': i.scheduled(),
+            'reserved': i.reserved(),
+            'revoked': i.revoked(),
+            'registered': list(i.registered().keys()) if i.registered() else [],
+            'stats': i.stats(),
+            'broker': celery.conf.get('broker_url'),
+        }
+    except Exception as e:
+        status = {'error': str(e)}
+        
     return json.dumps(status, default=str), 200, {'Content-Type': 'application/json'}
 
 if __name__ == '__main__':
