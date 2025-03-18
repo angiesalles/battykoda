@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install R packages
-RUN R -e "install.packages(c('plumber', 'class', 'jsonlite', 'stringr'), repos='https://cloud.r-project.org/')"
+RUN R -e "install.packages(c('plumber', 'class', 'jsonlite', 'stringr', 'warbleR', 'mlr3', 'mlr3learners', 'kknn'), repos='https://cloud.r-project.org/')"
 
 # Copy R code
 COPY *.R /app/

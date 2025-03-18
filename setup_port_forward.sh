@@ -13,7 +13,7 @@ echo -e "${BLUE}Setting up Port Forwarding (80 → 8060)${NC}"
 echo -e "${BLUE}====================================${NC}"
 
 # Check if script is run with sudo
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
   echo -e "${RED}Please run this script with sudo privileges${NC}"
   exit 1
 fi

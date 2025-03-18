@@ -1,185 +1,35 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>BattyCoda - Home</title>
-    <style>
-        body {
-            background-color: #121212;
-            color: white;
-            font-family: Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .header {
-            background-color: #e57373;
-            color: black;
-            padding: 15px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .nav-container {
-            display: flex;
-            justify-content: space-between;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 10px 20px;
-            background-color: #1e1e1e;
-            border-bottom: 1px solid #333;
-        }
-        
-        .nav-links {
-            display: flex;
-            align-items: center;
-        }
-        
-        .nav-links a {
-            color: #e57373;
-            text-decoration: none;
-            margin-right: 20px;
-        }
-        
-        .nav-links a:hover {
-            text-decoration: underline;
-        }
-        
-        .user-info {
-            display: flex;
-            align-items: center;
-        }
-        
-        .main-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .section {
-            background-color: #1e1e1e;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
-        
-        h2 {
-            color: #e57373;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
-        }
-        
-        ul {
-            list-style-type: none;
-            padding-left: 10px;
-        }
-        
-        li {
-            margin-bottom: 8px;
-        }
-        
-        .section-title {
-            font-weight: bold;
-            color: #e57373;
-            margin-top: 15px;
-            margin-bottom: 5px;
-        }
-        
-        a {
-            color: #e57373;
-            text-decoration: none;
-        }
-        
-        a:hover {
-            text-decoration: underline;
-        }
-        
-        .code-block {
-            background-color: #2a2a2a;
-            padding: 15px;
-            border-radius: 5px;
-            font-family: monospace;
-            white-space: pre;
-            overflow-x: auto;
-            margin: 10px 0;
-        }
-        
-        .button {
-            background-color: #e57373;
-            color: black;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-weight: bold;
-            text-decoration: none;
-            display: inline-block;
-        }
-        
-        .button:hover {
-            background-color: #ef5350;
-        }
-    </style>
-</head>
-<body>
-<div class="header">
-    <h1>BattyCoda</h1>
-    <p>Animal Vocalization Analysis Tool</p>
+{% extends 'base.html' %}
+
+{% block title %}BattyCoda - Home{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>About BattyCoda</h2>
+    <p>BattyCoda is a tool for analyzing animal vocalizations, including but not limited to bat echolocation, bird songs, frog calls, and other animal sounds. It helps researchers categorize, classify, and analyze vocalizations from any species.</p>
+    
+    <p>To use BattyCoda:</p>
+    <ol>
+        <li>Navigate to your user directory</li>
+        <li>Select or create a species folder (e.g., <code>Efuscus</code>)</li>
+        <li>Browse to the recorded data files</li>
+        <li>Analyze and categorize calls using the interactive interface</li>
+    </ol>
 </div>
 
-<div class="nav-container">
-    <div class="nav-links">
-        <a href="{{ url_for('home') }}">Home</a>
-        <a href="/home/{{ user.username }}/">My Files</a>
-        {% if user.is_admin %}
-        <a href="/admin">Admin</a>
-        {% endif %}
-    </div>
-    <div class="user-info">
-        <span>Logged in as: <strong>{{ user.username }}</strong></span>
-        <a href="{{ url_for('auth.profile') }}" style="margin-left: 15px; margin-right: 15px;">Profile</a>
-        <a href="/logout" class="button">Logout</a>
-    </div>
+<div class="section">
+    <h2>Navigation</h2>
+    <ul>
+        {{ species_links|safe }}
+    </ul>
 </div>
 
-<div class="main-container">
-
-    <div class="section">
-        <h2>About BattyCoda</h2>
-        <p>BattyCoda is a tool for analyzing animal vocalizations, including but not limited to bat echolocation, bird songs, frog calls, and other animal sounds. It helps researchers categorize, classify, and analyze vocalizations from any species.</p>
-        
-        <p>To use BattyCoda:</p>
-        <ol>
-            <li>Navigate to your user directory</li>
-            <li>Select or create a species folder (e.g., <code>Efuscus</code>)</li>
-            <li>Browse to the recorded data files</li>
-            <li>Analyze and categorize calls using the interactive interface</li>
-        </ol>
-    </div>
-
-    <div class="section">
-        <h2>Navigation</h2>
-        <ul>
-            {{ species_links|safe }}
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>Data Structure</h2>
-        <p>BattyCoda organizes data in the following way:</p>
-        <div class="code-block">/home/                       (List of user directories)
-  └── username/               (User's personal directory)
-     └── species_name/        (Bat species folder)
-        └── project_folder/   (Project-specific data)
-           └── data_files     (Bat call recordings)</div>
-    </div>
+<div class="section">
+    <h2>Data Structure</h2>
+    <p>BattyCoda organizes data in the following way:</p>
+    <div class="code-block">/home/                       (List of user directories)
+└── username/               (User's personal directory)
+   └── species_name/        (Bat species folder)
+      └── project_folder/   (Project-specific data)
+         └── data_files     (Bat call recordings)</div>
 </div>
-
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-<div class="flash-messages">
-    {% for message in messages %}
-    <div class="flash-message">{{ message }}</div>
-    {% endfor %}
-</div>
-{% endif %}
-{% endwith %}
+{% endblock %}

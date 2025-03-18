@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>User Profile</h2>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3>Welcome, {{ user.username }}</h3>
+        <a href="{% url 'battycoda_app:edit_profile' %}" class="button">Edit Profile</a>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+        <div class="section-title">User Information</div>
+        <div style="margin-left: 10px;">
+            <p><strong>Username:</strong> {{ user.username }}</p>
+            <p><strong>Email:</strong> {{ user.email }}</p>
+            <p><strong>Last Login:</strong> {{ user.last_login }}</p>
+            <p><strong>Account Created:</strong> {{ user.date_joined }}</p>
+        </div>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+        <div class="section-title">Your Storage</div>
+        <div style="margin-left: 10px;">
+            <a href="{% url 'battycoda_app:user_directory' username=user.username %}" class="button">Browse My Files</a>
+        </div>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Account Actions</h3>
+        <div style="margin-left: 10px;">
+            <p><a href="{% url 'battycoda_app:password_reset_request' %}">Reset Password</a></p>
+            <p><a href="{% url 'battycoda_app:logout' %}">Logout</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

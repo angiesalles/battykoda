@@ -1,11 +1,11 @@
-"""WSGI entry point for production servers like Gunicorn"""
+"""
+WSGI config for battycoda_django project.
+"""
 
-# Try to connect to PyCharm debugger before importing the app
-import utils
-utils.try_connect_debugger()
+import os
 
-# Now import the application
-from main import app as application
+from django.core.wsgi import get_wsgi_application
 
-if __name__ == "__main__":
-    application.run()
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+
+application = get_wsgi_application()

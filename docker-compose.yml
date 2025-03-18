@@ -1,108 +1,110 @@
 version: '3.8'
 
-# Use .env and .env.local files for environment variables
-# This will automatically load .env, and with the env_file below, .env.local will override those values
 services:
   web:
-    build: 
-      context: .
-      dockerfile: dockerfile.web
-    network_mode: "host"
-    # When using host networking, the ports section is not needed
-    # as the container uses the host's network directly
-    env_file:
-      - .env.local
+    image: python:3.12-slim
+    network_mode: host
     volumes:
-      - .:/app
-      - data-volume:/app/data
-      - /home/ubuntu/template:/template
+      - ./:/app:rw
+      - data-volume:/app/media:rw
+      - /home/ubuntu/template:/template:ro
+      - ./data:/data:rw
+    working_dir: /app
     environment:
-      - FLASK_ENV=production
-      - FLASK_DEBUG=0
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - REDIS_URL=redis://localhost:6379/0
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - CLOUDFLARE_ACCESS_ENABLED=True
+      - CLOUDFLARE_AUDIENCE=92f9c8b2586479249c3bea574d492514af0593259e62280662f6a3876f00cc1b
+      - CLOUDFLARE_DOMAIN=batlab.cloudflareaccess.com
+      - ENFORCE_CLOUDFLARE_IN_DEV=True
     depends_on:
       - redis
-      - r-server-direct
-      - r-server-original
     restart: unless-stopped
-    command: gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 --log-level debug --capture-output --access-logfile - --error-logfile - wsgi:application
+    command: >
+      bash -c "
+        pip install -r requirements.txt &&
+        gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 --log-level debug config.wsgi:application
+      "
 
   celery:
-    build: 
-      context: .
-      dockerfile: dockerfile.web
-    env_file:
-      - .env.local
+    image: python:3.12-slim
+    network_mode: host
     volumes:
-      - .:/app
-      - data-volume:/app/data
-      - /home/ubuntu/template:/template
+      - ./:/app:rw
+      - data-volume:/app/media:rw
+      - /home/ubuntu/template:/template:ro
+    working_dir: /app
     environment:
-      - FLASK_ENV=production
-      - FLASK_DEBUG=0
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - REDIS_URL=redis://localhost:6379/0
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
     depends_on:
       - redis
     restart: unless-stopped
-    command: celery -A celery_app.celery worker --loglevel=info
+    command: >
+      bash -c "
+        pip install -r requirements.txt &&
+        celery -A config worker --loglevel=info
+      "
 
   flower:
-    build: 
-      context: .
-      dockerfile: dockerfile.web
-    ports:
-      - "5555:5555"
-    env_file:
-      - .env.local
+    image: python:3.12-slim
+    network_mode: host
     volumes:
-      - .:/app
+      - ./:/app:rw
+    working_dir: /app
     environment:
-      - FLASK_ENV=production
-      - FLASK_DEBUG=0
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - REDIS_URL=redis://localhost:6379/0
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
     depends_on:
       - redis
       - celery
     restart: unless-stopped
-    command: celery -A celery_app.celery flower --port=5555
+    command: >
+      bash -c "
+        pip install -r requirements.txt &&
+        celery -A config flower --port=5555
+      "
 
   redis:
     image: redis:latest
-    ports:
-      - "6379:6379"
+    network_mode: host
     volumes:
       - redis-data:/data
     restart: unless-stopped
 
   r-server-direct:
-    build:
-      context: .
-      dockerfile: dockerfile.r
+    image: rocker/r-base:latest
     ports:
       - "8100:8100"
     volumes:
-      - .:/app
+      - ./:/app:rw
       - r-libs:/usr/local/lib/R/site-library
+    working_dir: /app
     restart: unless-stopped
-    command: Rscript r_server_direct.R
+    command: >
+      bash -c "
+        Rscript r_server_direct.R
+      "
 
   r-server-original:
-    build:
-      context: .
-      dockerfile: dockerfile.r
+    image: rocker/r-base:latest
     ports:
       - "8101:8101"
     volumes:
-      - .:/app
+      - ./:/app:rw
       - r-libs:/usr/local/lib/R/site-library
+    working_dir: /app
     restart: unless-stopped
-    command: Rscript r_prediction_server.R --port 8101
+    command: >
+      bash -c "
+        Rscript r_prediction_server.R --port 8101
+      "
 
 volumes:
   data-volume:

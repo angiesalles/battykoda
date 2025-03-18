@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}BattyCoda{% endblock %}</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            background-color: #e57373;
+            color: black;
+            padding: 15px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 10px 20px;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #333;
+        }
+        
+        .nav-links {
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #e57373;
+            text-decoration: none;
+            margin-right: 20px;
+        }
+        
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .section {
+            background-color: #1e1e1e;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        h2 {
+            color: #e57373;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        ul {
+            list-style-type: none;
+            padding-left: 10px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            color: #e57373;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+        
+        a {
+            color: #e57373;
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        .code-block {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        
+        .button {
+            background-color: #e57373;
+            color: black;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .button:hover {
+            background-color: #ef5350;
+        }
+
+        .flash-messages {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 10px 20px;
+        }
+
+        .flash-message {
+            background-color: #e57373;
+            color: black;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="header">
+    <h1>BattyCoda</h1>
+    <p>Animal Vocalization Analysis Tool</p>
+</div>
+
+<div class="nav-container">
+    <div class="nav-links">
+        <a href="{% url 'battycoda_app:index' %}">Home</a>
+        {% if user.is_authenticated %}
+        <a href="{% url 'battycoda_app:user_directory' username=user.username %}">My Files</a>
+        {% if user.is_staff %}
+        <a href="{% url 'admin:index' %}">Admin</a>
+        {% endif %}
+        {% endif %}
+    </div>
+    <div class="user-info">
+        {% if user.is_authenticated %}
+        <span>Logged in as: <strong>{{ user.username }}</strong></span>
+        <a href="{% url 'battycoda_app:profile' %}" style="margin-left: 15px; margin-right: 15px;">Profile</a>
+        <a href="{% url 'battycoda_app:logout' %}" class="button">Logout</a>
+        {% else %}
+        <a href="{% url 'battycoda_app:login' %}" class="button">Login</a>
+        <a href="{% url 'battycoda_app:register' %}" class="button" style="margin-left: 10px;">Register</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="main-container">
+    {% block content %}{% endblock %}
+</div>
+
+{% if messages %}
+<div class="flash-messages">
+    {% for message in messages %}
+    <div class="flash-message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

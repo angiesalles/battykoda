@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Profile | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Edit Profile</h2>
+    
+    <form method="post" action="{% url 'battycoda_app:edit_profile' %}">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_email" style="display: block; margin-bottom: 5px;">Email:</label>
+            <input type="email" name="email" id="id_email" value="{{ user.email }}" class="input-field" style="width: 100%; padding: 8px; border: 1px solid #333; background-color: #2a2a2a; color: #fff; border-radius: 3px;">
+        </div>
+        
+        <!-- Add more profile fields as needed -->
+        {{ form.as_p }}
+        
+        {% if form.non_field_errors %}
+        <div style="margin-bottom: 15px; color: #e57373;">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+        
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button type="submit" class="button">Save Changes</button>
+            <a href="{% url 'battycoda_app:profile' %}" class="button" style="background-color: #333;">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

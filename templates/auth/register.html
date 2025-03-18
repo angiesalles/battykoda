@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Register | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Register</h2>
+    <form method="post" action="{% url 'battycoda_app:register' %}">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_username" style="display: block; margin-bottom: 5px;">Username:</label>
+            {{ form.username }}
+            {% if form.username.errors %}
+            <span style="color: #e57373; font-size: 0.9em;">
+                {{ form.username.errors }}
+            </span>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_email" style="display: block; margin-bottom: 5px;">Email:</label>
+            {{ form.email }}
+            {% if form.email.errors %}
+            <span style="color: #e57373; font-size: 0.9em;">
+                {{ form.email.errors }}
+            </span>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_password1" style="display: block; margin-bottom: 5px;">Password:</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}
+            <span style="color: #e57373; font-size: 0.9em;">
+                {{ form.password1.errors }}
+            </span>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_password2" style="display: block; margin-bottom: 5px;">Confirm Password:</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}
+            <span style="color: #e57373; font-size: 0.9em;">
+                {{ form.password2.errors }}
+            </span>
+            {% endif %}
+        </div>
+        
+        {% if form.non_field_errors %}
+        <div style="margin-bottom: 15px; color: #e57373;">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+        
+        <div style="margin-top: 20px;">
+            <button type="submit" class="button">Register</button>
+        </div>
+    </form>
+    
+    <div style="margin-top: 20px;">
+        <p>Already have an account? <a href="{% url 'battycoda_app:login' %}">Login</a></p>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <h3>Password Requirements</h3>
+        <ul style="list-style: disc; padding-left: 20px;">
+            <li>Your password can't be too similar to your other personal information.</li>
+            <li>Your password must contain at least 8 characters.</li>
+            <li>Your password can't be a commonly used password.</li>
+            <li>Your password can't be entirely numeric.</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

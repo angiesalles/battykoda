@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Request Login Code | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Request Login Code</h2>
+    <p>Enter your username and we'll send you a one-time login code.</p>
+    
+    <form method="post" action="{% url 'battycoda_app:request_login_code' %}">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_username" style="display: block; margin-bottom: 5px;">Username:</label>
+            <input type="text" name="username" id="id_username" required class="input-field" style="width: 100%; padding: 8px; border: 1px solid #333; background-color: #2a2a2a; color: #fff; border-radius: 3px;">
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button type="submit" class="button">Send Login Code</button>
+        </div>
+    </form>
+    
+    <div style="margin-top: 20px;">
+        <p>Remember your password? <a href="{% url 'battycoda_app:login' %}">Login</a></p>
+        <p>Forgot your password? <a href="{% url 'battycoda_app:password_reset_request' %}">Reset Password</a></p>
+    </div>
+</div>
+{% endblock %}

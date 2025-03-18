@@ -1,0 +1,606 @@
+{% extends 'base.html' %}
+{% load battycoda_tags %}
+{% load static %}
+
+{% block title %}BattyCoda - Vocalization Analysis - {{ wav_path }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+    <div class="grid-container">
+        <!-- Small spectrogram section -->
+        <div class="spectrogram-small">
+            <h3>Spectrogram: <span id="current-call-text">1</span> of <span id="total-calls-text">{{ total_calls }}</span> calls</h3>
+            <div id="spectrogram-container" class="mb-3">
+                <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+                    <img id="spectrogram" class="img-fluid" alt="Spectrogram">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Controls section -->
+        <div class="controls">
+            <div class="mb-2">
+                <label for="contrast">Contrast:</label>
+                <input type="text" id="contrast" name="contrast" class="form-control" value="4.0">
+            </div>
+            <div class="mb-2">
+                <label for="loudness">Loudness:</label>
+                <input type="text" id="loudness" name="loudness" class="form-control" value="1.0">
+            </div>
+            <div class="mb-2">
+                <label for="channel-selector">Main channel:</label>
+                <select class="form-select" id="channel-selector">
+                    <option value="0">Channel 1</option>
+                    <option value="1">Channel 2</option>
+                </select>
+            </div>
+            
+            <div class="button-group mt-3">
+                <button class="btn btn-primary" id="prev-call-btn">Previous Call</button>
+                <button class="btn btn-primary" id="next-call-btn">Next Call</button>
+                <button class="btn btn-secondary" id="update-btn">Update View</button>
+            </div>
+            
+            <div class="mt-3">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-secondary" id="overview-btn">Overview</button>
+                    <button class="btn btn-outline-secondary active" id="detail-btn">Detail</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Call type section -->
+        <div class="call-type">
+            <h3>Vocalization Classification</h3>
+            
+            <div class="mb-3">
+                <p><strong>Species:</strong> {{ species }}</p>
+            </div>
+            
+            <!-- Unknown option always first -->
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" id="Unknown" name="type_call" value="Unknown" checked>
+                <label class="form-check-label" for="Unknown">Unknown</label>
+            </div>
+            
+            <!-- Dynamic call types from the species text file -->
+            {% if call_types %}
+                {% for call_type in call_types %}
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" id="{{ call_type|slugify }}" name="type_call" value="{{ call_type }}">
+                    <label class="form-check-label" for="{{ call_type|slugify }}" 
+                           title="{{ call_descriptions|get_item:call_type }}">
+                        {{ call_type }}
+                    </label>
+                </div>
+                {% endfor %}
+            {% else %}
+                <!-- Default options if no call types found -->
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" id="correct" name="type_call" value="correct">
+                    <label class="form-check-label" for="correct">Correctly classified</label>
+                </div>
+                
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" id="Unsure" name="type_call" value="Unsure">
+                    <label class="form-check-label" for="Unsure">Unsure</label>
+                </div>
+            {% endif %}
+            
+            <!-- Always include Other option -->
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" id="Other" name="type_call" value="">
+                <label class="form-check-label" for="Other">Other:</label>
+                <input type="text" class="form-control mt-1" id="other-input" name="other_call">
+            </div>
+        </div>
+        
+        <!-- Large spectrogram section -->
+        <div class="spectrogram-large">
+            <h3>Detailed View</h3>
+            <div id="spectrogram-large-container" class="mb-3">
+                <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+                    <img id="spectrogram-large" class="img-fluid" alt="Detailed Spectrogram">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Confidence section -->
+        <div class="confidence">
+            <h3>Classification Confidence</h3>
+            <p>Confidence: <strong id="confidence-value">--</strong></p>
+            
+            <div class="mb-3">
+                <label for="limit_confidence">If future confidence is below this ask:</label>
+                <input type="number" min="0" max="100" step="1" id="limit_confidence" 
+                    name="limit_confidence" value="80" class="form-control">
+            </div>
+            
+            <div class="mt-3">
+                <p>Species template:</p>
+                <div id="species-template-container">
+                    <!-- Try direct static path, fallback to our test endpoint -->
+                    <img id="species-template" class="img-fluid" alt="Species Template" 
+                         src="/static/{{ species }}.jpg" 
+                         onerror="this.src='{% url 'battycoda_app:test_static' filename=species|add:'.jpg' %}'; this.onerror=function(){this.src='{% url 'battycoda_app:test_static' filename='broken_image.png' %}';}">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Audio section -->
+        <div class="audio-section">
+            <h3>Audio Playback</h3>
+            <div class="mt-2">
+                <p>Short clip:</p>
+                <audio controls id="audio-player" preload="none" class="w-100">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+            
+            <div class="mt-3">
+                <p>Long clip:</p>
+                <audio controls id="audio-player-long" preload="none" class="w-100">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+        </div>
+        
+        <!-- Other channels section -->
+        <div class="others">
+            <h3>Other Channels</h3>
+            <div class="other-channels-content" id="other-channels-container">
+                <!-- Will be filled dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 mb-3 p-3 rounded shadow-sm" style="background-color: #262626;">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <small class="text-light">{{ species }} - {{ wav_path }}</small>
+            </div>
+            <div>
+                <button class="btn btn-primary me-2" id="save-changes-btn">Save Changes</button>
+                <button class="btn btn-outline-light" id="export-csv-btn">Export CSV</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // File information
+        const wavPath = "{{ full_path }}";
+        const fileHash = "{{ file_hash }}";
+        const totalCalls = {{ total_calls }}; // Loaded from the pickle file
+        
+        console.log("Loading WAV file:", wavPath);
+        console.log("File hash:", fileHash);
+        console.log("Total calls found:", totalCalls);
+        
+        // Current state
+        let currentCall = 0;
+        let currentChannel = 0;
+        let contrastValue = 4.0;
+        let loudnessValue = 1.0;
+        let overviewMode = false;
+        
+        // UI elements
+        const spectrogramImg = document.getElementById('spectrogram');
+        const spectrogramLargeImg = document.getElementById('spectrogram-large');
+        const channelSelector = document.getElementById('channel-selector');
+        const contrastInput = document.getElementById('contrast');
+        const loudnessInput = document.getElementById('loudness');
+        const playAudioBtn = document.getElementById('play-audio-btn');
+        const overviewBtn = document.getElementById('overview-btn');
+        const detailBtn = document.getElementById('detail-btn');
+        const prevCallBtn = document.getElementById('prev-call-btn');
+        const nextCallBtn = document.getElementById('next-call-btn');
+        const updateBtn = document.getElementById('update-btn');
+        const audioPlayer = document.getElementById('audio-player');
+        const audioPlayerLong = document.getElementById('audio-player-long');
+        const currentCallText = document.getElementById('current-call-text');
+        const totalCallsText = document.getElementById('total-calls-text');
+        const otherChannelsContainer = document.getElementById('other-channels-container');
+        
+        // Update UI to show current call
+        function updateCallDisplay() {
+            currentCallText.textContent = (currentCall + 1);
+            totalCallsText.textContent = totalCalls;
+        }
+
+        // Load spectrogram
+        function loadSpectrogram() {
+            // Build URL for main spectrogram
+            const spectrogramUrl = `{% url 'battycoda_app:spectrogram' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&numcalls=${totalCalls}&hash=${fileHash}&overview=${overviewMode ? '1' : '0'}&contrast=${contrastValue}`;
+            
+            // Build URL for detailed spectrogram
+            const spectrogramLargeUrl = `{% url 'battycoda_app:spectrogram' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&numcalls=${totalCalls}&hash=${fileHash}&overview=0&contrast=${contrastValue}&detail=1`;
+            
+            console.log("Loading spectrogram from:", spectrogramUrl);
+            
+            // Load main spectrogram
+            const img = new Image();
+            img.onload = function() {
+                console.log("Spectrogram loaded successfully");
+                spectrogramImg.src = this.src;
+            };
+            img.onerror = function(e) {
+                console.error("Failed to load spectrogram:", e);
+                // Show error message on the page
+                const container = document.querySelector('.spectrogram-small');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger';
+                errorDiv.textContent = 'Failed to load spectrogram. Check console for details.';
+                container.appendChild(errorDiv);
+            };
+            img.src = spectrogramUrl;
+            
+            console.log("Loading detailed spectrogram from:", spectrogramLargeUrl);
+            
+            // Load detailed spectrogram
+            const imgLarge = new Image();
+            imgLarge.onload = function() {
+                console.log("Detailed spectrogram loaded successfully");
+                spectrogramLargeImg.src = this.src;
+            };
+            imgLarge.onerror = function(e) {
+                console.error("Failed to load detailed spectrogram:", e);
+                // Show error message on the page
+                const container = document.querySelector('.spectrogram-large');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger';
+                errorDiv.textContent = 'Failed to load detailed spectrogram. Check console for details.';
+                container.appendChild(errorDiv);
+            };
+            imgLarge.src = spectrogramLargeUrl;
+            
+            // Load other channels
+            loadOtherChannels();
+        }
+        
+        // Load audio
+        function loadAudio() {
+            // Build URL for short audio snippet
+            const audioUrl = `{% url 'battycoda_app:audio_snippet' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&hash=${fileHash}&overview=False&loudness=${loudnessValue}`;
+            
+            // Build URL for long audio snippet
+            const audioLongUrl = `{% url 'battycoda_app:audio_snippet' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&hash=${fileHash}&overview=True&loudness=${loudnessValue}`;
+            
+            console.log("Loading short audio from:", audioUrl);
+            console.log("Loading long audio from:", audioLongUrl);
+            
+            // Set audio sources with error handling
+            audioPlayer.onerror = function(e) {
+                console.error("Error loading short audio:", e);
+                const container = document.querySelector('.audio-section');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger mt-2';
+                errorDiv.textContent = 'Failed to load audio snippet.';
+                container.appendChild(errorDiv);
+            };
+            
+            audioPlayerLong.onerror = function(e) {
+                console.error("Error loading long audio:", e);
+            };
+            
+            // Set sources
+            audioPlayer.src = audioUrl;
+            audioPlayer.load();
+            
+            audioPlayerLong.src = audioLongUrl;
+            audioPlayerLong.load();
+        }
+        
+        // Load other channels
+        function loadOtherChannels() {
+            otherChannelsContainer.innerHTML = '';
+            
+            // Get all channels except the main one
+            const maxChannels = 2; // This should be determined from the WAV file
+            for (let i = 0; i < maxChannels; i++) {
+                if (i != currentChannel) {
+                    const channelUrl = `{% url 'battycoda_app:spectrogram' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${i}&numcalls=${totalCalls}&hash=${fileHash}&overview=0&contrast=${contrastValue}`;
+                    
+                    const container = document.createElement('div');
+                    container.className = 'mb-3';
+                    
+                    const title = document.createElement('p');
+                    title.textContent = `Channel ${i+1}:`;
+                    container.appendChild(title);
+                    
+                    const img = document.createElement('img');
+                    img.className = 'img-fluid';
+                    img.alt = `Channel ${i+1} Spectrogram`;
+                    img.src = channelUrl;
+                    container.appendChild(img);
+                    
+                    otherChannelsContainer.appendChild(container);
+                }
+            }
+        }
+        
+        // Event handlers
+        channelSelector.addEventListener('change', function() {
+            currentChannel = parseInt(this.value);
+            loadSpectrogram();
+            loadAudio();
+        });
+        
+        updateBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            contrastValue = parseFloat(contrastInput.value);
+            loudnessValue = parseFloat(loudnessInput.value);
+            loadSpectrogram();
+            loadAudio();
+        });
+        
+        overviewBtn.addEventListener('click', function() {
+            overviewMode = true;
+            overviewBtn.classList.add('active');
+            detailBtn.classList.remove('active');
+            loadSpectrogram();
+            loadAudio();
+        });
+        
+        detailBtn.addEventListener('click', function() {
+            overviewMode = false;
+            detailBtn.classList.add('active');
+            overviewBtn.classList.remove('active');
+            loadSpectrogram();
+            loadAudio();
+        });
+        
+        prevCallBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (currentCall > 0) {
+                currentCall--;
+                updateCallDisplay();
+                loadSpectrogram();
+                loadAudio();
+            }
+        });
+        
+        nextCallBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (currentCall < totalCalls - 1) {
+                currentCall++;
+                updateCallDisplay();
+                loadSpectrogram();
+                loadAudio();
+            }
+        });
+        
+        document.getElementById('save-changes-btn').addEventListener('click', function() {
+            alert('Changes saved!'); // Placeholder - actual save functionality to be implemented
+        });
+        
+        document.getElementById('export-csv-btn').addEventListener('click', function() {
+            alert('Exporting to CSV...'); // Placeholder - actual export functionality to be implemented
+        });
+        
+        // Initialize the page
+        updateCallDisplay();
+        loadSpectrogram();
+        loadAudio();
+    });
+</script>
+
+<style>
+    /* Apply dark theme */
+    body {
+        background-color: #121212;
+        color: #e0e0e0;
+    }
+    
+    /* Improved grid layout for better spacing */
+    .grid-container {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto auto auto auto;
+        gap: 20px;
+        margin-bottom: 20px;
+        width: 100%;
+    }
+    
+    /* Main sections */
+    .spectrogram-small {
+        grid-column: 1;
+        grid-row: 1;
+        width: 100%;
+    }
+    
+    .controls {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+    }
+    
+    .call-type {
+        grid-column: 3;
+        grid-row: 1 / span 2; /* Make it span both rows to have enough height */
+        width: 100%;
+        overflow-y: visible;
+    }
+    
+    .spectrogram-large {
+        grid-column: 1;
+        grid-row: 2;
+        width: 100%;
+    }
+    
+    .confidence {
+        grid-column: 1;
+        grid-row: 3;
+        width: 100%;
+    }
+    
+    .audio-section {
+        grid-column: 2;
+        grid-row: 3;
+        width: 100%;
+    }
+    
+    .others {
+        grid-column: 1 / span 3;
+        grid-row: 4;
+        width: 100%;
+    }
+    
+    /* Ensure images and containers are sized properly */
+    img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+    }
+    
+    .form-check {
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Make headers consistent */
+    h3 {
+        font-size: 1.25rem;
+        margin-bottom: 0.75rem;
+        color: #fff;
+    }
+    
+    /* Other styling */
+    .button-group button {
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    
+    .other-channels-content {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    
+    .other-channels-content > div {
+        flex: 1 1 300px;
+        max-width: 350px;
+    }
+    
+    /* Dark card-like appearance for sections */
+    .spectrogram-small, .controls, .call-type, 
+    .spectrogram-large, .confidence, .audio-section, .others {
+        background-color: #1e1e1e;
+        border-radius: 4px;
+        padding: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    
+    /* Override Bootstrap form control styles for dark theme */
+    .form-control, .form-select {
+        background-color: #2d2d2d;
+        border: 1px solid #444;
+        color: #e0e0e0;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        background-color: #333;
+        color: #fff;
+        border-color: #007bff;
+    }
+    
+    /* Override Bootstrap button styles */
+    .btn-outline-secondary {
+        color: #adb5bd;
+        border-color: #495057;
+    }
+    
+    .btn-outline-secondary:hover,
+    .btn-outline-secondary.active {
+        color: #fff;
+        background-color: #495057;
+        border-color: #6c757d;
+    }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 992px) {
+        .grid-container {
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto auto;
+        }
+        
+        .spectrogram-small {
+            grid-column: 1 / span 2;
+            grid-row: 1;
+        }
+        
+        .controls {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        
+        .spectrogram-large {
+            grid-column: 1 / span 2;
+            grid-row: 3;
+        }
+        
+        .call-type {
+            grid-column: 2;
+            grid-row: 2;
+        }
+        
+        .confidence {
+            grid-column: 1;
+            grid-row: 4;
+        }
+        
+        .audio-section {
+            grid-column: 2;
+            grid-row: 4;
+        }
+        
+        .others {
+            grid-column: 1 / span 2;
+            grid-row: 5;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .grid-container {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto auto auto auto auto;
+        }
+        
+        .spectrogram-small {
+            grid-column: 1;
+            grid-row: 1;
+        }
+        
+        .controls {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        
+        .call-type {
+            grid-column: 1;
+            grid-row: 3;
+        }
+        
+        .spectrogram-large {
+            grid-column: 1;
+            grid-row: 4;
+        }
+        
+        .confidence {
+            grid-column: 1;
+            grid-row: 5;
+        }
+        
+        .audio-section {
+            grid-column: 1;
+            grid-row: 6;
+        }
+        
+        .others {
+            grid-column: 1;
+            grid-row: 7;
+        }
+    }
+</style>
+{% endblock %}

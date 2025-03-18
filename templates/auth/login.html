@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Login | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Login</h2>
+    <form method="post" action="{% url 'battycoda_app:login' %}">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_username" style="display: block; margin-bottom: 5px;">Username:</label>
+            {{ form.username }}
+            {% if form.username.errors %}
+            <span style="color: #e57373; font-size: 0.9em;">
+                {{ form.username.errors }}
+            </span>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_password" style="display: block; margin-bottom: 5px;">Password:</label>
+            {{ form.password }}
+            {% if form.password.errors %}
+            <span style="color: #e57373; font-size: 0.9em;">
+                {{ form.password.errors }}
+            </span>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_remember" style="display: inline-block;">
+                <input type="checkbox" name="remember" id="id_remember">
+                Remember me
+            </label>
+        </div>
+        
+        {% if form.non_field_errors %}
+        <div style="margin-bottom: 15px; color: #e57373;">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+        
+        <div style="margin-top: 20px;">
+            <button type="submit" class="button">Login</button>
+        </div>
+    </form>
+    
+    <div style="margin-top: 20px;">
+        <p>Don't have an account? <a href="{% url 'battycoda_app:register' %}">Register</a></p>
+        <p>Forgot your password? <a href="{% url 'battycoda_app:password_reset_request' %}">Reset Password</a></p>
+        <p>Need a login code? <a href="{% url 'battycoda_app:request_login_code' %}">Request Login Code</a></p>
+    </div>
+</div>
+{% endblock %}

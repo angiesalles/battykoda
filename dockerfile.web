@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -8,30 +8,23 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy requirements first for better layer caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn gevent
+
+# Install Python dependencies
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p data/home logs static/tempdata /home
-
-# Set proper permissions
-RUN chmod +x *.sh
-RUN chmod 777 /home
-
-# Create a non-root user
-RUN useradd -m battycoda
-RUN chown -R battycoda:battycoda /app
-USER battycoda
+RUN mkdir -p media/home logs static/tempdata
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV FLASK_ENV=production
-ENV FLASK_DEBUG=0
+ENV DJANGO_SETTINGS_MODULE=config.settings
 
 # Default command
-CMD ["gunicorn", "--workers=3", "--bind=0.0.0.0:8000", "wsgi:application"]
+CMD ["gunicorn", "--workers=3", "--bind=0.0.0.0:8060", "config.wsgi:application"]
