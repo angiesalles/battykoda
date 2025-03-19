@@ -7,17 +7,13 @@ import traceback
 import tempfile
 import shutil
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
 import scipy.signal
 import scipy.io
+from PIL import Image
 from django.conf import settings
 
 # Configure logging
 logger = logging.getLogger('battycoda.audio')
-
-# Force matplotlib to not use any Xwindows backend
-matplotlib.use('Agg')
 
 def appropriate_file(path, args, folder_only=False):
     """
@@ -251,41 +247,6 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
         logger.debug(traceback.format_exc())
         return None, 0, ""
 
-def create_error_image(error_message, width=800, height=400):
-    """
-    Create an error image with a message.
-    
-    Args:
-        error_message: Message to display on the image
-        width: Width of the image
-        height: Height of the image
-        
-    Returns:
-        str: Path to the generated error image file
-    """
-    # Create a temporary file for the image
-    fd, img_path = tempfile.mkstemp(suffix='.png')
-    os.close(fd)
-    
-    # Create figure and axis
-    plt.figure(figsize=(width/100, height/100), dpi=100, facecolor='black')
-    ax = plt.axes()
-    ax.set_facecolor('black')
-    
-    # Remove axis ticks
-    ax.set_xticks([])
-    ax.set_yticks([])
-    
-    # Add error message
-    ax.text(0.5, 0.5, error_message, 
-            color='white', fontsize=12, ha='center', va='center',
-            wrap=True, bbox=dict(boxstyle='round', facecolor='red', alpha=0.7))
-    
-    # Save the image
-    plt.savefig(img_path, facecolor='black', bbox_inches='tight')
-    plt.close()
-    
-    return img_path
 
 def overview_hwin():
     """Returns the half-window size for overview in milliseconds."""

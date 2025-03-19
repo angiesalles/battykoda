@@ -24,7 +24,9 @@ services:
     restart: unless-stopped
     command: >
       bash -c "
+        echo 'Installing dependencies...' &&
         pip install -r requirements.txt &&
+        echo 'Starting web server...' &&
         gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 --log-level debug config.wsgi:application
       "
 
@@ -46,7 +48,9 @@ services:
     restart: unless-stopped
     command: >
       bash -c "
+        echo 'Installing dependencies...' &&
         pip install -r requirements.txt &&
+        echo 'Starting Celery worker...' &&
         celery -A config worker --loglevel=info
       "
 
@@ -67,7 +71,9 @@ services:
     restart: unless-stopped
     command: >
       bash -c "
+        echo 'Installing dependencies...' &&
         pip install -r requirements.txt &&
+        echo 'Starting Flower...' &&
         celery -A config flower --port=5555
       "
 

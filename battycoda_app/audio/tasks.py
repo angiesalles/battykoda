@@ -8,13 +8,12 @@ import traceback
 import tempfile
 import shutil
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
 import scipy.signal
 from celery import shared_task, group, current_app
 from django.conf import settings
+from PIL import Image
 
-from .utils import appropriate_file, get_audio_bit, overview_hwin, normal_hwin, create_error_image
+from .utils import appropriate_file, get_audio_bit, overview_hwin, normal_hwin
 from ..utils import convert_path_to_os_specific
 
 # Configure logging
@@ -28,8 +27,7 @@ def log_performance(start_time, message):
         elapsed = time.time() - start_time
         logger.info(f"PERF: {message} - {elapsed:.3f}s")
 
-# Force matplotlib to not use any Xwindows backend
-matplotlib.use('Agg')
+# No need for matplotlib configuration anymore
 
 @shared_task(bind=True, name='battycoda_app.audio.tasks.generate_spectrogram_task', max_retries=3, retry_backoff=True)
 def generate_spectrogram_task(self, path, args, output_path=None):
@@ -203,44 +201,50 @@ def generate_spectrogram(path, args, output_path=None):
                                              noverlap=noverlap, 
                                              nfft=nfft)
         
-        # OPTIMIZATION: Save directly to output_path without tempfile
-        # Create figure with optimized output
-        plt.figure(figsize=(8, 6), facecolor='black', dpi=100)
-        ax = plt.axes()
-        ax.set_facecolor('indigo')
+        # Process data for image creation - measure time
+        process_start = time.time()
         
-        # Apply contrast
+        # Apply contrast enhancement
         temocontrast = 10 ** contrast
-        plt.pcolormesh(t, f, np.arctan(temocontrast * sxx), shading='auto')
+        processed_data = np.arctan(temocontrast * sxx)
         
-        if not overview:
-            plt.xlim(0, 0.050)
-            
-        # Optimize label rendering
-        ax.tick_params(axis='x', colors='white')
-        ax.tick_params(axis='y', colors='white')
-        ax.xaxis.label.set_color('white')
-        ax.yaxis.label.set_color('white')
+        # Normalize the data to 0-255 range for image
+        processed_data = (processed_data - processed_data.min()) / (processed_data.max() - processed_data.min()) * 255
         
-        if fs < 0:  # Mark error condition
-            plt.ylabel('kevinerror')
-            plt.xlabel('kevinerror')
-        else:
-            plt.ylabel('Frequency [Hz]')
-            plt.xlabel('Time [sec]')
-            
-        # Set title based on whether we're using direct timing or call numbers
-        if extra_params:
-            onset = float(extra_params['onset'])
-            offset = float(extra_params['offset'])
-            plt.title(f"Time {onset:.2f}s to {offset:.2f}s", color='white')
-        else:
-            plt.title(f"Call {call_to_do + 1}", color='white')
+        # Flip the spectrogram vertically (low frequencies at bottom)
+        processed_data = np.flipud(processed_data)
         
-        # OPTIMIZATION: Write directly to output file
-        plt.savefig(output_path, dpi=100, bbox_inches='tight', pad_inches=0.1, 
-                    facecolor='black')
-        plt.close()
+        # Convert to 8-bit unsigned integer
+        img_data = processed_data.astype(np.uint8)
+        
+        # For a more colorful image, you can create an RGB version:
+        # Here we're using a purple-blue colormap similar to the original
+        height, width = img_data.shape
+        rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
+        
+        # Simple colormap: convert grayscale to indigo-purple
+        # R channel - more for brighter areas
+        rgb_data[:, :, 0] = np.clip(img_data * 0.7, 0, 255).astype(np.uint8)
+        # G channel - less overall
+        rgb_data[:, :, 1] = np.clip(img_data * 0.2, 0, 255).astype(np.uint8)
+        # B channel - more in all areas for blue/indigo base
+        rgb_data[:, :, 2] = np.clip(img_data * 0.9, 0, 255).astype(np.uint8)
+        
+        log_performance(process_start, f"{task_id}: Process spectrogram data")
+        
+        # Create and save image - measure time
+        img_start = time.time()
+        
+        # Create PIL Image and save
+        img = Image.fromarray(rgb_data)
+        
+        # Resize to standard dimensions (800x600)
+        img = img.resize((800, 600), Image.Resampling.LANCZOS)
+        
+        # Save with minimal compression for speed
+        img.save(output_path, format='PNG', compress_level=1)
+        
+        log_performance(img_start, f"{task_id}: Create and save image")
         
         # Verify the file was created and log performance
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
@@ -252,14 +256,5 @@ def generate_spectrogram(path, args, output_path=None):
                 
     except Exception as e:
         logger.error(f"Error generating spectrogram: {str(e)}")
-        try:
-            plt.close()  # Make sure to close the figure even on error
-        except:
-            pass
-        
-        # Try to create an error image
-        try:
-            create_error_image(str(e), output_path)
-            return False, output_path, str(e)
-        except:
-            return False, output_path, str(e)
+        # Simply return the error, no attempt to create error image
+        return False, output_path, str(e)
