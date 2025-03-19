@@ -22,6 +22,18 @@
     </div>
     
     <div style="margin-bottom: 20px;">
+        <div class="section-title">Team Information</div>
+        <div style="margin-left: 10px;">
+            {% if profile.team %}
+                <p><strong>Team:</strong> <a href="{% url 'battycoda_app:team_detail' profile.team.id %}">{{ profile.team.name }}</a></p>
+                <p><strong>Role:</strong> {% if profile.is_admin %}Team Administrator{% else %}Team Member{% endif %}</p>
+            {% else %}
+                <p>You are not assigned to any team yet. Please contact an administrator.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
         <div class="section-title">Your Storage</div>
         <div style="margin-left: 10px;">
             <a href="{% url 'battycoda_app:user_directory' username=user.username %}" class="button">Browse My Files</a>

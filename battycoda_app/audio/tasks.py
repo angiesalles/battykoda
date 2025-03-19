@@ -160,7 +160,17 @@ def generate_spectrogram(path, args, output_path=None):
         
         # Get audio data
         logger.debug(f"Getting audio data from: {path}")
-        thr_x1, fs, hashof = get_audio_bit(path, call_to_do, hwin)
+        
+        # Check for onset/offset in args for task-based annotation
+        extra_params = None
+        if 'onset' in args and 'offset' in args:
+            extra_params = {
+                'onset': args['onset'],
+                'offset': args['offset']
+            }
+            logger.info(f"Using direct onset/offset from args: {extra_params}")
+            
+        thr_x1, fs, hashof = get_audio_bit(path, call_to_do, hwin, extra_params)
         
         # Validate audio data
         if thr_x1 is None or thr_x1.size == 0:
@@ -204,6 +214,14 @@ def generate_spectrogram(path, args, output_path=None):
         else:
             plt.ylabel('Frequency [Hz]')
             plt.xlabel('Time [sec]')
+            
+        # Set title based on whether we're using direct timing or call numbers
+        if extra_params:
+            onset = float(extra_params['onset'])
+            offset = float(extra_params['offset'])
+            plt.title(f"Time {onset:.2f}s to {offset:.2f}s", color='white')
+        else:
+            plt.title(f"Call {call_to_do + 1}", color='white')
         
         # Save to a temporary file first, then move it to final destination
         # This helps avoid partial writes

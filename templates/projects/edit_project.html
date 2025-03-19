@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Project - BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Edit Project: {{ project.name }}</h2>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_name" style="display: block; margin-bottom: 5px;">Name:</label>
+            {{ form.name }}
+            {% if form.name.errors %}
+            <div style="color: #e57373; margin-top: 5px;">
+                {% for error in form.name.errors %}
+                {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_description" style="display: block; margin-bottom: 5px;">Description:</label>
+            {{ form.description }}
+            {% if form.description.errors %}
+            <div style="color: #e57373; margin-top: 5px;">
+                {% for error in form.description.errors %}
+                {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button type="submit" class="button">Update Project</button>
+            <a href="{% url 'battycoda_app:project_detail' project.id %}" style="margin-left: 10px;">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

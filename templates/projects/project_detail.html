@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ project.name }} - BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>{{ project.name }}</h2>
+    
+    <div style="margin-bottom: 20px;">
+        <a href="{% url 'battycoda_app:edit_project' project.id %}" class="button">Edit Project</a>
+        <a href="{% url 'battycoda_app:project_list' %}" class="button" style="margin-left: 10px;">Back to Projects List</a>
+    </div>
+    
+    <div>
+        <p><strong>Created:</strong> {{ project.created_at|date:"F d, Y H:i" }}</p>
+        <p><strong>Created By:</strong> {{ project.created_by.username }}</p>
+        
+        {% if project.description %}
+        <h3>Description</h3>
+        <div style="margin-bottom: 20px;">
+            {{ project.description|linebreaks }}
+        </div>
+        {% endif %}
+    </div>
+    
+    <h3>Task Batches in this Project</h3>
+    {% if batches %}
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Name</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Species</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Tasks</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for batch in batches %}
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">
+                    <a href="{% url 'battycoda_app:task_batch_detail' batch.id %}">{{ batch.name }}</a>
+                </td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">
+                    <a href="{% url 'battycoda_app:species_detail' batch.species.id %}">{{ batch.species.name }}</a>
+                </td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ batch.created_at|date:"M d, Y" }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ batch.tasks.count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No task batches in this project.</p>
+    {% endif %}
+    
+    <h3>Tasks in this Project</h3>
+    {% if tasks %}
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">WAV File</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Segment</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Status</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Species</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ task.wav_file_name }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ task.status }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">
+                    <a href="{% url 'battycoda_app:species_detail' task.species.id %}">{{ task.species.name }}</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No tasks in this project.</p>
+    {% endif %}
+</div>
+{% endblock %}

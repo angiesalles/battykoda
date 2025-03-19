@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Species List - BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Species List</h2>
+    
+    <div style="margin-bottom: 20px;">
+        <a href="{% url 'battycoda_app:create_species' %}" class="button">Add New Species</a>
+    </div>
+    
+    {% if species_list %}
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Name</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Scientific Name</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for species in species_list %}
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">
+                    <a href="{% url 'battycoda_app:species_detail' species.id %}">{{ species.name }}</a>
+                </td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ species.scientific_name|default:"" }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ species.created_at|date:"M d, Y" }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">
+                    <a href="{% url 'battycoda_app:edit_species' species.id %}" class="button">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No species have been added yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

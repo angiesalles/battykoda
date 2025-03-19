@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Projects List - BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Projects List</h2>
+    
+    <div style="margin-bottom: 20px;">
+        <a href="{% url 'battycoda_app:create_project' %}" class="button">Add New Project</a>
+    </div>
+    
+    {% if project_list %}
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Name</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created By</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in project_list %}
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">
+                    <a href="{% url 'battycoda_app:project_detail' project.id %}">{{ project.name }}</a>
+                </td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ project.created_at|date:"M d, Y" }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ project.created_by.username }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">
+                    <a href="{% url 'battycoda_app:edit_project' project.id %}" class="button">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No projects have been added yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

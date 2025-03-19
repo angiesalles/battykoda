@@ -7,6 +7,16 @@
     <h2>About BattyCoda</h2>
     <p>BattyCoda is a tool for analyzing animal vocalizations, including but not limited to bat echolocation, bird songs, frog calls, and other animal sounds. It helps researchers categorize, classify, and analyze vocalizations from any species.</p>
     
+    <div class="mt-5 mb-5 text-center">
+        <div class="py-3 px-4" style="background-color: rgba(255,255,255,0.05); border-radius: 10px;">
+            <h3 class="mb-4">Ready to work on tasks?</h3>
+            <a href="{% url 'battycoda_app:get_next_task' %}" class="btn btn-success btn-lg task-button mb-3">
+                <i class="fas fa-tasks me-2"></i> GET NEW TASK
+            </a>
+            <p class="mt-3 text-muted">This will find an unfinished task and take you directly to the annotation interface</p>
+        </div>
+    </div>
+    
     <p>To use BattyCoda:</p>
     <ol>
         <li>Navigate to your user directory</li>

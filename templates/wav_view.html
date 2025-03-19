@@ -12,8 +12,8 @@
         <div class="spectrogram-small">
             <h3>Spectrogram: <span id="current-call-text">1</span> of <span id="total-calls-text">{{ total_calls }}</span> calls</h3>
             <div id="spectrogram-container" class="mb-3">
-                <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
-                    <img id="spectrogram" class="img-fluid" alt="Spectrogram">
+                <div class="d-flex justify-content-center align-items-center spectrogram-container">
+                    <img id="spectrogram" alt="Spectrogram">
                 </div>
             </div>
         </div>
@@ -58,12 +58,6 @@
                 <p><strong>Species:</strong> {{ species }}</p>
             </div>
             
-            <!-- Unknown option always first -->
-            <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" id="Unknown" name="type_call" value="Unknown" checked>
-                <label class="form-check-label" for="Unknown">Unknown</label>
-            </div>
-            
             <!-- Dynamic call types from the species text file -->
             {% if call_types %}
                 {% for call_type in call_types %}
@@ -88,6 +82,12 @@
                 </div>
             {% endif %}
             
+            <!-- Unknown option before Other -->
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" id="Unknown" name="type_call" value="Unknown" checked>
+                <label class="form-check-label" for="Unknown">Unknown</label>
+            </div>
+            
             <!-- Always include Other option -->
             <div class="form-check mb-2">
                 <input class="form-check-input" type="radio" id="Other" name="type_call" value="">
@@ -100,8 +100,8 @@
         <div class="spectrogram-large">
             <h3>Detailed View</h3>
             <div id="spectrogram-large-container" class="mb-3">
-                <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
-                    <img id="spectrogram-large" class="img-fluid" alt="Detailed Spectrogram">
+                <div class="d-flex justify-content-center align-items-center spectrogram-container">
+                    <img id="spectrogram-large" alt="Detailed Spectrogram">
                 </div>
             </div>
         </div>
@@ -122,8 +122,11 @@
                 <div id="species-template-container">
                     <!-- Try direct static path, fallback to our test endpoint -->
                     <img id="species-template" class="img-fluid" alt="Species Template" 
-                         src="/static/{{ species }}.jpg" 
-                         onerror="this.src='{% url 'battycoda_app:test_static' filename=species|add:'.jpg' %}'; this.onerror=function(){this.src='{% url 'battycoda_app:test_static' filename='broken_image.png' %}';}">
+                         src="{% static 'broken_image.png' %}" 
+                         {% if species %}
+                         data-species-img="{% static species|add:'.jpg' %}" 
+                         onload="if (this.getAttribute('data-species-img')) this.src = this.getAttribute('data-species-img');"
+                         {% endif %}>
                 </div>
             </div>
         </div>
@@ -310,11 +313,14 @@
                     title.textContent = `Channel ${i+1}:`;
                     container.appendChild(title);
                     
+                    const imgContainer = document.createElement('div');
+                    imgContainer.className = 'spectrogram-container';
+                    container.appendChild(imgContainer);
+                    
                     const img = document.createElement('img');
-                    img.className = 'img-fluid';
                     img.alt = `Channel ${i+1} Spectrogram`;
                     img.src = channelUrl;
-                    container.appendChild(img);
+                    imgContainer.appendChild(img);
                     
                     otherChannelsContainer.appendChild(container);
                 }
@@ -453,6 +459,13 @@
         max-width: 100%;
         height: auto;
         border-radius: 4px;
+        object-fit: contain;
+    }
+    
+    .spectrogram-container {
+        min-height: 300px;
+        width: 100%;
+        overflow: visible;
     }
     
     .form-check {

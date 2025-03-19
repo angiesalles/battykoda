@@ -1,31 +1,5 @@
-env/*
-.venv/
-venv/
-.DS_Store
-.idea/*
-.vscode/
-__pycache__/
-*.py[cod]
-*$py.class
-/data/*
-/tempdata/*
-*.pickle
-for_gabby/*
-*.log
-*.pid
-instance/
-*.db
-*.db-journal
-*.sqlite
-
-# Environment variables - don't commit sensitive information
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env
-
-# Replit-specific files (but keep .replit and replit.nix)
-.config/
-.cache/
-.upm/
+*.pid
+.venv
+*__pycache__*
+*.sqlite3

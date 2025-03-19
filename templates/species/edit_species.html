@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Species - BattyCoda{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Edit Species: {{ species.name }}</h2>
+    
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_name" style="display: block; margin-bottom: 5px;">Name:</label>
+            {{ form.name }}
+            {% if form.name.errors %}
+            <div style="color: #e57373; margin-top: 5px;">
+                {% for error in form.name.errors %}
+                {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_scientific_name" style="display: block; margin-bottom: 5px;">Scientific Name:</label>
+            {{ form.scientific_name }}
+            {% if form.scientific_name.errors %}
+            <div style="color: #e57373; margin-top: 5px;">
+                {% for error in form.scientific_name.errors %}
+                {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_description" style="display: block; margin-bottom: 5px;">Description:</label>
+            {{ form.description }}
+            {% if form.description.errors %}
+            <div style="color: #e57373; margin-top: 5px;">
+                {% for error in form.description.errors %}
+                {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_image" style="display: block; margin-bottom: 5px;">Species Image:</label>
+            {% if species.image %}
+            <p>Current image: {{ species.image.url }}</p>
+            <img src="{{ species.image.url }}" alt="{{ species.name }}" style="max-width: 300px; margin-bottom: 10px;">
+            {% endif %}
+            {{ form.image }}
+            <p style="font-size: 0.8em; margin-top: 5px;">Upload a new image to replace the current one</p>
+            {% if form.image.errors %}
+            <div style="color: #e57373; margin-top: 5px;">
+                {% for error in form.image.errors %}
+                {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <h3>Call Types</h3>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="id_calls_file" style="display: block; margin-bottom: 5px;">Import Calls from File:</label>
+            {{ form.calls_file }}
+            <p style="font-size: 0.8em; margin-top: 5px;">Upload a text file with call types (one per line, format: short_name,long_name)</p>
+            {% if form.calls_file.errors %}
+            <div style="color: #e57373; margin-top: 5px;">
+                {% for error in form.calls_file.errors %}
+                {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #2a2a2a; border-radius: 5px;">
+            <h4 style="margin-top: 0;">Edit Call Types</h4>
+            {{ call_formset.management_form }}
+            
+            <table id="call-formset-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Short Name</th>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Long Name</th>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Description</th>
+                        <th style="text-align: center; padding: 8px; border-bottom: 1px solid #333;">Delete</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for call_form in call_formset %}
+                    <tr class="call-form">
+                        <td style="padding: 8px; border-bottom: 1px solid #333;">
+                            {{ call_form.short_name }}
+                            {% if call_form.short_name.errors %}
+                            <div style="color: #e57373; margin-top: 5px;">
+                                {% for error in call_form.short_name.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px; border-bottom: 1px solid #333;">
+                            {{ call_form.long_name }}
+                            {% if call_form.long_name.errors %}
+                            <div style="color: #e57373; margin-top: 5px;">
+                                {% for error in call_form.long_name.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px; border-bottom: 1px solid #333;">
+                            {{ call_form.description }}
+                            {% if call_form.description.errors %}
+                            <div style="color: #e57373; margin-top: 5px;">
+                                {% for error in call_form.description.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px; border-bottom: 1px solid #333; text-align: center;">
+                            {{ call_form.DELETE }}
+                            {{ call_form.id }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <button type="button" id="add-call" class="button" style="margin-top: 10px;">Add Another Call</button>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button type="submit" class="button">Update Species</button>
+            <a href="{% url 'battycoda_app:species_detail' species.id %}" style="margin-left: 10px;">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addCallButton = document.getElementById('add-call');
+    const callFormsetTable = document.getElementById('call-formset-table').querySelector('tbody');
+    
+    // Initial form count
+    let formCount = {{ call_formset.total_form_count }};
+    
+    // Get the form prefix
+    const prefix = 'calls';
+    
+    // Function to update the form count
+    function updateFormCount() {
+        document.getElementById('id_' + prefix + '-TOTAL_FORMS').value = formCount;
+    }
+    
+    // Add new call form
+    addCallButton.addEventListener('click', function() {
+        // Clone the first form
+        const callForms = document.querySelectorAll('.call-form');
+        if (callForms.length === 0) {
+            return; // No template form available
+        }
+        
+        const newForm = callForms[0].cloneNode(true);
+        
+        // Update form IDs and names
+        const inputs = newForm.querySelectorAll('input, select, textarea');
+        inputs.forEach(function(input) {
+            const name = input.getAttribute('name');
+            if (name) {
+                // Find the index in the current name
+                const match = name.match(new RegExp(prefix + '-(\\d+)-'));
+                if (match) {
+                    const newName = name.replace(prefix + '-' + match[1] + '-', prefix + '-' + formCount + '-');
+                    input.setAttribute('name', newName);
+                    input.setAttribute('id', 'id_' + newName);
+                    
+                    // Clear value except for hidden fields
+                    if (input.type !== 'hidden') {
+                        input.value = '';
+                    }
+                    
+                    // Uncheck checkboxes
+                    if (input.type === 'checkbox') {
+                        input.checked = false;
+                    }
+                }
+            }
+        });
+        
+        // Add the new form to the table
+        callFormsetTable.appendChild(newForm);
+        
+        // Increment form count
+        formCount++;
+        updateFormCount();
+    });
+});
+</script>
+{% endblock %}
+
+{% endblock %}

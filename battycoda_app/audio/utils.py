@@ -3,6 +3,7 @@ Utility functions for audio processing in BattyCoda.
 """
 import os
 import logging
+import traceback
 import tempfile
 import shutil
 import numpy as np
@@ -71,21 +72,22 @@ def appropriate_file(path, args, folder_only=False):
     
     return os.path.join(cache_dir, filename)
 
-def get_audio_bit(audio_path, call_number, window_size):
+def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
     """
     Get a specific bit of audio containing a bat call.
-    This pulls call data from the paired pickle file and extracts the audio.
+    Primary method: Use onset/offset from Task model (passed in extra_params)
+    Legacy method: Pull call data from paired pickle file (only used during TaskBatch creation)
     
     Args:
         audio_path: Path to the WAV file
-        call_number: Which call to extract
+        call_number: Which call to extract (only used for legacy pickle method)
         window_size: Size of the window around the call in milliseconds
+        extra_params: Dictionary of extra parameters like onset/offset from Task model
         
     Returns:
         tuple: (audio_data, sample_rate, hash_string)
     """
     try:
-        import pickle
         import hashlib
         from scipy.io import wavfile
         
@@ -96,17 +98,7 @@ def get_audio_bit(audio_path, call_number, window_size):
             logger.error(f"Audio file not found: {audio_path}")
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
             
-        # Check if pickle file exists
-        pickle_path = audio_path + '.pickle'
-        if not os.path.exists(pickle_path):
-            logger.error(f"Pickle file not found: {pickle_path}")
-            raise FileNotFoundError(f"Pickle file not found: {pickle_path}")
-        
-        # Read audio data
-        logger.debug(f"Reading audio data")
-        
         # Calculate file hash based on path (for consistency across containers)
-        # This matches how the hash is generated in wav_file_view
         file_hash = hashlib.md5(audio_path.encode()).hexdigest()
         
         # Read WAV file
@@ -132,126 +124,102 @@ def get_audio_bit(audio_path, call_number, window_size):
         else:
             logger.warning(f"Audio data has zero standard deviation (silent file): {audio_path}")
         
-        # Load segment data from pickle file
-        logger.debug(f"Loading segment data from {pickle_path}")
-        try:
-            with open(pickle_path, 'rb') as pfile:
-                segment_data = pickle.load(pfile)
-        except Exception as e:
-            logger.error(f"Error loading pickle file {pickle_path}: {str(e)}")
-            raise
+        # PREFERRED METHOD: Use onset/offset from Task model via extra_params
+        if extra_params and 'onset' in extra_params and 'offset' in extra_params:
+            try:
+                # Use onset/offset provided in parameters
+                onset_time = float(extra_params['onset'])
+                offset_time = float(extra_params['offset'])
+                
+                # Convert to samples
+                onset = int(onset_time * fs)
+                offset = int(offset_time * fs)
+                
+                logger.info(f"Using task onset/offset: {onset_time}s-{offset_time}s ({onset}-{offset} samples)")
+                
+                # Validate boundaries and apply reasonable constraints
+                if onset < 0:
+                    logger.warning(f"Fixing negative onset: {onset} -> 0")
+                    onset = 0
+                
+                if onset >= len(audiodata):
+                    logger.warning(f"Onset beyond file length: {onset} >= {len(audiodata)}, setting to 0")
+                    onset = 0
+                    
+                if offset > len(audiodata):
+                    logger.warning(f"Offset beyond file length: {offset} > {len(audiodata)}, setting to file end")
+                    offset = len(audiodata)
+                    
+                if offset <= onset:
+                    logger.warning(f"Invalid segment (offset <= onset): {offset} <= {onset}, using whole file")
+                    onset = 0
+                    offset = len(audiodata)
+                
+                # Extract audio segment with window padding
+                start_idx = max(0, onset - (fs * window_size // 1000))
+                end_idx = min(offset + (fs * window_size // 1000), len(audiodata))
+                
+                logger.debug(f"Extracting segment: start_idx={start_idx}, end_idx={end_idx}")
+                audio_segment = audiodata[start_idx:end_idx, :]
+                
+                logger.info(f"Successfully extracted audio segment: shape={audio_segment.shape}")
+                return audio_segment, fs, file_hash
+                
+            except Exception as e:
+                logger.error(f"Error using provided onset/offset: {str(e)}")
+                # Use full audio as fallback
+                logger.warning(f"Using full audio as fallback due to error")
+                return audiodata, fs, file_hash
         
-        # Validate segment data
-        if 'onsets' not in segment_data or 'offsets' not in segment_data:
-            logger.error(f"Invalid segment data: missing onsets or offsets")
-            raise ValueError(f"Invalid segment data: missing onsets or offsets")
-            
-        # Validate call index
-        if call_number >= len(segment_data['onsets']) or call_number >= len(segment_data['offsets']):
-            logger.error(f"Invalid call index {call_number}: out of range (max: {len(segment_data['onsets'])-1})")
-            raise IndexError(f"Invalid call index {call_number}: out of range")
-        
-        # Calculate onset and offset in samples
-        onset = int(segment_data['onsets'][call_number] * fs)
-        offset = int(segment_data['offsets'][call_number] * fs)
-        
-        logger.debug(f"Call {call_number}: onset={onset}, offset={offset}, fs={fs}")
-        
-        # Validate audio data boundaries
-        if onset >= len(audiodata) or offset > len(audiodata):
-            logger.error(f"Invalid segment boundaries: onset={onset}, offset={offset}, audio length={len(audiodata)}")
-            raise ValueError(f"Invalid segment boundaries: onset={onset}, offset={offset}, audio length={len(audiodata)}")
-            
-        # Extract audio segment with window padding
-        start_idx = max(0, onset - (fs * window_size // 1000))
-        end_idx = min(offset + (fs * window_size // 1000), len(audiodata))
-        
-        logger.debug(f"Extracting segment: start_idx={start_idx}, end_idx={end_idx}")
-        audio_segment = audiodata[start_idx:end_idx, :]
-        
-        # Mark segments that are too long or have invalid boundaries
-        if (offset-onset)*1.0/fs > 1.0 or offset <= onset:
-            logger.warning(f"Marking segment as error due to invalid duration or boundaries")
-            fs = -fs
-            
-        logger.info(f"Successfully extracted audio segment: shape={audio_segment.shape}")
-        return audio_segment, fs, file_hash
+        # FALLBACK: If we don't have onset/offset data, use the full audio
+        logger.info(f"No onset/offset data available, using full audio file")
+        return audiodata, fs, file_hash
         
     except Exception as e:
         logger.error(f"Error in get_audio_bit: {str(e)}")
-        import traceback
         logger.debug(traceback.format_exc())
-        return None, -1, ''
+        return None, 0, ""
 
-def overview_hwin():
-    """Return window size for overview."""
-    return 50  # This matches the original Hwin.py value
-
-def normal_hwin():
-    """Return window size for normal view."""
-    return 10  # This matches the original Hwin.py value
-
-def create_error_image(error_message, output_path=None):
+def create_error_image(error_message, width=800, height=400):
     """
-    Create an error image with the given message.
+    Create an error image with a message.
     
     Args:
-        error_message: Error message to display
-        output_path: Where to save the image (if None, a temp file is created)
+        error_message: Message to display on the image
+        width: Width of the image
+        height: Height of the image
         
     Returns:
-        str: Path to the error image
+        str: Path to the generated error image file
     """
-    try:
-        # Create a temp file if no output path provided
-        if output_path is None:
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            temp_file.close()
-            output_path = temp_file.name
-        else:
-            # Make sure directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        # Create figure
-        fig = plt.figure(figsize=(8, 6), facecolor='red')
-        ax = plt.axes()
-        
-        # Add error message and detailed diagnostics
-        ax.text(0.5, 0.7, f"Error: {error_message}", 
-                horizontalalignment='center',
-                verticalalignment='center',
-                transform=ax.transAxes,
-                color='white',
-                fontsize=14)
-                
-        # Add some debug info
-        import datetime
-        debug_info = (
-            f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"Media root: {settings.MEDIA_ROOT}\n"
-            f"Error ID: {id(error_message)}"
-        )
-        
-        ax.text(0.5, 0.3, debug_info, 
-                horizontalalignment='center',
-                verticalalignment='center',
-                transform=ax.transAxes,
-                color='yellow',
-                fontsize=10)
-                
-        ax.set_axis_off()
-        
-        # Save image
-        plt.savefig(output_path)
-        plt.close()
-        
-        logger.info(f"Created error image at {output_path}: {error_message}")
-        return output_path
-        
-    except Exception as e:
-        logger.error(f"Failed to create error image: {str(e)}")
-        try:
-            plt.close()
-        except:
-            pass
-        return None
+    # Create a temporary file for the image
+    fd, img_path = tempfile.mkstemp(suffix='.png')
+    os.close(fd)
+    
+    # Create figure and axis
+    plt.figure(figsize=(width/100, height/100), dpi=100, facecolor='black')
+    ax = plt.axes()
+    ax.set_facecolor('black')
+    
+    # Remove axis ticks
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    # Add error message
+    ax.text(0.5, 0.5, error_message, 
+            color='white', fontsize=12, ha='center', va='center',
+            wrap=True, bbox=dict(boxstyle='round', facecolor='red', alpha=0.7))
+    
+    # Save the image
+    plt.savefig(img_path, facecolor='black', bbox_inches='tight')
+    plt.close()
+    
+    return img_path
+
+def overview_hwin():
+    """Returns the half-window size for overview in samples."""
+    return 0
+
+def normal_hwin():
+    """Returns the half-window size for detailed view in samples."""
+    return 500
