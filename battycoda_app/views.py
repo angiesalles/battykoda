@@ -374,7 +374,8 @@ def upload_file_view(request):
 
 @login_required
 def get_next_task_view(request):
-    """Get the next undone task and redirect to the annotation interface"""
+    """Get the next undone task and redirect to the annotation interface,
+    preferentially selecting from the same batch as the last completed task."""
     # Get user profile and team
     profile = request.user.profile
     
@@ -389,10 +390,40 @@ def get_next_task_view(request):
         # Only look at user's own tasks if not in a team
         tasks_query = tasks_query.filter(created_by=request.user)
     
-    # Get the first undone task
+    # Try to find the most recently completed task to check its batch
+    recent_tasks = Task.objects.filter(
+        is_done=True
+    )
+    
+    # Filter recent tasks by team or user
+    if profile.team:
+        recent_tasks = recent_tasks.filter(team=profile.team)
+    else:
+        recent_tasks = recent_tasks.filter(created_by=request.user)
+    
+    # Get the most recently updated task
+    recent_task = recent_tasks.order_by('-updated_at').first()
+    
+    # If we found a recent task and it has a batch, preferentially get tasks from that batch
+    if recent_task and recent_task.batch:
+        logger.info(f"Looking for next task from same batch as recently completed task #{recent_task.id}")
+        
+        # Look for undone tasks from the same batch
+        same_batch_tasks = tasks_query.filter(batch=recent_task.batch)
+        next_task = same_batch_tasks.order_by('created_at').first()
+        
+        if next_task:
+            logger.info(f"Found task #{next_task.id} from the same batch #{recent_task.batch.id}")
+            return redirect('battycoda_app:annotate_task', task_id=next_task.id)
+        else:
+            logger.info(f"No more undone tasks in batch #{recent_task.batch.id}")
+    
+    # Fall back to the regular selection if no suitable task found from the same batch
     task = tasks_query.order_by('created_at').first()
     
     if task:
+        logger.info(f"Selected next task #{task.id}" + 
+                   (f" from batch #{task.batch.id}" if task.batch else " (no batch)"))
         # Redirect to the annotation interface with the task ID
         return redirect('battycoda_app:annotate_task', task_id=task.id)
     else:

@@ -81,7 +81,8 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
     Args:
         audio_path: Path to the WAV file
         call_number: Which call to extract (only used for legacy pickle method)
-        window_size: Size of the window around the call in milliseconds
+        window_size: Size of the window around the call in samples (when passed from normal_hwin/overview_hwin)
+                     or in milliseconds (when passed directly as a number)
         extra_params: Dictionary of extra parameters like onset/offset from Task model
         
     Returns:
@@ -287,9 +288,9 @@ def create_error_image(error_message, width=800, height=400):
     return img_path
 
 def overview_hwin():
-    """Returns the half-window size for overview in samples."""
+    """Returns the half-window size for overview in milliseconds."""
     return 0
 
 def normal_hwin():
-    """Returns the half-window size for detailed view in samples."""
-    return 500
+    """Returns the half-window size for detailed view in milliseconds."""
+    return 8
