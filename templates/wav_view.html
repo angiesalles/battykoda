@@ -4,16 +4,152 @@
 
 {% block title %}BattyCoda - Vocalization Analysis - {{ wav_path }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Grid layout update for single spectrogram view */
+    .grid-container {
+        display: grid;
+        grid-template-columns: 1fr 250px 250px;
+        grid-template-rows: auto auto auto;
+        grid-template-areas:
+            "spectrogram controls call-type"
+            "spectrogram confidence audio"
+            "spectrogram others audio";
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .spectrogram-section {
+        grid-area: spectrogram;
+    }
+    
+    .controls {
+        grid-area: controls;
+    }
+    
+    .call-type {
+        grid-area: call-type;
+    }
+    
+    .confidence {
+        grid-area: confidence;
+    }
+    
+    .audio-section {
+        grid-area: audio;
+    }
+    
+    .others {
+        grid-area: others;
+    }
+    
+    /* Axis label styling */
+    .spectrogram-y-axis {
+        display: flex;
+        flex-direction: row;
+        margin-right: 10px;
+        min-width: 60px; /* Ensure minimum width for the axis */
+    }
+    
+    .spectrogram-x-axis {
+        margin-top: 5px;
+        min-height: 40px; /* Ensure minimum height for the axis */
+    }
+    
+    .axis-label {
+        font-weight: bold;
+        color: white;
+        margin-bottom: 5px;
+    }
+    
+    .y-tick-marks {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 400px; /* Adjusted height */
+        margin-left: 5px;
+        text-align: right;
+        min-width: 40px; /* Ensure tick labels have space */
+    }
+    
+    .x-tick-marks {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        padding: 0 10px;
+        margin-top: 5px;
+    }
+    
+    .y-tick, .x-tick {
+        color: #cccccc;
+        font-size: 12px;
+        display: block; /* Force display */
+        padding: 2px;
+    }
+    
+    /* Make sure the spectrogram container fits properly */
+    .spectrogram-container {
+        border: 1px solid #444;
+        background-color: #1a1a1a;
+        padding: 5px;
+        border-radius: 5px;
+    }
+    
+    /* Make spectrogram image responsive */
+    #spectrogram {
+        max-width: 100%;
+        height: auto;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-3">
 
     <div class="grid-container">
-        <!-- Small spectrogram section -->
-        <div class="spectrogram-small">
+        <!-- Spectrogram section with labels -->
+        <div class="spectrogram-section">
             <h3>Spectrogram: <span id="current-call-text">1</span> of <span id="total-calls-text">{{ total_calls }}</span> calls</h3>
             <div id="spectrogram-container" class="mb-3">
-                <div class="d-flex justify-content-center align-items-center spectrogram-container">
-                    <img id="spectrogram" alt="Spectrogram">
+                <!-- Spectrogram with axes -->
+                <div class="d-flex">
+                    <!-- Y-axis labels -->
+                    <div class="spectrogram-y-axis">
+                        <div class="axis-label" style="writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; margin-right: 5px;">
+                            Frequency (kHz)
+                        </div>
+                        <div class="y-tick-marks">
+                            <div class="y-tick">250</div>
+                            <div class="y-tick">200</div>
+                            <div class="y-tick">150</div>
+                            <div class="y-tick">100</div>
+                            <div class="y-tick">50</div>
+                            <div class="y-tick">0</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Spectrogram and X-axis -->
+                    <div style="flex: 1;">
+                        <!-- Spectrogram image -->
+                        <div class="spectrogram-container" style="text-align: center;">
+                            <img id="spectrogram" alt="Spectrogram" style="max-width: 100%; height: auto;">
+                        </div>
+                        
+                        <!-- X-axis labels -->
+                        <div class="spectrogram-x-axis">
+                            <div class="x-tick-marks">
+                                <div class="x-tick">0</div>
+                                <div class="x-tick">10</div>
+                                <div class="x-tick">20</div>
+                                <div class="x-tick">30</div>
+                                <div class="x-tick">40</div>
+                                <div class="x-tick">50</div>
+                            </div>
+                            <div class="d-flex justify-content-center">
+                                <div class="axis-label">Time (ms)</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -96,15 +232,7 @@
             </div>
         </div>
         
-        <!-- Large spectrogram section -->
-        <div class="spectrogram-large">
-            <h3>Detailed View</h3>
-            <div id="spectrogram-large-container" class="mb-3">
-                <div class="d-flex justify-content-center align-items-center spectrogram-container">
-                    <img id="spectrogram-large" alt="Detailed Spectrogram">
-                </div>
-            </div>
-        </div>
+        <!-- Removed large spectrogram section -->
         
         <!-- Confidence section -->
         <div class="confidence">
@@ -191,7 +319,6 @@
         
         // UI elements
         const spectrogramImg = document.getElementById('spectrogram');
-        const spectrogramLargeImg = document.getElementById('spectrogram-large');
         const channelSelector = document.getElementById('channel-selector');
         const contrastInput = document.getElementById('contrast');
         const loudnessInput = document.getElementById('loudness');
@@ -215,15 +342,12 @@
 
         // Load spectrogram
         function loadSpectrogram() {
-            // Build URL for main spectrogram
+            // Build URL for spectrogram
             const spectrogramUrl = `{% url 'battycoda_app:spectrogram' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&numcalls=${totalCalls}&hash=${fileHash}&overview=${overviewMode ? '1' : '0'}&contrast=${contrastValue}`;
-            
-            // Build URL for detailed spectrogram
-            const spectrogramLargeUrl = `{% url 'battycoda_app:spectrogram' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&numcalls=${totalCalls}&hash=${fileHash}&overview=0&contrast=${contrastValue}&detail=1`;
             
             console.log("Loading spectrogram from:", spectrogramUrl);
             
-            // Load main spectrogram
+            // Load spectrogram
             const img = new Image();
             img.onload = function() {
                 console.log("Spectrogram loaded successfully");
@@ -232,32 +356,13 @@
             img.onerror = function(e) {
                 console.error("Failed to load spectrogram:", e);
                 // Show error message on the page
-                const container = document.querySelector('.spectrogram-small');
+                const container = document.querySelector('.spectrogram-section');
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'alert alert-danger';
                 errorDiv.textContent = 'Failed to load spectrogram. Check console for details.';
                 container.appendChild(errorDiv);
             };
             img.src = spectrogramUrl;
-            
-            console.log("Loading detailed spectrogram from:", spectrogramLargeUrl);
-            
-            // Load detailed spectrogram
-            const imgLarge = new Image();
-            imgLarge.onload = function() {
-                console.log("Detailed spectrogram loaded successfully");
-                spectrogramLargeImg.src = this.src;
-            };
-            imgLarge.onerror = function(e) {
-                console.error("Failed to load detailed spectrogram:", e);
-                // Show error message on the page
-                const container = document.querySelector('.spectrogram-large');
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'alert alert-danger';
-                errorDiv.textContent = 'Failed to load detailed spectrogram. Check console for details.';
-                container.appendChild(errorDiv);
-            };
-            imgLarge.src = spectrogramLargeUrl;
             
             // Load other channels
             loadOtherChannels();

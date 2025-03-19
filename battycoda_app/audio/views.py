@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.conf import settings
 from celery.result import AsyncResult
 
-from .utils import appropriate_file, create_error_image, get_audio_bit, overview_hwin, normal_hwin
+from .utils import appropriate_file, get_audio_bit, overview_hwin, normal_hwin
 from .tasks import generate_spectrogram_task, prefetch_spectrograms
 from ..utils import convert_path_to_os_specific
 
@@ -45,7 +45,7 @@ def handle_spectrogram(request):
     for arg in required_args:
         if arg not in request.GET:
             logger.error(f"Missing required argument: {arg}")
-            return HttpResponse(create_error_image(f"Missing required argument: {arg}"), content_type='image/png')
+            return HttpResponse(f"Error: Missing required argument: {arg}", content_type='text/plain', status=400)
     
     # Extract path and args
     path = request.GET.get('wav_path')
@@ -112,26 +112,22 @@ def handle_spectrogram(request):
                         return FileResponse(open(check_path, 'rb'), content_type='image/png')
                 
                 # Task reported success but file not found
-                error_img_path = create_error_image("Image generation succeeded but file was not found.")
-                return FileResponse(open(error_img_path, 'rb'), content_type='image/png')
+                return HttpResponse("Error: Image generation succeeded but file was not found.", content_type='text/plain', status=404)
             else:
                 # Task failed
                 error_msg = result.get('error', 'Unknown error')
                 logger.error(f"Task failed to generate image: {error_msg}")
-                error_img_path = create_error_image(f"Failed to generate image: {error_msg}")
-                return FileResponse(open(error_img_path, 'rb'), content_type='image/png')
+                return HttpResponse(f"Error: Failed to generate image: {error_msg}", content_type='text/plain', status=500)
                 
         except Exception as e:
-            # If we hit a timeout, create an error image with a clear message
+            # If we hit a timeout, return an error message
             logger.error(f"Timeout or error waiting for task: {str(e)}")
-            error_img_path = create_error_image(f"Timeout generating image. Try refreshing.")
-            return FileResponse(open(error_img_path, 'rb'), content_type='image/png')
+            return HttpResponse(f"Error: Timeout generating image. Try refreshing.", content_type='text/plain', status=504)
             
     except Exception as e:
         logger.error(f"Error in handle_spectrogram: {str(e)}")
         logger.debug(traceback.format_exc())
-        error_img_path = create_error_image(f"Server error: {str(e)}")
-        return FileResponse(open(error_img_path, 'rb'), content_type='image/png')
+        return HttpResponse(f"Error: Server error: {str(e)}", content_type='text/plain', status=500)
 
 @login_required
 def task_status(request, task_id):
