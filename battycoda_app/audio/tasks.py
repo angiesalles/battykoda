@@ -182,19 +182,20 @@ def generate_spectrogram(path, args, output_path=None):
         # OPTIMIZATION: Skip hash validation to reduce overhead
         # This is safe because we're using file paths that are already validated
         
-        # OPTIMIZATION: Use more efficient spectrogram parameters 
-        # - Use smaller nperseg for faster computation
-        # - Use less overlap to reduce computation
+        # Use high-quality spectrogram parameters for better visual detail
+        # - Higher nperseg for better frequency resolution
+        # - Higher overlap for smoother time transitions
+        # - Larger nfft for better frequency bins
         if overview:
-            # For overview, use more detail since we're showing more
-            nperseg = 2**8  # 256
-            noverlap = 200   # ~75% overlap instead of 99%
-            nfft = 2**9      # 512 for better frequency resolution
+            # For overview, use very high detail since we're showing more
+            nperseg = 2**9  # 512
+            noverlap = int(nperseg * 0.99)  # 99% overlap for highest quality
+            nfft = 2**10    # 1024 for excellent frequency resolution
         else:
-            # For call detail view, optimize for speed
-            nperseg = 2**7   # 128 
-            noverlap = 64    # 50% overlap is standard
-            nfft = 2**8      # 256
+            # For call detail view, use high quality parameters
+            nperseg = 2**8  # 256
+            noverlap = int(nperseg * 0.99)  # 99% overlap for highest quality
+            nfft = 2**9     # 512 for better frequency resolution
         
         # Generate spectrogram with optimized parameters
         f, t, sxx = scipy.signal.spectrogram(thr_x1, fs, 

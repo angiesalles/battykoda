@@ -40,13 +40,7 @@
                 <h3>Spectrogram</h3>
                 <div id="spectrogram-container" class="mb-3">
                     <div class="d-flex justify-content-center align-items-center spectrogram-container">
-                        <div class="loading-spinner" id="spectrogram-loader">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="mt-2">Loading spectrogram...</div>
-                        </div>
-                        <img id="spectrogram" alt="Spectrogram" style="display: none;">
+                        <img src="{% url 'battycoda_app:spectrogram' %}?wav_path={{ full_path|urlencode }}&call=0&channel=0&numcalls=1&hash={{ file_hash }}&overview=0&contrast=4.0&onset={{ task.onset }}&offset={{ task.offset }}" alt="Spectrogram">
                     </div>
                 </div>
                 
@@ -54,28 +48,20 @@
                 <div class="audio-section mt-4">
                     <h3>Audio Playback</h3>
                     <div class="mt-2">
-                        <audio controls id="audio-player" preload="none" class="w-100">
+                        <audio controls src="{% url 'battycoda_app:audio_snippet' %}?wav_path={{ full_path|urlencode }}&call=0&channel=0&hash={{ file_hash }}&overview=False&onset={{ task.onset }}&offset={{ task.offset }}" preload="auto" class="w-100">
                             Your browser does not support the audio element.
                         </audio>
                     </div>
                 </div>
                 
-                <!-- Simple controls -->
-                <div class="controls-simple mt-4">
+                <!-- Static configuration -->
+                <div class="configuration-info mt-4">
                     <div class="row">
-                        <div class="col-md-4 mb-2">
-                            <label for="contrast">Contrast:</label>
-                            <input type="text" id="contrast" name="contrast" class="form-control" value="4.0">
+                        <div class="col-md-6 mb-2">
+                            <p><strong>Contrast:</strong> 4.0</p>
                         </div>
-                        <div class="col-md-4 mb-2">
-                            <label for="channel-selector">Channel:</label>
-                            <select class="form-select" id="channel-selector">
-                                <option value="0">Channel 1</option>
-                                <option value="1">Channel 2</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-2 d-flex align-items-end">
-                            <button class="btn btn-secondary w-100" id="update-btn">Update View</button>
+                        <div class="col-md-6 mb-2">
+                            <p><strong>Channel:</strong> 1</p>
                         </div>
                     </div>
                 </div>
@@ -148,201 +134,14 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // File information
-        const wavPath = "{{ full_path }}";
-        const fileHash = "{{ file_hash }}";
-        
-        // For compatibility with the original code, we'll use a fixed call index 
-        // to represent the task's segment
-        const currentCall = 0;
-        const totalCalls = 1;
-        
-        // Current state
-        let currentChannel = 0;
-        let contrastValue = 4.0;
-        
-        // UI elements
-        const spectrogramImg = document.getElementById('spectrogram');
-        const channelSelector = document.getElementById('channel-selector');
-        const contrastInput = document.getElementById('contrast');
-        const updateBtn = document.getElementById('update-btn');
-        const audioPlayer = document.getElementById('audio-player');
-        
-        // Simple function to load an image with async support
-        function loadImage(url, imgElement, loaderId) {
-            // Show loader, hide image
-            const loader = document.getElementById(loaderId);
-            if (loader) loader.style.display = 'block';
-            if (imgElement) imgElement.style.display = 'none';
-            
-            // Make request with async parameter
-            const asyncUrl = url + (url.includes('?') ? '&' : '?') + 'async=true';
-            
-            fetch(asyncUrl)
-                .then(response => {
-                    const contentType = response.headers.get('content-type');
-                    
-                    if (contentType && contentType.includes('application/json')) {
-                        // This is an async task response
-                        return response.json().then(data => {
-                            if (data.status === 'queued' && data.task_id && data.poll_url) {
-                                // Start polling for task completion
-                                console.log(`Image generation queued. Task ID:`, data.task_id);
-                                pollForCompletion(data.poll_url, imgElement, loaderId);
-                            }
-                        });
-                    } else if (contentType && contentType.includes('image/')) {
-                        // Direct image response
-                        return response.blob().then(blob => {
-                            const imageUrl = URL.createObjectURL(blob);
-                            imgElement.onload = function() {
-                                if (loader) loader.style.display = 'none';
-                                imgElement.style.display = 'block';
-                            };
-                            imgElement.src = imageUrl;
-                        });
-                    } else {
-                        console.error('Unexpected content type:', contentType);
-                        tryDirectLoading(url, imgElement, loaderId);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading image:', error);
-                    tryDirectLoading(url, imgElement, loaderId);
-                });
-        }
-        
-        // Fallback to direct image loading
-        function tryDirectLoading(url, imgElement, loaderId) {
-            console.log('Trying direct image loading as fallback');
-            
-            // Remove async parameter if present
-            let directUrl = url;
-            if (directUrl.includes('async=true')) {
-                directUrl = directUrl.replace('async=true', '');
-                directUrl = directUrl.replace('?&', '?').replace('&&', '&');
-                if (directUrl.endsWith('?') || directUrl.endsWith('&')) {
-                    directUrl = directUrl.slice(0, -1);
-                }
-            }
-            
-            imgElement.onload = function() {
-                const loader = document.getElementById(loaderId);
-                if (loader) loader.style.display = 'none';
-                imgElement.style.display = 'block';
-                console.log('Direct image loading succeeded');
-            };
-            
-            imgElement.onerror = function() {
-                console.error('Direct image loading also failed');
-                const loader = document.getElementById(loaderId);
-                if (loader) {
-                    loader.innerHTML = 'Failed to load image. Try refreshing.';
-                }
-            };
-            
-            imgElement.src = directUrl;
-        }
-        
-        // Simple polling function for task completion
-        function pollForCompletion(pollUrl, imgElement, loaderId) {
-            let attempts = 0;
-            const maxAttempts = 20;  // 20 seconds max
-            
-            function checkStatus() {
-                attempts++;
-                if (attempts > maxAttempts) {
-                    console.error('Polling timed out');
-                    const loader = document.getElementById(loaderId);
-                    if (loader) {
-                        loader.innerHTML = 'Timed out. Try refreshing the page.';
-                    }
-                    return;
-                }
-                
-                // Add cache buster
-                const url = `${pollUrl}${pollUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
-                
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success' && data.file_path) {
-                            // Image is ready
-                            imgElement.onload = function() {
-                                const loader = document.getElementById(loaderId);
-                                if (loader) loader.style.display = 'none';
-                                imgElement.style.display = 'block';
-                            };
-                            
-                            imgElement.onerror = function() {
-                                console.error('Failed to load image after task completion');
-                                const loader = document.getElementById(loaderId);
-                                if (loader) {
-                                    loader.innerHTML = 'Failed to load generated image.';
-                                }
-                            };
-                            
-                            imgElement.src = data.file_path;
-                        } 
-                        else if (data.status === 'error') {
-                            console.error('Task failed:', data.message);
-                            const loader = document.getElementById(loaderId);
-                            if (loader) {
-                                loader.innerHTML = `Error: ${data.message}`;
-                            }
-                        }
-                        else {
-                            // Still processing - check again in 1 second
-                            setTimeout(checkStatus, 1000);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error checking task status:', error);
-                        // Still try again
-                        setTimeout(checkStatus, 1000);
-                    });
-            }
-            
-            // Start checking
-            checkStatus();
-        }
-        
-        // Load spectrogram and audio
-        function loadContent() {
-            // Build URLs for spectrogram and audio (prefetch explicitly disabled)
-            const spectrogramUrl = `{% url 'battycoda_app:spectrogram' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&numcalls=${totalCalls}&hash=${fileHash}&overview=0&contrast=${contrastValue}&onset={{ task.onset }}&offset={{ task.offset }}&prefetch=false`;
-            
-            const audioUrl = `{% url 'battycoda_app:audio_snippet' %}?wav_path=${encodeURIComponent(wavPath)}&call=${currentCall}&channel=${currentChannel}&hash=${fileHash}&overview=False&onset={{ task.onset }}&offset={{ task.offset }}`;
-            
-            // Load main spectrogram
-            loadImage(spectrogramUrl, spectrogramImg, 'spectrogram-loader');
-            
-            // Set audio source
-            audioPlayer.src = audioUrl;
-        }
-        
-        // Event handlers
-        channelSelector.addEventListener('change', function() {
-            currentChannel = parseInt(this.value);
-            loadContent();
-        });
-        
-        updateBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            contrastValue = parseFloat(contrastInput.value);
-            loadContent();
-        });
-        
         // When the "Other" input receives focus, also select the "Other" radio button
         const otherRadio = document.getElementById('Other');
         const otherInput = document.getElementById('other-input');
-        otherInput.addEventListener('focus', function() {
-            otherRadio.checked = true;
-        });
-        
-        // Initialize content only once
-        console.log("Initializing content");
-        loadContent();
+        if (otherInput && otherRadio) {
+            otherInput.addEventListener('focus', function() {
+                otherRadio.checked = true;
+            });
+        }
     });
 </script>
 
