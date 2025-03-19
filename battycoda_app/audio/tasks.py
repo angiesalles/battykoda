@@ -194,8 +194,8 @@ def generate_spectrogram(path, args, output_path=None):
         else:
             # For call detail view, use high quality parameters
             nperseg = 2**8  # 256
-            noverlap = int(nperseg * 0.99)  # 99% overlap for highest quality
-            nfft = 2**9     # 512 for better frequency resolution
+            noverlap = 254
+            nfft = 2**8
         
         # Generate spectrogram with optimized parameters
         f, t, sxx = scipy.signal.spectrogram(thr_x1, fs, 
