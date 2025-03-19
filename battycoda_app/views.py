@@ -375,11 +375,22 @@ def upload_file_view(request):
 @login_required
 def get_next_task_view(request):
     """Get the next undone task and redirect to the annotation interface"""
-    # Look for a task that isn't done yet
-    task = Task.objects.filter(
-        created_by=request.user,
-        is_done=False
-    ).order_by('created_at').first()
+    # Get user profile and team
+    profile = request.user.profile
+    
+    # Initialize query for tasks that aren't done yet
+    tasks_query = Task.objects.filter(is_done=False)
+    
+    # If user has a team, include team tasks
+    if profile.team:
+        # Look for tasks from the user's team
+        tasks_query = tasks_query.filter(team=profile.team)
+    else:
+        # Only look at user's own tasks if not in a team
+        tasks_query = tasks_query.filter(created_by=request.user)
+    
+    # Get the first undone task
+    task = tasks_query.order_by('created_at').first()
     
     if task:
         # Redirect to the annotation interface with the task ID
@@ -392,10 +403,22 @@ def get_next_task_view(request):
 @login_required
 def get_last_task_view(request):
     """Get the last task the user worked on (most recently updated) and redirect to it"""
+    # Get user profile and team
+    profile = request.user.profile
+    
+    # Initialize query for tasks
+    tasks_query = Task.objects.all()
+    
+    # If user has a team, include team tasks
+    if profile.team:
+        # Look for tasks from the user's team
+        tasks_query = tasks_query.filter(team=profile.team)
+    else:
+        # Only look at user's own tasks if not in a team
+        tasks_query = tasks_query.filter(created_by=request.user)
+    
     # Get the most recently updated task
-    task = Task.objects.filter(
-        created_by=request.user
-    ).order_by('-updated_at').first()
+    task = tasks_query.order_by('-updated_at').first()
     
     if task:
         # Redirect to the annotation interface with the task ID
@@ -408,8 +431,13 @@ def get_last_task_view(request):
 @login_required
 def task_annotation_view(request, task_id):
     """Show the annotation interface for a specific task"""
-    # Get the task
-    task = get_object_or_404(Task, id=task_id, created_by=request.user)
+    # Get the task - allow team members to access tasks from the same team
+    task = get_object_or_404(Task, id=task_id)
+    
+    # Check if user has permission to view this task
+    if task.created_by != request.user and (not request.user.profile.team or task.team != request.user.profile.team):
+        messages.error(request, "You don't have permission to view this task.")
+        return redirect('battycoda_app:task_list')
     
     # Handle task update if form submitted
     if request.method == 'POST':
@@ -637,9 +665,18 @@ def task_list_view(request):
 @login_required
 def task_detail_view(request, task_id):
     """Display details of a specific task with option to update"""
-    task = get_object_or_404(Task, id=task_id, created_by=request.user)
+    # Get the task without filtering by created_by
+    task = get_object_or_404(Task, id=task_id)
     
-    if request.method == 'POST':
+    # Check if user has permission to view this task
+    if task.created_by != request.user and (not request.user.profile.team or task.team != request.user.profile.team):
+        messages.error(request, "You don't have permission to view this task.")
+        return redirect('battycoda_app:task_list')
+    
+    # For editing, check if the user is the creator or a team admin
+    can_edit = (task.created_by == request.user) or (request.user.profile.is_admin and task.team == request.user.profile.team)
+    
+    if request.method == 'POST' and can_edit:
         form = TaskUpdateForm(request.POST, instance=task)
         if form.is_valid():
             form.save()
@@ -651,6 +688,7 @@ def task_detail_view(request, task_id):
     context = {
         'task': task,
         'form': form,
+        'can_edit': can_edit
     }
     
     return render(request, 'tasks/task_detail.html', context)

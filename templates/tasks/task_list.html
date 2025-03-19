@@ -34,6 +34,7 @@
                                 <th>Species</th>
                                 <th>Project</th>
                                 <th>Team</th>
+                                <th>Created By</th>
                                 <th>Segment</th>
                                 <th>Status</th>
                                 <th>Label</th>
@@ -43,12 +44,18 @@
                         </thead>
                         <tbody>
                             {% for task in tasks %}
-                            <tr>
+                            <tr {% if task.created_by == request.user %}class="table-active"{% endif %}>
                                 <td>{{ task.id }}</td>
                                 <td>{{ task.wav_file_name }}</td>
                                 <td>{{ task.species }}</td>
                                 <td>{{ task.project }}</td>
                                 <td>{{ task.team.name|default:"--" }}</td>
+                                <td>
+                                    {{ task.created_by.username }}
+                                    {% if task.created_by == request.user %}
+                                        <small class="text-muted">(you)</small>
+                                    {% endif %}
+                                </td>
                                 <td>{{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</td>
                                 <td>
                                     {% if task.status == 'pending' %}
@@ -67,7 +74,8 @@
                                 <td>{{ task.label|default:"-" }}</td>
                                 <td>{{ task.created_at|date:"M d, Y" }}</td>
                                 <td>
-                                    <a href="{% url 'battycoda_app:task_detail' task.id %}" class="btn btn-sm btn-outline-info">View</a>
+                                    <a href="{% url 'battycoda_app:annotate_task' task.id %}" class="btn btn-sm btn-outline-primary">Annotate</a>
+                                    <a href="{% url 'battycoda_app:task_detail' task.id %}" class="btn btn-sm btn-outline-info">Details</a>
                                 </td>
                             </tr>
                             {% endfor %}

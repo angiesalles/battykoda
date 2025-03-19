@@ -20,6 +20,14 @@ from ..utils import convert_path_to_os_specific
 # Configure logging
 logger = logging.getLogger('battycoda.tasks')
 
+# Create a timer function for performance tracking - with minimal output
+def log_performance(start_time, message):
+    """Log performance with elapsed time - only for total task time"""
+    # Only log total task completions to reduce log volume
+    if "TOTAL" in message:
+        elapsed = time.time() - start_time
+        logger.info(f"PERF: {message} - {elapsed:.3f}s")
+
 # Force matplotlib to not use any Xwindows backend
 matplotlib.use('Agg')
 
@@ -36,9 +44,15 @@ def generate_spectrogram_task(self, path, args, output_path=None):
     Returns:
         dict: Result information
     """
+    start_time = time.time()
+    
+    # Create minimal task identifier for logging
+    call = args.get('call', '?')
+    channel = args.get('channel', '?')
+    task_id = f"Call {call} Ch {channel}"
+    
     try:
-        # Update task state to processing
-        self.update_state(state="PROCESSING", meta={'progress': 10})
+        # Skip state updates to reduce logs
         
         # Get file paths
         if output_path is None:
@@ -50,17 +64,14 @@ def generate_spectrogram_task(self, path, args, output_path=None):
         else:
             os_path = path
             
-        # Update progress
-        self.update_state(state="PROCESSING", meta={'progress': 30})
-        
         # Generate the spectrogram
         success, output_file, error = generate_spectrogram(os_path, args, output_path)
         
-        # Update progress
-        self.update_state(state="PROCESSING", meta={'progress': 90})
+        # Only log results for failures
+        if not success:
+            logger.error(f"{task_id} FAILED: {error}")
         
         if success:
-            logger.info(f"Task {self.request.id}: Successfully generated {output_file}")
             return {
                 'status': 'success',
                 'file_path': output_file,
@@ -68,7 +79,6 @@ def generate_spectrogram_task(self, path, args, output_path=None):
                 'args': args
             }
         else:
-            logger.error(f"Task {self.request.id}: Failed to generate {output_file}: {error}")
             return {
                 'status': 'error',
                 'error': error if error else 'Failed to generate spectrogram',
@@ -76,12 +86,11 @@ def generate_spectrogram_task(self, path, args, output_path=None):
             }
             
     except Exception as e:
-        logger.error(f"Task {self.request.id}: Error generating spectrogram: {str(e)}")
-        logger.debug(traceback.format_exc())
+        # Only log full errors for catastrophic failures
+        logger.error(f"{task_id} CATASTROPHIC ERROR: {str(e)}")
         
         # Retry the task if appropriate
         if self.request.retries < self.max_retries:
-            logger.info(f"Retrying task {self.request.id} ({self.request.retries+1}/{self.max_retries})")
             raise self.retry(exc=e, countdown=2 ** self.request.retries)
             
         return {
@@ -95,6 +104,7 @@ def generate_spectrogram_task(self, path, args, output_path=None):
 def prefetch_spectrograms(self, path, base_args, call_range):
     """
     Prefetch multiple spectrograms for a range of calls.
+    DISABLED - This function now does nothing to reduce server load
     
     Args:
         path: Path to the audio file
@@ -102,29 +112,14 @@ def prefetch_spectrograms(self, path, base_args, call_range):
         call_range: Tuple of (start_call, end_call)
     
     Returns:
-        dict: Summary of prefetched items
+        dict: Status indicating the function is disabled
     """
-    start_call, end_call = call_range
-    tasks = []
+    logger.info("Prefetching is disabled for performance reasons")
     
-    for call in range(start_call, end_call + 1):
-        # Create a copy of args with updated call number
-        args = base_args.copy()
-        args['call'] = str(call)
-        
-        # Add task to list
-        tasks.append(current_app.send_task.s('battycoda_app.audio.tasks.generate_spectrogram_task', args=[path, args]))
-    
-    # Execute tasks as a group
-    job = group(tasks)
-    result = job.apply_async()
-    
-    # Return a summary
+    # Return a summary indicating prefetch is disabled
     return {
-        'status': 'submitted',
-        'total_tasks': len(tasks),
-        'call_range': call_range,
-        'path': path
+        'status': 'disabled',
+        'message': 'Prefetching is disabled for performance reasons'
     }
 
 def generate_spectrogram(path, args, output_path=None):
@@ -139,11 +134,16 @@ def generate_spectrogram(path, args, output_path=None):
     Returns:
         tuple: (success, output_path, error_message)
     """
+    # Start performance timer
+    start_time = time.time()
+    
     if output_path is None:
         output_path = appropriate_file(path, args)
     
-    logger.info(f"Generating spectrogram: {output_path}")
-    logger.debug(f"Parameters: {args}")
+    # Extract basic parameters for minimal task ID
+    call = args.get('call', '0')
+    channel = args.get('channel', '0')
+    task_id = f"Call {call} Ch {channel}"
     
     try:
         # Ensure directory exists
@@ -158,28 +158,22 @@ def generate_spectrogram(path, args, output_path=None):
         # Select window size
         hwin = overview_hwin() if overview else normal_hwin()
         
-        # Get audio data
-        logger.debug(f"Getting audio data from: {path}")
-        
-        # Check for onset/offset in args for task-based annotation
+        # Get audio data - without incremental timing logs
         extra_params = None
         if 'onset' in args and 'offset' in args:
             extra_params = {
                 'onset': args['onset'],
                 'offset': args['offset']
             }
-            logger.info(f"Using direct onset/offset from args: {extra_params}")
             
         thr_x1, fs, hashof = get_audio_bit(path, call_to_do, hwin, extra_params)
         
         # Validate audio data
         if thr_x1 is None or thr_x1.size == 0:
-            logger.error(f"Audio data is empty or None")
             return False, output_path, "Audio data is empty"
             
         # Check channel is valid
         if channel >= thr_x1.shape[1]:
-            logger.error(f"Channel index {channel} is out of bounds for array of shape {thr_x1.shape}")
             return False, output_path, f"Channel index {channel} is out of bounds"
             
         # Extract channel
@@ -187,10 +181,9 @@ def generate_spectrogram(path, args, output_path=None):
         
         # Verify hash matches
         if args.get('hash') != hashof:
-            logger.error(f"Hash mismatch: {args.get('hash')} vs {hashof}")
             return False, output_path, "Hash validation failed"
-            
-        # Generate spectrogram
+        
+        # Generate spectrogram - no incremental timing logs
         f, t, sxx = scipy.signal.spectrogram(thr_x1, fs, nperseg=2 ** 8, noverlap=254, nfft=2 ** 8)
         
         # Create figure
@@ -224,23 +217,20 @@ def generate_spectrogram(path, args, output_path=None):
             plt.title(f"Call {call_to_do + 1}", color='white')
         
         # Save to a temporary file first, then move it to final destination
-        # This helps avoid partial writes
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
         temp_file.close()
         
-        logger.debug(f"Saving figure to temp file: {temp_file.name}")
         plt.savefig(temp_file.name, dpi=100)
         plt.close()
         
         # Check if temp file was created successfully
         if os.path.exists(temp_file.name) and os.path.getsize(temp_file.name) > 0:
             # Move the file to the final destination
-            logger.debug(f"Moving temp file to: {output_path}")
             shutil.move(temp_file.name, output_path)
             
             # Double-check the file exists and has content
             if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                logger.info(f"Successfully created: {output_path}")
+                log_performance(start_time, f"{task_id}: TOTAL SPECTROGRAM GENERATION")
                 return True, output_path, None
             else:
                 logger.error(f"ERROR: Final file not created properly: {output_path}")
@@ -253,7 +243,6 @@ def generate_spectrogram(path, args, output_path=None):
                 
     except Exception as e:
         logger.error(f"Error generating spectrogram: {str(e)}")
-        logger.debug(traceback.format_exc())
         try:
             plt.close()  # Make sure to close the figure even on error
         except:

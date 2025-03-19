@@ -33,10 +33,6 @@ def handle_spectrogram(request):
     - overview: Whether to generate overview (0 or 1)
     - contrast: Contrast setting
     
-    Optional parameters:
-    - async: If 'true', returns a task ID instead of waiting for the image
-    - prefetch: If 'true', prefetches the next few images in the sequence
-    
     Returns:
         Django response with the spectrogram image or task status
     """
@@ -55,12 +51,11 @@ def handle_spectrogram(request):
     mod_path = convert_path_to_os_specific(path)
     args_dict = {k: v for k, v in request.GET.items()}
     
-    # Check for async mode
+    # Check for async mode (used for client-side error handling)
     async_mode = request.GET.get('async', 'false').lower() == 'true'
-    prefetch_mode = request.GET.get('prefetch', 'false').lower() == 'true'
     
     # Log the request details for debugging
-    logger.info(f"Spectrogram request received: {path} (async={async_mode}, prefetch={prefetch_mode})")
+    logger.info(f"Spectrogram request received: {path} (async={async_mode})")
     logger.debug(f"Original path: {path}, Modified path: {mod_path}")
     
     try:
@@ -77,20 +72,6 @@ def handle_spectrogram(request):
         for check_path in paths_to_check:
             if os.path.exists(check_path) and os.path.getsize(check_path) > 0:
                 logger.info(f"Cache hit! Using existing image: {check_path}")
-                
-                # If prefetch is enabled, launch background task for next calls
-                if prefetch_mode:
-                    current_call = int(request.GET['call'])
-                    total_calls = int(request.GET['numcalls'])
-                    if current_call + 1 < total_calls:
-                        # Prefetch next 3 calls or remaining calls, whichever is smaller
-                        prefetch_count = min(3, total_calls - current_call - 1)
-                        prefetch_range = (current_call + 1, current_call + prefetch_count)
-                        
-                        # Launch prefetch task in background
-                        prefetch_spectrograms.delay(path, args_dict, prefetch_range)
-                        logger.info(f"Prefetching calls {prefetch_range[0]} to {prefetch_range[1]}")
-                
                 return FileResponse(open(check_path, 'rb'), content_type='image/png')
         
         # Create directories if needed
@@ -101,50 +82,36 @@ def handle_spectrogram(request):
         logger.info(f"Cache miss. Generating image: {file_path}")
         
         # Launch Celery task to generate the image
-        # Use the full task name to ensure it's found properly
         from celery import current_app
         task = current_app.send_task(
             'battycoda_app.audio.tasks.generate_spectrogram_task',
             args=[path, args_dict, file_path]
         )
         
-        # If async mode, return task ID immediately
+        # Always use async mode - simpler approach
         if async_mode:
-            return JsonResponse({
+            response_data = {
                 'status': 'queued',
                 'task_id': task.id,
                 'poll_url': reverse('battycoda_app:task_status', kwargs={'task_id': task.id})
-            })
-            
-        # For non-async mode, default to async mode with a short timeout
+            }
+            return JsonResponse(response_data)
+        
+        # Wait for task to complete with a timeout of 10 seconds
+        # This is a simpler approach - wait longer to get more direct successes
         try:
-            # Wait for task to complete with a very short timeout
-            # If it completes quickly, return the result directly
-            result = task.get(timeout=3.0)  # 3 second quick timeout
+            result = task.get(timeout=10.0)
             
-            if result.get('status') == 'success':
-                # Prefetch next call if needed
-                if prefetch_mode:
-                    current_call = int(request.GET['call'])
-                    total_calls = int(request.GET['numcalls'])
-                    if current_call + 1 < total_calls:
-                        next_args = args_dict.copy()
-                        next_args['call'] = str(current_call + 1)
-                        from celery import current_app
-                        current_app.send_task(
-                            'battycoda_app.audio.tasks.generate_spectrogram_task',
-                            args=[path, next_args]
-                        )
-                        logger.info(f"Prefetching next call: {current_call + 1}")
-                
+            # Check if task succeeded
+            if result and result.get('status') == 'success':
                 # Check both possible file paths
                 for check_path in paths_to_check:
                     if os.path.exists(check_path) and os.path.getsize(check_path) > 0:
                         logger.info(f"Successfully generated image: {check_path}")
                         return FileResponse(open(check_path, 'rb'), content_type='image/png')
                 
-                # If we get here but task reported success, something went wrong
-                error_img_path = create_error_image("Task reported success but image was not found.")
+                # Task reported success but file not found
+                error_img_path = create_error_image("Image generation succeeded but file was not found.")
                 return FileResponse(open(error_img_path, 'rb'), content_type='image/png')
             else:
                 # Task failed
@@ -154,14 +121,10 @@ def handle_spectrogram(request):
                 return FileResponse(open(error_img_path, 'rb'), content_type='image/png')
                 
         except Exception as e:
-            # If we hit a timeout or other error, switch to async mode and return the task ID
-            # The client can then poll for updates
-            logger.info(f"Switching to async mode due to: {str(e)}")
-            return JsonResponse({
-                'status': 'queued',
-                'task_id': task.id,
-                'poll_url': reverse('battycoda_app:task_status', kwargs={'task_id': task.id})
-            })
+            # If we hit a timeout, create an error image with a clear message
+            logger.error(f"Timeout or error waiting for task: {str(e)}")
+            error_img_path = create_error_image(f"Timeout generating image. Try refreshing.")
+            return FileResponse(open(error_img_path, 'rb'), content_type='image/png')
             
     except Exception as e:
         logger.error(f"Error in handle_spectrogram: {str(e)}")
@@ -181,46 +144,86 @@ def task_status(request, task_id):
     Returns:
         JSON response with task status
     """
+    logger.info(f"Checking status for task: {task_id}")
     task_result = AsyncResult(task_id)
     
+    # Log the raw task state for debugging
+    logger.info(f"Task {task_id} state: {task_result.state}")
+    
+    # Check for ready but forgotten task
+    if task_result.ready():
+        logger.info(f"Task {task_id} is ready with result: {task_result.result}")
+    
+    # Simple status responses
     if task_result.state == 'PENDING':
         response = {
             'status': 'pending',
-            'message': 'Task is pending'
+            'message': 'Task is pending',
+            'task_id': task_id
         }
     elif task_result.state == 'FAILURE':
         response = {
             'status': 'error',
-            'message': str(task_result.info)
-        }
-    elif task_result.state == 'PROCESSING':
-        response = {
-            'status': 'processing',
-            'progress': task_result.info.get('progress', 0),
-            'message': 'Task is processing'
+            'message': str(task_result.info) if hasattr(task_result, 'info') else 'Task failed',
+            'task_id': task_id
         }
     elif task_result.state == 'SUCCESS':
+        # For successful tasks, create URL for direct image access
         if task_result.info and 'status' in task_result.info:
             if task_result.info['status'] == 'success':
-                response = {
-                    'status': 'success',
-                    'file_path': task_result.info.get('file_path'),
-                    'message': 'Task completed successfully'
-                }
+                # Get file path and args from task result
+                file_path = task_result.info.get('file_path')
+                original_args = task_result.info.get('args', {})
+                
+                if file_path and os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                    # Create URL parameters
+                    params = {
+                        'wav_path': original_args.get('wav_path', ''),
+                        'call': original_args.get('call', '0'),
+                        'channel': original_args.get('channel', '0'),
+                        'numcalls': original_args.get('numcalls', '1'),
+                        'hash': original_args.get('hash', ''),
+                        'overview': original_args.get('overview', '0'),
+                        'contrast': original_args.get('contrast', '4.0')
+                    }
+                    
+                    # Build URL for direct image access
+                    import urllib.parse
+                    query_string = urllib.parse.urlencode(params)
+                    spectrogram_url = request.build_absolute_uri(
+                        f"{reverse('battycoda_app:spectrogram')}?{query_string}"
+                    )
+                    
+                    response = {
+                        'status': 'success',
+                        'file_path': spectrogram_url,
+                        'message': 'Task completed successfully'
+                    }
+                else:
+                    # File not found or empty
+                    logger.error(f"Task completed but usable file not found: {file_path}")
+                    response = {
+                        'status': 'error',
+                        'message': 'Task completed but image file not found'
+                    }
             else:
+                # Task reported error
                 response = {
                     'status': 'error',
                     'message': task_result.info.get('error', 'Unknown error')
                 }
         else:
+            # Task completed but no status info
             response = {
                 'status': 'success',
-                'message': 'Task completed, but no details available'
+                'message': 'Task completed but no image info available'
             }
     else:
+        # Other states (like PROCESSING)
         response = {
-            'status': 'unknown',
-            'message': f'Unknown task state: {task_result.state}'
+            'status': 'processing',
+            'message': f'Task is {task_result.state.lower()}',
+            'task_id': task_id
         }
     
     return JsonResponse(response)
