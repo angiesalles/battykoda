@@ -274,25 +274,52 @@
             console.log("Loading short audio from:", audioUrl);
             console.log("Loading long audio from:", audioLongUrl);
             
+            // Clear any previous error messages
+            const existingErrors = document.querySelectorAll('.audio-error-message');
+            existingErrors.forEach(el => el.remove());
+            
             // Set audio sources with error handling
-            audioPlayer.onerror = function(e) {
+            audioPlayer.addEventListener('error', function(e) {
                 console.error("Error loading short audio:", e);
+                console.error("Error details:", audioPlayer.error);
                 const container = document.querySelector('.audio-section');
                 const errorDiv = document.createElement('div');
-                errorDiv.className = 'alert alert-danger mt-2';
-                errorDiv.textContent = 'Failed to load audio snippet.';
+                errorDiv.className = 'alert alert-danger mt-2 audio-error-message';
+                errorDiv.textContent = 'Failed to load audio snippet. Error: ' + 
+                    (audioPlayer.error ? 'Code: ' + audioPlayer.error.code + ', Message: ' + getErrorMessage(audioPlayer.error.code) : 'Unknown error');
                 container.appendChild(errorDiv);
-            };
+            });
             
-            audioPlayerLong.onerror = function(e) {
+            audioPlayerLong.addEventListener('error', function(e) {
                 console.error("Error loading long audio:", e);
-            };
+                console.error("Error details:", audioPlayerLong.error);
+                const container = document.querySelector('.audio-section');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger mt-2 audio-error-message';
+                errorDiv.textContent = 'Failed to load long audio snippet. Error: ' + 
+                    (audioPlayerLong.error ? 'Code: ' + audioPlayerLong.error.code + ', Message: ' + getErrorMessage(audioPlayerLong.error.code) : 'Unknown error');
+                container.appendChild(errorDiv);
+            });
+            
+            // Helper function to get media error messages
+            function getErrorMessage(code) {
+                switch(code) {
+                    case 1: return 'MEDIA_ERR_ABORTED - The fetching process was aborted by the user.';
+                    case 2: return 'MEDIA_ERR_NETWORK - A network error occurred while fetching the media.';
+                    case 3: return 'MEDIA_ERR_DECODE - A decoding error occurred.';
+                    case 4: return 'MEDIA_ERR_SRC_NOT_SUPPORTED - The audio format is not supported.';
+                    default: return 'Unknown error code.';
+                }
+            }
+            
+            // Set a cache-busting parameter to prevent browser caching issues
+            const cacheBuster = new Date().getTime();
             
             // Set sources
-            audioPlayer.src = audioUrl;
+            audioPlayer.src = audioUrl + "&t=" + cacheBuster;
             audioPlayer.load();
             
-            audioPlayerLong.src = audioLongUrl;
+            audioPlayerLong.src = audioLongUrl + "&t=" + cacheBuster;
             audioPlayerLong.load();
         }
         

@@ -5,6 +5,7 @@ import os
 import json
 import logging
 import traceback
+import numpy as np
 from django.http import HttpResponse, JsonResponse, FileResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
@@ -277,95 +278,160 @@ def handle_audio_snippet(request):
         
         # Generate file paths for caching
         file_path = appropriate_file(path, file_args)
+        alt_file_path = appropriate_file(mod_path, file_args)
         
-        # Create directory if needed and generate audio file if it doesn't exist
+        # Check if file already exists
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            logger.info(f"Using existing audio file: {file_path}")
+            return FileResponse(open(file_path, 'rb'), content_type='audio/wav')
+        elif os.path.exists(alt_file_path) and os.path.getsize(alt_file_path) > 0:
+            logger.info(f"Using existing audio file (alt path): {alt_file_path}")
+            return FileResponse(open(alt_file_path, 'rb'), content_type='audio/wav')
+        
+        # Create directory if needed for generation
         slowdown = 5
-        if not os.path.exists(file_path):
-            # Create directories if needed
-            folder_path = appropriate_file(mod_path, file_args, folder_only=True)
-            if not os.path.exists(folder_path):
-                logger.info(f"Creating cache directory: {folder_path}")
-                os.makedirs(folder_path, exist_ok=True)
+        
+        # Create directories if needed
+        folder_path = appropriate_file(mod_path, file_args, folder_only=True)
+        logger.info(f"Creating cache directory: {folder_path}")
+        os.makedirs(folder_path, exist_ok=True)
+        
+        # Process audio
+        call_to_do = int(request.GET['call'])
+        overview = request.GET['overview'] == 'True'
+        hwin = overview_hwin if overview else normal_hwin
+        
+        # Prepare extra parameters for onset/offset from request
+        extra_params = None
+        if 'onset' in request.GET and 'offset' in request.GET:
+            extra_params = {
+                'onset': request.GET['onset'],
+                'offset': request.GET['offset']
+            }
+            logger.info(f"Using direct onset/offset from request: {extra_params}")
+        
+        # Get audio data 
+        # Check if the path is already in media directory
+        if 'task_batches' in mod_path and mod_path.startswith('/app/'):
+            audio_path = mod_path  # Use the path as is if it starts with /app/
+        else:
+            # Convert path separators for non-absolute paths
+            audio_path = os.sep.join(mod_path.split('/'))
             
-            # Process audio
-            call_to_do = int(request.GET['call'])
-            overview = request.GET['overview'] == 'True'
-            hwin = overview_hwin if overview else normal_hwin
-            
-            # Prepare extra parameters for onset/offset from request
-            extra_params = None
-            if 'onset' in request.GET and 'offset' in request.GET:
-                extra_params = {
-                    'onset': request.GET['onset'],
-                    'offset': request.GET['offset']
-                }
-                logger.info(f"Using direct onset/offset from request: {extra_params}")
-            
-            # Get audio data 
-            # Check if the path is already in media directory
-            if 'task_batches' in mod_path and mod_path.startswith('/app/'):
-                audio_path = mod_path  # Use the path as is if it starts with /app/
+            # For media files, make sure we're using the correct path within the Docker container
+            if not os.path.exists(audio_path) and 'task_batches' in audio_path:
+                audio_path = os.path.join('/app/media', audio_path.lstrip('/'))
+        
+        logger.info(f"Final audio path for processing: {audio_path}")
+        thr_x1, fs, hashof = get_audio_bit(audio_path, call_to_do, hwin(), extra_params)
+        
+        # Validate hash
+        if request.GET['hash'] != hashof:
+            logger.error(f"Hash mismatch: {request.GET['hash']} != {hashof}")
+            # For now, we'll skip the hash validation since we're having path issues
+            logger.warning(f"Skipping hash validation due to path issues")
+            # return HttpResponse("Hash validation failed", status=400)
+        
+        # Check for valid audio data
+        if thr_x1 is None or len(thr_x1) == 0:
+            logger.error("No audio data returned")
+            return HttpResponse("Failed to extract audio data", status=500)
+        
+        # Extract the specific channel with error handling
+        try:
+            channel_idx = int(request.GET['channel'])
+            if len(thr_x1.shape) > 1 and channel_idx < thr_x1.shape[1]:
+                # Multi-channel audio, extract specific channel
+                thr_x1 = thr_x1[:, channel_idx]
             else:
-                # Convert path separators for non-absolute paths
-                audio_path = os.sep.join(mod_path.split('/'))
-                
-                # For media files, make sure we're using the correct path within the Docker container
-                if not os.path.exists(audio_path) and 'task_batches' in audio_path:
-                    audio_path = os.path.join('/app/media', audio_path.lstrip('/'))
-            
-            logger.info(f"Final audio path for processing: {audio_path}")
-            thr_x1, fs, hashof = get_audio_bit(audio_path, call_to_do, hwin(), extra_params)
-            
-            # Validate hash
-            if request.GET['hash'] != hashof:
-                logger.error(f"Hash mismatch: {request.GET['hash']} != {hashof}")
-                # For now, we'll skip the hash validation since we're having path issues
-                logger.warning(f"Skipping hash validation due to path issues")
-                # return HttpResponse("Hash validation failed", status=400)
-            
-            # Check for valid audio data
-            if thr_x1 is None or len(thr_x1) == 0:
-                logger.error("No audio data returned")
-                return HttpResponse("Failed to extract audio data", status=500)
-            
-            # Extract the specific channel with error handling
-            try:
-                channel_idx = int(request.GET['channel'])
-                if len(thr_x1.shape) > 1 and channel_idx < thr_x1.shape[1]:
-                    # Multi-channel audio, extract specific channel
-                    thr_x1 = thr_x1[:, channel_idx]
-                else:
-                    # Single channel or invalid channel index
-                    if len(thr_x1.shape) > 1:
-                        logger.warning(f"Invalid channel index {channel_idx} for audio with {thr_x1.shape[1]} channels. Using first channel.")
-                    thr_x1 = thr_x1 if len(thr_x1.shape) == 1 else thr_x1[:, 0]
-                
-                # Ensure audio data is 1D
+                # Single channel or invalid channel index
                 if len(thr_x1.shape) > 1:
-                    thr_x1 = thr_x1.flatten()
+                    logger.warning(f"Invalid channel index {channel_idx} for audio with {thr_x1.shape[1]} channels. Using first channel.")
+                thr_x1 = thr_x1 if len(thr_x1.shape) == 1 else thr_x1[:, 0]
+            
+            # Ensure audio data is 1D
+            if len(thr_x1.shape) > 1:
+                thr_x1 = thr_x1.flatten()
+            
+            # Get loudness with error handling
+            try:
+                loudness = float(request.GET['loudness'])
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid loudness value: {request.GET['loudness']}, using 1.0")
+                loudness = 1.0
+            
+            # Write audio file with error handling
+            try:
+                # Create destination directory if it doesn't exist
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 
-                # Get loudness with error handling
+                # Ensure we have a valid sample rate
+                sample_rate = fs // slowdown if fs > 0 else abs(fs) // slowdown
+                if sample_rate <= 0:
+                    sample_rate = 44100 // slowdown
+                    logger.warning(f"Invalid sample rate detected, using default: {sample_rate}")
+                
+                # Ensure we have valid audio data
+                audio_data = thr_x1.astype('float32')
+                
+                # Log audio data details for debugging
+                logger.info(f"Writing audio with shape: {audio_data.shape}, sample rate: {sample_rate}, min: {audio_data.min()}, max: {audio_data.max()}")
+                
+                # Adjust and ensure proper range for audio data
+                if np.isnan(audio_data).any() or np.isinf(audio_data).any():
+                    logger.warning("Invalid values in audio data, replacing with zeros")
+                    audio_data = np.nan_to_num(audio_data)
+                
+                # Scale audio data to be between -1 and 1
+                max_val = np.max(np.abs(audio_data))
+                if max_val > 0:
+                    audio_data = audio_data / max_val
+                
+                # Apply slowdown and loudness adjustment
+                audio_data = np.repeat(audio_data, slowdown) * loudness
+                
+                # Ensure the data has at least a few samples
+                if len(audio_data) < 100:
+                    logger.warning(f"Audio segment too short ({len(audio_data)} samples), padding")
+                    # Check dimensions to create appropriate padding
+                    if len(audio_data.shape) > 1:
+                        # Multi-channel data
+                        padding = np.zeros((1000, audio_data.shape[1]), dtype=np.float32)
+                    else:
+                        # Single channel data
+                        padding = np.zeros(1000, dtype=np.float32)
+                    audio_data = np.concatenate([audio_data, padding])
+                
+                # Try using soundfile first (more robust)
                 try:
-                    loudness = float(request.GET['loudness'])
-                except (ValueError, TypeError):
-                    logger.warning(f"Invalid loudness value: {request.GET['loudness']}, using 1.0")
-                    loudness = 1.0
+                    import soundfile as sf
+                    sf.write(file_path, audio_data, sample_rate)
+                    logger.info(f"Successfully wrote audio file using soundfile: {file_path}")
+                except Exception as sf_error:
+                    logger.warning(f"Error writing with soundfile, trying scipy: {str(sf_error)}")
+                    # Fall back to scipy if soundfile fails
+                    import scipy.io.wavfile
+                    # Convert to appropriate range for wavfile
+                    wav_data = (audio_data * 32767).astype(np.int16)
+                    scipy.io.wavfile.write(file_path, sample_rate, wav_data)
+                    logger.info(f"Successfully wrote audio file using scipy: {file_path}")
                 
-                # Write audio file with error handling
-                import scipy.io.wavfile
-                scipy.io.wavfile.write(
-                    file_path,
-                    fs // slowdown if fs > 0 else abs(fs) // slowdown,  # Handle negative fs
-                    thr_x1.astype('float32').repeat(slowdown) * loudness
-                )
+                # Verify the file was created correctly
+                if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                    logger.error(f"Failed to create audio file at {file_path}")
+                    return HttpResponse("Failed to create audio file", status=500)
                 
             except Exception as e:
-                logger.error(f"Error processing audio data: {str(e)}")
+                logger.error(f"Error writing audio file: {str(e)}")
                 logger.debug(traceback.format_exc())
-                return HttpResponse(f"Error processing audio: {str(e)}", status=500)
+                return HttpResponse(f"Error writing audio file: {str(e)}", status=500)
             
-            logger.info(f"Generated audio snippet: {file_path}")
-
+        except Exception as e:
+            logger.error(f"Error processing audio data: {str(e)}")
+            logger.debug(traceback.format_exc())
+            return HttpResponse(f"Error processing audio: {str(e)}", status=500)
+        
+        logger.info(f"Generated audio snippet: {file_path}")
         return FileResponse(open(file_path, 'rb'), content_type='audio/wav')
         
     except Exception as e:
