@@ -150,3 +150,68 @@ class Task(models.Model):
             self.status = 'done'
             
         super().save(*args, **kwargs)
+        
+        # After saving, pre-generate spectrograms
+        self.generate_spectrograms()
+    
+    def generate_spectrograms(self):
+        """Pre-generate spectrograms for this task to avoid frontend requests"""
+        import os
+        import hashlib
+        from django.conf import settings
+        from .audio.tasks import generate_spectrogram, normal_hwin, overview_hwin
+        from .utils import convert_path_to_os_specific
+        
+        # Skip if this is called during migration
+        if not os.path.exists(settings.MEDIA_ROOT):
+            return
+        
+        try:
+            # Prepare the WAV file path
+            if self.batch and self.batch.wav_file:
+                # Get the path from the uploaded file in the batch
+                wav_path = self.batch.wav_file.path
+            else:
+                # Assume the path is based on the project structure
+                wav_path = os.path.join(
+                    "home", 
+                    self.created_by.username, 
+                    self.species.name, 
+                    self.project.name, 
+                    self.wav_file_name
+                )
+                wav_path = convert_path_to_os_specific(wav_path)
+            
+            # Create hash
+            file_hash = hashlib.md5(wav_path.encode()).hexdigest()
+            
+            # Generate spectrograms for all channels (0, 1) and types (normal, overview)
+            for channel in [0, 1]:  # Assuming 2 channels
+                for overview in [False, True]:
+                    # Prepare args for spectrogram generation
+                    args = {
+                        'call': '0',  # Always the first call for a task
+                        'channel': str(channel),
+                        'numcalls': '1',
+                        'hash': file_hash,
+                        'overview': '1' if overview else '0',
+                        'contrast': '4.0'  # Default contrast value
+                    }
+                    
+                    # Add the onset and offset to the args
+                    args['onset'] = str(self.onset)
+                    args['offset'] = str(self.offset)
+                    
+                    # Generate the spectrogram asynchronously
+                    from celery import current_app
+                    task = current_app.send_task(
+                        'battycoda_app.audio.tasks.generate_spectrogram_task',
+                        args=[wav_path, args, None]
+                    )
+                    
+        except Exception as e:
+            import logging
+            logger = logging.getLogger('battycoda.models')
+            logger.error(f"Error pre-generating spectrograms: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())

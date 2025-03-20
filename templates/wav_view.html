@@ -66,10 +66,11 @@
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        height: 400px; /* Adjusted height */
+        height: 400px; /* Match height of spectrogram */
         margin-left: 5px;
         text-align: right;
         min-width: 40px; /* Ensure tick labels have space */
+        z-index: 10; /* Ensure visibility */
     }
     
     .x-tick-marks {
@@ -78,13 +79,16 @@
         width: 100%;
         padding: 0 10px;
         margin-top: 5px;
+        z-index: 10; /* Ensure visibility */
     }
     
     .y-tick, .x-tick {
         color: #cccccc;
         font-size: 12px;
-        display: block; /* Force display */
+        display: inline-block !important; /* Force display */
         padding: 2px;
+        background-color: rgba(30, 30, 30, 0.7); /* Semi-transparent background */
+        border-radius: 2px;
     }
     
     /* Make sure the spectrogram container fits properly */
@@ -131,8 +135,8 @@
                     <!-- Spectrogram and X-axis -->
                     <div style="flex: 1;">
                         <!-- Spectrogram image -->
-                        <div class="spectrogram-container" style="text-align: center;">
-                            <img id="spectrogram" alt="Spectrogram" style="max-width: 100%; height: auto;">
+                        <div class="spectrogram-container" style="text-align: center; position: relative; height: 400px;">
+                            <img id="spectrogram" alt="Spectrogram" style="max-width: 100%; height: 100%; object-fit: contain;">
                         </div>
                         
                         <!-- X-axis labels -->

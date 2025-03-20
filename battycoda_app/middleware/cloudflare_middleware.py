@@ -237,7 +237,13 @@ class CloudflareAccessMiddleware:
             if not jwt_payload:
                 logger.warning(f"Invalid or missing Cloudflare Access JWT for {request.path} from {request.META.get('REMOTE_ADDR')}")
                 # Redirect to login page instead of returning 401
-                return HttpResponseRedirect(reverse('login'))
+                # Use battycoda_app:login to match the app's URL pattern
+                try:
+                    login_url = reverse('battycoda_app:login')
+                except:
+                    # Fallback to absolute URL if reverse fails
+                    login_url = '/accounts/login/'
+                return HttpResponseRedirect(login_url)
             
             # Store Cloudflare user info in the request
             request.cloudflare_user = jwt_payload

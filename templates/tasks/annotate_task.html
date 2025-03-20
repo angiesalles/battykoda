@@ -40,9 +40,90 @@
                 <h3>Spectrogram</h3>
                 <div id="spectrogram-container" class="mb-3">
                     <div class="d-flex justify-content-center align-items-center spectrogram-container">
-                        <img src="{% url 'battycoda_app:spectrogram' %}?wav_path={{ full_path|urlencode }}&call=0&channel=0&numcalls=1&hash={{ file_hash }}&overview=0&contrast=4.0&onset={{ task.onset }}&offset={{ task.offset }}" alt="Spectrogram">
+                        <!-- Use pre-generated spectrogram URL if available -->
+                        <img src="{{ spectrogram_urls.channel_0_detail|default:"/spectrogram/?wav_path="|add:full_path|urlencode|add:"&call=0&channel=0&numcalls=1&hash="|add:file_hash|add:"&overview=0&contrast=4.0&onset="|add:task.onset|stringformat:"s"|add:"&offset="|add:task.offset|stringformat:"s" }}" 
+                             alt="Spectrogram" 
+                             id="main-spectrogram">
                     </div>
                 </div>
+                
+                <!-- Spectrogram controls -->
+                <div class="controls-simple mt-3 mb-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="d-flex">
+                                <button id="detail-view-btn" class="btn btn-primary me-2 active">Detail View</button>
+                                <button id="overview-btn" class="btn btn-outline-secondary">Overview</button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="channel-toggle">
+                                <label class="form-check-label" for="channel-toggle">
+                                    <span id="channel-label">Channel 1</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const mainSpectrogram = document.getElementById('main-spectrogram');
+                        const detailViewBtn = document.getElementById('detail-view-btn');
+                        const overviewBtn = document.getElementById('overview-btn');
+                        const channelToggle = document.getElementById('channel-toggle');
+                        const channelLabel = document.getElementById('channel-label');
+                        
+                        let currentChannel = 0;
+                        let isOverview = false;
+                        
+                        // Preload all spectrograms
+                        const spectrogramUrls = {
+                            'channel_0_detail': '{{ spectrogram_urls.channel_0_detail|escapejs }}',
+                            'channel_0_overview': '{{ spectrogram_urls.channel_0_overview|escapejs }}',
+                            'channel_1_detail': '{{ spectrogram_urls.channel_1_detail|escapejs }}',
+                            'channel_1_overview': '{{ spectrogram_urls.channel_1_overview|escapejs }}'
+                        };
+                        
+                        // Function to update spectrogram based on current settings
+                        function updateSpectrogram() {
+                            const key = `channel_${currentChannel}_${isOverview ? 'overview' : 'detail'}`;
+                            if (spectrogramUrls[key]) {
+                                mainSpectrogram.src = spectrogramUrls[key];
+                            }
+                        }
+                        
+                        // Set up event listeners
+                        detailViewBtn.addEventListener('click', function() {
+                            isOverview = false;
+                            detailViewBtn.classList.add('active');
+                            detailViewBtn.classList.remove('btn-outline-primary');
+                            detailViewBtn.classList.add('btn-primary');
+                            overviewBtn.classList.remove('active');
+                            overviewBtn.classList.remove('btn-primary');
+                            overviewBtn.classList.add('btn-outline-secondary');
+                            updateSpectrogram();
+                        });
+                        
+                        overviewBtn.addEventListener('click', function() {
+                            isOverview = true;
+                            overviewBtn.classList.add('active');
+                            overviewBtn.classList.remove('btn-outline-secondary');
+                            overviewBtn.classList.add('btn-primary');
+                            detailViewBtn.classList.remove('active');
+                            detailViewBtn.classList.remove('btn-primary');
+                            detailViewBtn.classList.add('btn-outline-secondary');
+                            updateSpectrogram();
+                        });
+                        
+                        channelToggle.addEventListener('change', function() {
+                            currentChannel = this.checked ? 1 : 0;
+                            channelLabel.textContent = `Channel ${currentChannel + 1}`;
+                            updateSpectrogram();
+                        });
+                    });
+                </script>
                 
                 <!-- Audio section -->
                 <div class="audio-section mt-4">

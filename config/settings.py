@@ -11,10 +11,16 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 import os
+import dotenv
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env.local if it exists
+env_file = BASE_DIR / '.env.local'
+if env_file.exists():
+    dotenv.load_dotenv(env_file)
 
 
 # Quick-start development settings - unsuitable for production
@@ -29,7 +35,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']  # For testing. Replace with specific hostname/IP in production
 
 # Allow forms from Cloudflare, even if the origin appears different
-CSRF_TRUSTED_ORIGINS = ['https://battycoda.com', 'https://*.cloudflareaccess.com', 'https://*.batlab.org']
+CSRF_TRUSTED_ORIGINS = ['https://battycoda.com', 'https://*.cloudflareaccess.com', 'https://*.batlab.org', 'https://*.boergens.net', 'https://boergens.net']
 
 
 # Application definition

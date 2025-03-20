@@ -571,6 +571,43 @@ def task_annotation_view(request, task_id):
             except Exception as e:
                 logger.error(f"Error loading call types from text file: {str(e)}")
     
+    # Get pre-generated spectrogram URLs 
+    from .audio.utils import appropriate_file
+    
+    # Create cache paths for spectrograms
+    spectrogram_urls = {}
+    for channel in [0, 1]:
+        for is_overview in [True, False]:
+            # Create args for the spectrogram
+            spectrogram_args = {
+                'call': '0',
+                'channel': str(channel),
+                'numcalls': '1',
+                'hash': file_hash,
+                'overview': '1' if is_overview else '0',
+                'contrast': '4.0'
+            }
+            
+            # Add onset/offset to args
+            spectrogram_args['onset'] = str(task.onset)
+            spectrogram_args['offset'] = str(task.offset)
+            
+            # Generate the file path
+            cache_path = appropriate_file(full_path, spectrogram_args)
+            
+            # Check if the file exists, if not, trigger generation
+            if not os.path.exists(cache_path):
+                # Trigger spectrogram generation
+                logger.info(f"Pre-generating spectrogram: channel={channel}, overview={is_overview}")
+                task.generate_spectrograms()
+            
+            # Create a URL for the spectrogram (that will be handled by spectrogram_view)
+            spectrogram_url = f"/spectrogram/?wav_path={full_path}&call=0&channel={channel}&numcalls=1&hash={file_hash}&overview={'1' if is_overview else '0'}&contrast=4.0&onset={task.onset}&offset={task.offset}"
+            
+            # Store in the dictionary with a descriptive key
+            key = f"channel_{channel}_{'overview' if is_overview else 'detail'}"
+            spectrogram_urls[key] = spectrogram_url
+            
     # Create context for the template
     context = {
         'task': task,
@@ -585,7 +622,8 @@ def task_annotation_view(request, task_id):
         'call_types': call_types,
         'call_descriptions': call_descriptions,
         'onset': task.onset,
-        'offset': task.offset
+        'offset': task.offset,
+        'spectrogram_urls': spectrogram_urls  # Add pre-generated spectrogram URLs
     }
     
     # Return the annotation interface

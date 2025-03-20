@@ -10,14 +10,14 @@ services:
       - /home/ubuntu/template:/template:ro
       - ./data:/data:rw
     working_dir: /app
+    env_file:
+      - .env.local
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
       - CLOUDFLARE_ACCESS_ENABLED=True
-      - CLOUDFLARE_AUDIENCE=92f9c8b2586479249c3bea574d492514af0593259e62280662f6a3876f00cc1b
-      - CLOUDFLARE_DOMAIN=batlab.cloudflareaccess.com
       - ENFORCE_CLOUDFLARE_IN_DEV=True
     depends_on:
       - redis
@@ -26,7 +26,8 @@ services:
       bash -c "
         echo 'Installing dependencies...' &&
         pip install -r requirements.txt &&
-        echo 'Starting web server...' &&
+        echo 'Starting web server with Cloudflare settings from env file' &&
+        env | grep CLOUDFLARE &&
         gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 --log-level debug config.wsgi:application
       "
 
