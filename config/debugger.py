@@ -5,6 +5,7 @@ This module provides a function to activate the PyCharm debugger
 with a single import.
 """
 import sys
+import os
 
 def activate_debugger(port=12345):
     """
@@ -14,9 +15,15 @@ def activate_debugger(port=12345):
     on localhost at the specified port. If the connection fails, it will 
     continue execution without the debugger.
     
+    Skip activation when running tests to avoid connection errors.
+    
     Args:
         port (int): The port on which PyCharm is listening for debug connections.
     """
+    # Skip debugger activation when running tests
+    if 'test' in sys.argv:
+        return
+        
     try:
         import pydevd_pycharm
         pydevd_pycharm.settrace(
