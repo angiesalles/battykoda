@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}Debug Team Info{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1>Team Debug Information</h1>
+    
+    <div class="card bg-dark mb-4">
+        <div class="card-header">
+            <h2>Current User Information</h2>
+        </div>
+        <div class="card-body">
+            <p><strong>Username:</strong> {{ user.username }}</p>
+            <p><strong>Email:</strong> {{ user.email }}</p>
+            <p><strong>Current Team:</strong> 
+                {% if user.profile.team %}
+                    {{ user.profile.team.name }} (ID: {{ user.profile.team.id }})
+                {% else %}
+                    None
+                {% endif %}
+            </p>
+            <p><strong>Is Admin:</strong> {{ user.profile.is_admin }}</p>
+        </div>
+    </div>
+    
+    <div class="card bg-dark mb-4">
+        <div class="card-header">
+            <h2>Team Membership Health Check</h2>
+        </div>
+        <div class="card-body">
+            <p><strong>Total Profiles with Teams:</strong> {{ total_profiles_with_teams }}</p>
+            <p><strong>Total TeamMembership Records:</strong> {{ total_memberships }}</p>
+            
+            {% if profiles_without_membership %}
+            <div class="alert alert-danger">
+                <h5>Profiles Without Corresponding Membership Records ({{ profiles_without_membership.count }})</h5>
+                <ul>
+                    {% for profile in profiles_without_membership %}
+                    <li>{{ profile.user.username }} (Team: {{ profile.team.name }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {% if users_with_memberships_no_team %}
+            <div class="alert alert-warning">
+                <h5>Users With Memberships But No Active Team ({{ users_with_memberships_no_team.count }})</h5>
+                <ul>
+                    {% for profile in users_with_memberships_no_team %}
+                    <li>{{ profile.user.username }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {% if user.is_superuser %}
+            <a href="?sync=true" class="btn btn-warning">Synchronize Team Memberships</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card bg-dark mb-4">
+        <div class="card-header">
+            <h2>All Teams in Database</h2>
+        </div>
+        <div class="card-body">
+            <table class="table table-dark">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Created At</th>
+                        <th>Members (via TeamMembership)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in all_teams %}
+                    <tr>
+                        <td>{{ team.id }}</td>
+                        <td>{{ team.name }}</td>
+                        <td>{{ team.description }}</td>
+                        <td>{{ team.created_at }}</td>
+                        <td>
+                            <ul>
+                                {% for membership in team.team_memberships.all %}
+                                <li>
+                                    {{ membership.user.username }} 
+                                    {% if membership.is_admin %}<span class="badge bg-primary">Admin</span>{% endif %}
+                                </li>
+                                {% empty %}
+                                <li>No members</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">No teams found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="card bg-dark mb-4">
+        <div class="card-header">
+            <h2>User's Team Memberships ({{ user_memberships.count }} total)</h2>
+        </div>
+        <div class="card-body">
+            <table class="table table-dark">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>Team ID</th>
+                        <th>Is Admin</th>
+                        <th>Created At</th>
+                        <th>Is Current Team</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for membership in user_memberships %}
+                    <tr>
+                        <td>{{ membership.team.name }}</td>
+                        <td>{{ membership.team.id }}</td>
+                        <td>{{ membership.is_admin }}</td>
+                        <td>{{ membership.created_at }}</td>
+                        <td>{% if user.profile.team == membership.team %}Yes{% else %}No{% endif %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">No team memberships found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="card bg-dark">
+        <div class="card-header">
+            <h2>Available Teams (from user.profile.available_teams)</h2>
+        </div>
+        <div class="card-body">
+            <table class="table table-dark">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Is Current Team</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in user.profile.available_teams %}
+                    <tr>
+                        <td>{{ team.id }}</td>
+                        <td>{{ team.name }}</td>
+                        <td>{% if user.profile.team == team %}Yes{% else %}No{% endif %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">No available teams found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

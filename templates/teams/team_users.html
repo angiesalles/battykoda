@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Team Users - {{ team.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Users in {{ team.name }}</h1>
+        <a href="{% url 'battycoda_app:invite_user' %}" class="btn btn-primary">
+            <i class="fas fa-envelope me-1"></i> Invite User
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Team Members</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Last Login</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for membership in team_memberships %}
+                            <tr>
+                                <td>{{ membership.user.username }}</td>
+                                <td>{{ membership.user.email }}</td>
+                                <td>{% if membership.is_admin %}<span class="badge bg-primary">Admin</span>{% else %}Member{% endif %}</td>
+                                <td>{{ membership.user.last_login|date:"Y-m-d H:i" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center">No team members found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Pending Invitations</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for invitation in active_invitations %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ invitation.email }}</strong>
+                                    <div><small class="text-muted">Invited by: {{ invitation.invited_by.username }}</small></div>
+                                    <div><small class="text-muted">Expires: {{ invitation.expires_at|date:"Y-m-d H:i" }}</small></div>
+                                </div>
+                                <form method="post" action="{% url 'battycoda_app:invite_user' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="resend" value="{{ invitation.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-sync-alt"></i> Resend
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-center">No pending invitations.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

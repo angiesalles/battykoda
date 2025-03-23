@@ -276,3 +276,178 @@ def import_default_species(user):
             logger.error(traceback.format_exc())
             
     return created_species
+
+
+def create_demo_task_batch(user):
+    """Create a demo task batch for a new user using sample files
+    
+    Args:
+        user: The User object to create the task batch for
+        
+    Returns:
+        TaskBatch or None: The created TaskBatch object, or None if creation failed
+    """
+    import pickle
+    import numpy as np
+    import traceback
+    from django.core.files import File
+    from django.db import transaction
+    from .models import Project, Species, TaskBatch, Task
+    
+    logger.info(f"Creating demo task batch for user {user.username}")
+    
+    # Get the user's team and profile
+    profile = user.profile
+    team = profile.team
+    if not team:
+        logger.warning(f"User {user.username} has no team, skipping task batch creation")
+        return None
+    
+    # Find the user's demo project
+    try:
+        project = Project.objects.filter(
+            team=team,
+            name__contains="Demo Project"
+        ).first()
+        
+        if not project:
+            logger.warning(f"No demo project found for {user.username}, skipping task batch creation")
+            return None
+            
+        # Find the Carollia species
+        species = Species.objects.filter(
+            team=team,
+            name__contains="Carollia"
+        ).first()
+        
+        if not species:
+            logger.warning(f"No Carollia species found for {user.username}, skipping task batch creation")
+            return None
+            
+        # Define the paths to the sample files
+        sample_paths = {
+            'wav': [
+                "/app/static/bat1_angie_19.wav",
+                "/home/ubuntu/battycoda/static/bat1_angie_19.wav"
+            ],
+            'pickle': [
+                "/app/static/bat1_angie_19.wav.pickle",
+                "/home/ubuntu/battycoda/static/bat1_angie_19.wav.pickle"
+            ]
+        }
+        
+        # Find the sample WAV file
+        wav_path = None
+        for path in sample_paths['wav']:
+            if os.path.exists(path):
+                wav_path = path
+                break
+                
+        if not wav_path:
+            logger.warning("Sample WAV file not found, skipping task batch creation")
+            return None
+            
+        # Find the sample pickle file
+        pickle_path = None
+        for path in sample_paths['pickle']:
+            if os.path.exists(path):
+                pickle_path = path
+                break
+                
+        if not pickle_path:
+            logger.warning("Sample pickle file not found, skipping task batch creation")
+            return None
+            
+        # Create the task batch
+        batch_name = f"Demo Bat Calls - {user.username}"
+        
+        # Create and save the TaskBatch
+        batch = TaskBatch(
+            name=batch_name,
+            description="Sample bat calls for demonstration and practice",
+            created_by=user,
+            wav_file_name="bat1_angie_19.wav",
+            species=species,
+            project=project,
+            team=team
+        )
+        
+        # Save the batch to get an ID
+        batch.save()
+        
+        # Attach the WAV file
+        with open(wav_path, 'rb') as wav_file:
+            batch.wav_file.save("bat1_angie_19.wav", File(wav_file), save=True)
+        
+        logger.info(f"Created task batch {batch.name} for user {user.username}")
+        
+        # Load the pickle file
+        try:
+            with open(pickle_path, 'rb') as f:
+                pickle_data = pickle.load(f)
+                
+            # Extract onsets and offsets
+            if isinstance(pickle_data, dict):
+                onsets = pickle_data.get('onsets', [])
+                offsets = pickle_data.get('offsets', [])
+            elif isinstance(pickle_data, (list, tuple)) and len(pickle_data) >= 2:
+                onsets = pickle_data[0]
+                offsets = pickle_data[1]
+            else:
+                logger.error(f"Pickle file format not recognized")
+                return batch
+            
+            # Convert to lists if they're NumPy arrays
+            if isinstance(onsets, np.ndarray):
+                onsets = onsets.tolist()
+            if isinstance(offsets, np.ndarray):
+                offsets = offsets.tolist()
+                
+            # Create tasks for each onset-offset pair inside a transaction
+            tasks_created = 0
+            with transaction.atomic():
+                # Only use the first 10 entries to keep the demo manageable
+                max_entries = min(10, len(onsets))
+                
+                for i in range(max_entries):
+                    try:
+                        # Convert numpy types to Python native types if needed
+                        onset_value = float(onsets[i])
+                        offset_value = float(offsets[i])
+                        
+                        # Create and save the task
+                        task = Task(
+                            wav_file_name=batch.wav_file_name,
+                            onset=onset_value,
+                            offset=offset_value,
+                            species=batch.species,
+                            project=batch.project,
+                            batch=batch,
+                            created_by=user,
+                            team=team,
+                            status='pending'
+                        )
+                        task.save()
+                        tasks_created += 1
+                    except Exception as e:
+                        logger.error(f"Error creating task {i}: {str(e)}")
+                        logger.error(traceback.format_exc())
+                        raise  # Re-raise to trigger transaction rollback
+                        
+            logger.info(f"Created {tasks_created} tasks for batch {batch.name}")
+            return batch
+                    
+        except Exception as e:
+            logger.error(f"Error processing pickle file: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # Delete the batch if pickle processing failed
+            if batch.id:
+                batch.delete()
+                
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error creating demo task batch: {str(e)}")
+        logger.error(traceback.format_exc())
+        return None

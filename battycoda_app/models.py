@@ -135,6 +135,17 @@ def create_user_profile(sender, instance, created, **kwargs):
             logger.info(f"Created {len(created_species)} default species for user {instance.username}")
         except Exception as e:
             logger.error(f"Error importing default species for user {instance.username}: {str(e)}")
+            
+        # Create a demo task batch with sample bat calls
+        try:
+            from .utils import create_demo_task_batch
+            batch = create_demo_task_batch(instance)
+            if batch:
+                logger.info(f"Created demo task batch '{batch.name}' for user {instance.username}")
+            else:
+                logger.warning(f"Failed to create demo task batch for user {instance.username}")
+        except Exception as e:
+            logger.error(f"Error creating demo task batch for user {instance.username}: {str(e)}")
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
