@@ -15,7 +15,6 @@
         <thead>
             <tr>
                 <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Name</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Scientific Name</th>
                 <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created</th>
                 <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Actions</th>
             </tr>
@@ -26,7 +25,6 @@
                 <td style="padding: 8px; border-bottom: 1px solid #333;">
                     <a href="{% url 'battycoda_app:species_detail' species.id %}">{{ species.name }}</a>
                 </td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ species.scientific_name|default:"" }}</td>
                 <td style="padding: 8px; border-bottom: 1px solid #333;">{{ species.created_at|date:"M d, Y" }}</td>
                 <td style="padding: 8px; border-bottom: 1px solid #333;">
                     <a href="{% url 'battycoda_app:edit_species' species.id %}" class="button">Edit</a>

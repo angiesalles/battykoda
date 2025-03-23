@@ -30,12 +30,21 @@ if env_file.exists():
 SECRET_KEY = 'django-insecure-r)5pg=&w_$mad+)iuy(o8zv9!f4saom0@#=tw$(@_b&xa51oga'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = True  # Temporarily enable for troubleshooting
 
-ALLOWED_HOSTS = ['*']  # For testing. Replace with specific hostname/IP in production
+ALLOWED_HOSTS = ['*']  # Allow all hosts for now
 
-# Allow forms from Cloudflare, even if the origin appears different
-CSRF_TRUSTED_ORIGINS = ['https://battycoda.com', 'https://*.cloudflareaccess.com', 'https://*.batlab.org', 'https://*.boergens.net', 'https://boergens.net']
+# CSRF trusted origins
+CSRF_TRUSTED_ORIGINS = ['http://*', 'https://*', 'https://battycoda.com', 'https://*.batlab.org', 'https://*.boergens.net', 'https://boergens.net', 'http://localhost', 'http://127.0.0.1']
+
+# Security settings for HTTPS - temporarily disabled until HTTPS is fully set up
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = False  # Temporarily disable until HTTPS is set up
+SESSION_COOKIE_SECURE = False  # Temporarily disable until HTTPS is set up
+CSRF_COOKIE_SECURE = False  # Temporarily disable until HTTPS is set up
+# SECURE_HSTS_SECONDS = 31536000  # Commented out until HTTPS is fully configured
+# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# SECURE_HSTS_PRELOAD = True
 
 
 # Application definition
@@ -58,15 +67,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # Add Cloudflare verification middleware
-    'battycoda_app.middleware.cloudflare_middleware.CloudflareAccessMiddleware',
+    # Add standard authentication middleware
+    'battycoda_app.middleware.authentication_middleware.AuthenticationMiddleware',
 ]
 
-# Cloudflare Access settings
-CLOUDFLARE_ACCESS_ENABLED = True
-CLOUDFLARE_AUDIENCE = os.environ.get('CLOUDFLARE_AUDIENCE', '92f9c8b2586479249c3bea574d492514af0593259e62280662f6a3876f00cc1b')
-CLOUDFLARE_DOMAIN = os.environ.get('CLOUDFLARE_DOMAIN', 'batlab.cloudflareaccess.com')
-ENFORCE_CLOUDFLARE_IN_DEV = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -179,7 +183,7 @@ LOGGING = {
         },
     },
     'loggers': {
-        'battycoda.cloudflare': {
+        'battycoda.auth': {
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': True,
@@ -194,5 +198,18 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'battycoda.email': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
     },
 }
+
+# AWS SES Email Configuration
+EMAIL_BACKEND = 'django_ses.SESBackend'
+AWS_SES_REGION_NAME = os.environ.get('AWS_SES_REGION_NAME', 'us-east-1')
+AWS_SES_ACCESS_KEY_ID = os.environ.get('AWS_SES_ACCESS_KEY_ID')
+AWS_SES_SECRET_ACCESS_KEY = os.environ.get('AWS_SES_SECRET_ACCESS_KEY')
+AWS_SES_CONFIGURATION_SET = os.environ.get('AWS_SES_CONFIGURATION_SET', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@battycoda.com')

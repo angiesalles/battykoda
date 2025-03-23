@@ -51,6 +51,7 @@
                                 <td>{{ batch.created_at|date:"M d, Y" }}</td>
                                 <td>
                                     <a href="{% url 'battycoda_app:task_batch_detail' batch.id %}" class="btn btn-sm btn-outline-info">View</a>
+                                    <a href="{% url 'battycoda_app:annotate_batch' batch.id %}" class="btn btn-sm btn-outline-primary">Annotate</a>
                                 </td>
                             </tr>
                             {% endfor %}

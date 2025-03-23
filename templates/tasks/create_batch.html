@@ -55,13 +55,7 @@
                     </div>
                 </div>
                 
-                <div class="mb-3">
-                    <label for="{{ form.team.id_for_label }}" class="form-label">Team</label>
-                    {{ form.team|add_class:"form-control bg-dark text-light" }}
-                    {% if form.team.errors %}
-                        <div class="text-danger">{{ form.team.errors }}</div>
-                    {% endif %}
-                </div>
+                <!-- Team field removed - team is now automatically assigned -->
                 
                 
                 <div class="mb-4">

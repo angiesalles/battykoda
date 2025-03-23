@@ -21,17 +21,7 @@
             {% endif %}
         </div>
         
-        <div style="margin-bottom: 15px;">
-            <label for="id_scientific_name" style="display: block; margin-bottom: 5px;">Scientific Name:</label>
-            {{ form.scientific_name }}
-            {% if form.scientific_name.errors %}
-            <div style="color: #e57373; margin-top: 5px;">
-                {% for error in form.scientific_name.errors %}
-                {{ error }}
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+        <!-- Scientific Name field removed -->
         
         <div style="margin-bottom: 15px;">
             <label for="id_description" style="display: block; margin-bottom: 5px;">Description:</label>
@@ -61,8 +51,12 @@
         
         <div style="margin-bottom: 15px;">
             <label for="id_calls_file" style="display: block; margin-bottom: 5px;">Import Calls from File:</label>
-            {{ form.calls_file }}
+            <p style="margin-bottom: 8px; font-style: italic; color: #999;">Uploading a file will replace any calls you've already added.</p>
+            <div>
+                {{ form.calls_file }}
+            </div>
             <p style="font-size: 0.8em; margin-top: 5px;">Upload a text file with call types (one per line, format: short_name,long_name)</p>
+            <div id="file-load-status" style="margin-top: 5px;"></div>
             {% if form.calls_file.errors %}
             <div style="color: #e57373; margin-top: 5px;">
                 {% for error in form.calls_file.errors %}
@@ -81,7 +75,6 @@
                     <tr>
                         <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Short Name</th>
                         <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Long Name</th>
-                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Description</th>
                         <th style="text-align: center; padding: 8px; border-bottom: 1px solid #333;">Delete</th>
                     </tr>
                 </thead>
@@ -108,16 +101,7 @@
                             </div>
                             {% endif %}
                         </td>
-                        <td style="padding: 8px; border-bottom: 1px solid #333;">
-                            {{ call_form.description }}
-                            {% if call_form.description.errors %}
-                            <div style="color: #e57373; margin-top: 5px;">
-                                {% for error in call_form.description.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </td>
+                        <!-- Description field removed -->
                         <td style="padding: 8px; border-bottom: 1px solid #333; text-align: center;">
                             {{ call_form.DELETE }} 
                             {{ call_form.id }}
@@ -142,6 +126,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const addCallButton = document.getElementById('add-call');
     const callFormsetTable = document.getElementById('call-formset-table').querySelector('tbody');
+    const fileLoadStatus = document.getElementById('file-load-status');
     
     // Initial form count
     let formCount = {{ call_formset.total_form_count }};
@@ -154,8 +139,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('id_' + prefix + '-TOTAL_FORMS').value = formCount;
     }
     
-    // Add new call form
-    addCallButton.addEventListener('click', function() {
+    // Function to add a new call form with pre-filled values
+    function addCallFormWithValues(shortName = '', longName = '', description = '') {
         // Clone the first form
         const callForms = document.querySelectorAll('.call-form');
         const newForm = callForms[0].cloneNode(true);
@@ -181,12 +166,80 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        // Set values if provided
+        const shortNameInput = newForm.querySelector('input[name$="-short_name"]');
+        const longNameInput = newForm.querySelector('input[name$="-long_name"]');
+        const descriptionInput = newForm.querySelector('textarea[name$="-description"]');
+        
+        if (shortNameInput && shortName) shortNameInput.value = shortName;
+        if (longNameInput && longName) longNameInput.value = longName;
+        if (descriptionInput && description) descriptionInput.value = description;
+        
         // Add the new form to the table
         callFormsetTable.appendChild(newForm);
         
         // Increment form count
         formCount++;
         updateFormCount();
+    }
+    
+    // Add empty call form
+    addCallButton.addEventListener('click', function() {
+        addCallFormWithValues();
+    });
+    
+    // Automatically parse calls when a file is selected
+    document.getElementById('id_calls_file').addEventListener('change', function() {
+        const filesInput = document.getElementById('id_calls_file');
+        const files = filesInput.files;
+        
+        if (!files || files.length === 0) {
+            fileLoadStatus.innerHTML = '<span style="color: #e57373;">Please select a file first</span>';
+            return;
+        }
+        
+        const file = files[0];
+        const formData = new FormData();
+        formData.append('calls_file', file);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        // Show loading message
+        fileLoadStatus.innerHTML = '<span style="color: #fff;">Loading calls from file...</span>';
+        
+        // Send AJAX request to parse the file
+        fetch('{% url "battycoda_app:parse_calls_file" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear any existing call forms except the first one
+                const callForms = document.querySelectorAll('.call-form');
+                for (let i = 1; i < callForms.length; i++) {
+                    callForms[i].remove();
+                }
+                
+                // Reset form count to 1 (keeping the first empty form)
+                formCount = 1;
+                updateFormCount();
+                
+                // Add new forms for each call
+                data.calls.forEach(call => {
+                    addCallFormWithValues(call.short_name, call.long_name);
+                });
+                
+                fileLoadStatus.innerHTML = `<span style="color: #4caf50;">Successfully loaded ${data.calls.length} calls from file</span>`;
+            } else {
+                fileLoadStatus.innerHTML = `<span style="color: #e57373;">Error: ${data.error}</span>`;
+            }
+        })
+        .catch(error => {
+            fileLoadStatus.innerHTML = `<span style="color: #e57373;">Error: ${error.message}</span>`;
+        });
     });
 });
 </script>

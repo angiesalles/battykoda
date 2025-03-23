@@ -6,54 +6,79 @@
 
 {% block content %}
 <div class="container-fluid py-3">
-    <div class="task-info-bar mb-4 p-3 rounded shadow-sm" style="background-color: #262626;">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <div class="d-flex align-items-center">
-                    <h2 class="mb-0">Task #{{ task.id }}</h2>
+    <div class="row">
+        <!-- Task info sidebar -->
+        <div class="col-md-2">
+            <div class="task-sidebar p-3 rounded shadow-sm" style="background-color: #262626; height: 100%;">
+                <div class="d-flex align-items-center mb-2">
+                    <h4 class="mb-0">Task #{{ task.id }}</h4>
                     {% if task.created_by != request.user %}
-                        <span class="badge bg-info ms-2">Team Task</span>
+                        <span class="badge bg-info ms-2">Team</span>
                     {% endif %}
                 </div>
-                <small class="text-light">{{ species }} - {{ wav_path }} ({{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s)</small>
-                <div class="mt-1">
-                    <small class="text-muted">
-                        Created by: {{ task.created_by.username }}
-                        {% if task.created_by == request.user %}(you){% endif %} |
-                        Team: {{ task.team.name|default:"None" }} |
-                        Project: {{ task.project }}
-                    </small>
+                
+                <div class="task-info mb-3">
+                    <p class="small text-light mb-1">{{ species }}</p>
+                    <p class="small text-light mb-1">{{ wav_path }}</p>
+                    <p class="small text-light mb-1">{{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</p>
+                    <p class="small text-muted mb-1">By: {{ task.created_by.username }}
+                    {% if task.created_by == request.user %}(you){% endif %}</p>
+                    <p class="small text-muted mb-1">Team: {{ task.team.name|default:"None" }}</p>
+                    <p class="small text-muted mb-1">Project: {{ task.project }}</p>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="{% url 'battycoda_app:task_list' %}" class="btn btn-sm btn-outline-secondary">Back to Tasks</a>
+                    <a href="{% url 'battycoda_app:get_last_task' %}" class="btn btn-sm btn-outline-info">Last Task</a>
+                    <a href="{% url 'battycoda_app:get_next_task' %}" class="btn btn-sm btn-outline-primary">Skip to Next Task</a>
                 </div>
             </div>
-            <div>
-                <a href="{% url 'battycoda_app:task_list' %}" class="btn btn-outline-secondary me-2">Back to Tasks</a>
-                <a href="{% url 'battycoda_app:get_last_task' %}" class="btn btn-outline-info me-2">Last Task</a>
-                <a href="{% url 'battycoda_app:get_next_task' %}" class="btn btn-outline-primary">Skip to Next Task</a>
-            </div>
         </div>
-    </div>
-
-    <div class="simplified-container">
-        <div class="row">
-            <!-- Main spectrogram section -->
-            <div class="col-md-8">
-                <h3>Spectrogram</h3>
-                <div id="spectrogram-container" class="mb-3">
-                    <div class="d-flex justify-content-center align-items-center spectrogram-container">
-                        <!-- Use pre-generated spectrogram URL if available -->
-                        <img src="{{ spectrogram_urls.channel_0_detail|default:"/spectrogram/?wav_path="|add:full_path|urlencode|add:"&call=0&channel=0&numcalls=1&hash="|add:file_hash|add:"&overview=0&contrast=4.0&onset="|add:task.onset|stringformat:"s"|add:"&offset="|add:task.offset|stringformat:"s" }}" 
-                             alt="Spectrogram" 
-                             id="main-spectrogram">
+        
+        <!-- Main content area -->
+        <div class="col-md-8">
+            <div class="spectrogram-section p-3 rounded shadow-sm" style="background-color: #1e1e1e;">
+                <h3 class="mb-2">Spectrogram</h3>
+                <div id="spectrogram-container" class="mb-2">
+                    <div class="spectrogram-wrapper">
+                        <!-- Spectrogram with axes -->
+                        <div class="d-flex justify-content-center align-items-center spectrogram-container">
+                            <!-- Use pre-generated spectrogram URL if available -->
+                            <img src="{{ spectrogram_urls.channel_0_detail }}" 
+                                 alt="Spectrogram" 
+                                 id="main-spectrogram">
+                                 
+                            <!-- Y-axis ticks overlay -->
+                            <div class="y-axis-ticks">
+                                <div class="y-tick" style="top: 0%">100 kHz</div>
+                                <div class="y-tick" style="top: 20%">80 kHz</div>
+                                <div class="y-tick" style="top: 40%">60 kHz</div>
+                                <div class="y-tick" style="top: 60%">40 kHz</div>
+                                <div class="y-tick" style="top: 80%">20 kHz</div>
+                                <div class="y-tick" style="top: 100%">0 kHz</div>
+                            </div>
+                            
+                            <!-- X-axis ticks overlay -->
+                            <div class="x-axis-ticks">
+                                <div class="x-tick" style="left: 0%">-{{ normal_hwin|default:"8" }} ms</div>
+                                <div class="x-tick" style="left: 50%">0.00 s</div>
+                                <div class="x-tick" style="left: 100%">+{{ normal_hwin|default:"8" }} ms</div>
+                            </div>
+                            
+                            <!-- Axis labels -->
+                            <div class="y-axis-label">Frequency (kHz)</div>
+                            <div class="x-axis-label">Time (s)</div>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Spectrogram controls -->
-                <div class="controls-simple mt-3 mb-3">
+                <!-- Spectrogram controls - moved closer to spectrogram -->
+                <div class="controls-simple mt-1 mb-3">
                     <div class="row align-items-center">
                         <div class="col-md-6">
                             <div class="d-flex">
-                                <button id="detail-view-btn" class="btn btn-primary me-2 active">Detail View</button>
-                                <button id="overview-btn" class="btn btn-outline-secondary">Overview</button>
+                                <button id="detail-view-btn" class="btn btn-sm btn-primary me-2 active">Detail View</button>
+                                <button id="overview-btn" class="btn btn-sm btn-outline-secondary">Overview</button>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -122,91 +147,97 @@
                             channelLabel.textContent = `Channel ${currentChannel + 1}`;
                             updateSpectrogram();
                         });
+                        
+                        // Call updateSpectrogram on page load to ensure the image is loaded immediately
+                        updateSpectrogram();
                     });
                 </script>
                 
-                <!-- Audio section -->
-                <div class="audio-section mt-4">
-                    <h3>Audio Playback</h3>
-                    <div class="mt-2">
+                <!-- Audio section - reduced top margin -->
+                <div class="audio-section mt-3">
+                    <h4 class="mb-2">Audio Playback</h4>
+                    <div>
                         <audio controls src="{% url 'battycoda_app:audio_snippet' %}?wav_path={{ full_path|urlencode }}&call=0&channel=0&hash={{ file_hash }}&overview=False&onset={{ task.onset }}&offset={{ task.offset }}" preload="auto" class="w-100">
                             Your browser does not support the audio element.
                         </audio>
                     </div>
                 </div>
                 
-                <!-- Static configuration -->
-                <div class="configuration-info mt-4">
+                <!-- Static configuration - more compact -->
+                <div class="configuration-info mt-2 small text-muted">
                     <div class="row">
-                        <div class="col-md-6 mb-2">
-                            <p><strong>Contrast:</strong> 4.0</p>
+                        <div class="col-md-6">
+                            <span><strong>Contrast:</strong> 4.0</span>
                         </div>
-                        <div class="col-md-6 mb-2">
-                            <p><strong>Channel:</strong> 1</p>
+                        <div class="col-md-6">
+                            <span><strong>Channel:</strong> 1</span>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
             
-            <!-- Call type section with form -->
-            <div class="col-md-4">
-                <div class="call-type">
-                    <form method="post" id="task-form">
-                        {% csrf_token %}
-                        <h3>Task Classification</h3>
-                        
-                        <div class="mb-3">
-                            <p><strong>Task ID:</strong> #{{ task.id }}</p>
-                            <p><strong>Species:</strong> {{ species }}</p>
-                            <p><strong>Project:</strong> {{ task.project }}</p>
-                            <p><strong>Segment:</strong> {{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</p>
-                        </div>
-                        
-                        <h4 class="mt-4">Select Label</h4>
-                        
-                        <!-- Dynamic call types from the species text file -->
-                        {% if call_types %}
-                            {% for call_type in call_types %}
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="radio" id="{{ call_type|slugify }}" name="type_call" value="{{ call_type }}">
-                                <label class="form-check-label" for="{{ call_type|slugify }}" 
-                                      title="{{ call_descriptions|get_item:call_type }}">
-                                    {{ call_type }}
-                                </label>
-                            </div>
-                            {% endfor %}
-                        {% else %}
-                            <!-- Default options if no call types found -->
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="radio" id="correct" name="type_call" value="correct">
-                                <label class="form-check-label" for="correct">Correctly classified</label>
-                            </div>
-                            
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="radio" id="Unsure" name="type_call" value="Unsure">
-                                <label class="form-check-label" for="Unsure">Unsure</label>
-                            </div>
-                        {% endif %}
-                        
-                        <!-- Unknown option before Other -->
+        <!-- Task classification sidebar -->
+        <div class="col-md-2">
+            <div class="task-classification p-3 rounded shadow-sm" style="background-color: #262626; height: 100%;">
+                <!-- Classification header -->
+                <h4 class="mb-3">Task Classification</h4>
+                
+                <!-- Call type selection form -->
+                <form method="post" id="task-form">
+                    {% csrf_token %}
+                    <h5 class="mb-3">Select Label</h5>
+                    
+                    <!-- Dynamic call types from the species text file -->
+                    {% if call_types %}
+                        {% for call_type in call_types %}
                         <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" id="Unknown" name="type_call" value="Unknown" checked>
-                            <label class="form-check-label" for="Unknown">Unknown</label>
+                            <input class="form-check-input" type="radio" id="{{ call_type|slugify }}" name="type_call" value="{{ call_type }}">
+                            <label class="form-check-label" for="{{ call_type|slugify }}">
+                                {{ call_type }}
+                            </label>
                         </div>
-                        
-                        <!-- Always include Other option -->
+                        {% endfor %}
+                    {% else %}
+                        <!-- Default options if no call types found -->
                         <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" id="Other" name="type_call" value="">
-                            <label class="form-check-label" for="Other">Other:</label>
-                            <input type="text" class="form-control mt-1" id="other-input" name="other_call">
+                            <input class="form-check-input" type="radio" id="correct" name="type_call" value="correct">
+                            <label class="form-check-label" for="correct">Correctly classified</label>
                         </div>
                         
-                        <div class="mt-4">
-                            <button type="submit" name="mark_done" class="btn btn-success btn-lg w-100">
-                                Mark as Done with Selected Label
-                            </button>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" id="Unsure" name="type_call" value="Unsure">
+                            <label class="form-check-label" for="Unsure">Unsure</label>
                         </div>
-                    </form>
+                    {% endif %}
+                    
+                    <!-- Unknown option before Other -->
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" id="Unknown" name="type_call" value="Unknown" checked>
+                        <label class="form-check-label" for="Unknown">Unknown</label>
+                    </div>
+                    
+                    <!-- Always include Other option -->
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" id="Other" name="type_call" value="">
+                        <label class="form-check-label" for="Other">Other:</label>
+                        <input type="text" class="form-control mt-1" id="other-input" name="other_call">
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" name="mark_done" class="btn btn-success btn-lg w-100">
+                            Mark as Done
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Task info section - placed below the form -->
+                <div class="classification-info mt-4 pt-4 border-top border-secondary">
+                    <h5 class="mb-3">Task Details</h5>
+                    <p class="small text-light mb-1"><strong>Task ID:</strong> #{{ task.id }}</p>
+                    <p class="small text-light mb-1"><strong>Species:</strong> {{ species }}</p>
+                    <p class="small text-light mb-1"><strong>Project:</strong> {{ task.project }}</p>
+                    <p class="small text-light mb-1"><strong>Segment:</strong> {{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</p>
                 </div>
             </div>
         </div>
@@ -231,6 +262,13 @@
     body {
         background-color: #121212;
         color: #e0e0e0;
+        min-height: 100vh;
+    }
+    
+    /* Make sidebars sticky */
+    .row {
+        display: flex;
+        min-height: calc(100vh - 30px);
     }
     
     /* Simplified container */
@@ -247,10 +285,92 @@
         object-fit: contain;
     }
     
+    /* Spectrogram styling with axis support */
+    .spectrogram-wrapper {
+        position: relative;
+        width: 100%;
+        padding: 30px 40px 30px 80px; /* Padding for axes (top, right, bottom, left) - reduced bottom padding */
+        margin-bottom: 10px; /* Reduced bottom margin */
+    }
+    
     .spectrogram-container {
+        position: relative;
         min-height: 300px;
         width: 100%;
         overflow: visible;
+    }
+    
+    /* X-axis styling */
+    .x-axis-ticks {
+        position: absolute;
+        bottom: -30px;
+        left: 0;
+        right: 0;
+        height: 20px;
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .x-tick {
+        position: absolute;
+        font-size: 12px;
+        color: #aaa;
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }
+    
+    .x-axis-label {
+        position: absolute;
+        bottom: -45px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 14px;
+        font-weight: 500;
+        color: #ddd;
+    }
+    
+    /* Y-axis styling */
+    .y-axis-ticks {
+        position: absolute;
+        top: 0;
+        left: -65px;
+        height: 100%;
+        width: 60px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .y-tick {
+        position: absolute;
+        font-size: 12px;
+        color: #aaa;
+        text-align: right;
+        width: 100%;
+        transform: translateY(-50%);
+        white-space: nowrap;
+    }
+    
+    .y-axis-label {
+        position: absolute;
+        left: -75px;
+        top: 50%;
+        transform: rotate(-90deg) translate(0, -50%);
+        transform-origin: center left;
+        font-size: 14px;
+        font-weight: 500;
+        color: #ddd;
+        white-space: nowrap;
+    }
+    
+    /* Main spectrogram image */
+    #main-spectrogram {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        height: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        border: 1px solid #333;
     }
     
     .form-check {
@@ -294,6 +414,41 @@
         justify-content: center;
         min-height: 200px;
         width: 100%;
+    }
+    
+    /* Task sidebar styling */
+    .task-sidebar {
+        position: sticky;
+        top: 15px;
+        height: calc(100vh - 30px);
+        overflow-y: auto;
+    }
+    
+    .task-info p {
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.85rem;
+    }
+    
+    /* Task classification sidebar styling */
+    .task-classification {
+        position: sticky;
+        top: 15px;
+        height: calc(100vh - 30px);
+        overflow-y: auto;
+    }
+    
+    .classification-info p {
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.85rem;
+    }
+    
+    /* Make form labels smaller */
+    .form-check-label {
+        font-size: 0.9rem;
     }
 </style>
 {% endblock %}

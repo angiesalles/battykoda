@@ -48,15 +48,13 @@
             <tr>
                 <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Short Name</th>
                 <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Long Name</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Description</th>
             </tr>
         </thead>
         <tbody>
             {% for call in calls %}
             <tr>
                 <td style="padding: 8px; border-bottom: 1px solid #333;">{{ call.short_name }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ call.long_name }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ call.description|default:"" }}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ call.long_name|default:"" }}</td>
             </tr>
             {% endfor %}
         </tbody>

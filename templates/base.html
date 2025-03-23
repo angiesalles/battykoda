@@ -176,7 +176,9 @@
         <a href="{% url 'battycoda_app:task_list' %}">Tasks</a>
         <a href="{% url 'battycoda_app:species_list' %}">Species</a>
         <a href="{% url 'battycoda_app:project_list' %}">Projects</a>
-        <a href="{% url 'battycoda_app:team_list' %}">Teams</a>
+        {% if user.profile.is_admin and user.profile.team %}
+        <a href="{% url 'battycoda_app:team_users' %}">Users</a>
+        {% endif %}
         {% if user.is_staff %}
         <a href="{% url 'admin:index' %}">Admin</a>
         {% endif %}
@@ -189,7 +191,36 @@
         </a>
         <span class="me-3">Logged in as: <strong>{{ user.username }}</strong></span>
         <a href="{% url 'battycoda_app:profile' %}" style="margin-right: 15px;">Profile</a>
-        <a href="{% url 'battycoda_app:logout' %}" class="button">Logout</a>
+        
+        <!-- Team Dropdown -->
+        <div class="dropdown me-3">
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="teamDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                {% if user.profile.team %}Team: {{ user.profile.team.name }}{% else %}No Team{% endif %}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="teamDropdown">
+                <li><h6 class="dropdown-header">Your Teams</h6></li>
+                {% for membership in user.team_memberships.all %}
+                <li>
+                    <a class="dropdown-item {% if user.profile.team == membership.team %}active{% endif %}" 
+                       href="{% url 'battycoda_app:switch_team' team_id=membership.team.id %}">
+                        {{ membership.team.name }}
+                        {% if membership.is_admin %}<i class="fas fa-user-shield ms-1" title="Admin"></i>{% endif %}
+                        {% if user.profile.team == membership.team %}<i class="fas fa-check ms-2"></i>{% endif %}
+                    </a>
+                </li>
+                {% empty %}
+                <li><span class="dropdown-item">No teams available</span></li>
+                {% endfor %}
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'battycoda_app:create_team' %}">
+                    <i class="fas fa-plus-circle me-1"></i> Create New Team
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'battycoda_app:logout' %}">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a></li>
+            </ul>
+        </div>
         {% else %}
         <a href="{% url 'battycoda_app:login' %}" class="button">Login</a>
         <a href="{% url 'battycoda_app:register' %}" class="button" style="margin-left: 10px;">Register</a>

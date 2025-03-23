@@ -132,3 +132,147 @@ def available_species():
     except Exception as e:
         logger.error(f"Error getting available species: {str(e)}")
         return []
+        
+def import_default_species(user):
+    """Import default species (Carollia and Efuscus) for a new user's team
+    
+    Args:
+        user: The User object to import species for
+    
+    Returns:
+        list: List of created Species objects
+    """
+    from django.core.files import File
+    from .models import Species, Call
+    import traceback
+    import time
+    
+    # Add a delay to ensure user creation transaction is complete
+    time.sleep(1)
+    
+    logger.info(f"Importing default species for user {user.username}")
+    
+    # Get the user's team
+    team = user.profile.team
+    if not team:
+        logger.warning(f"User {user.username} has no team, skipping species import")
+        return []
+        
+    created_species = []
+    
+    # Define the default species to import
+    default_species = [
+        {
+            'name': 'Carollia',
+            'image_file': 'Carollia.png',
+            'call_file': 'Carollia.txt',
+            'description': 'Carollia is a genus of short-tailed leaf-nosed bats. Their calls include various types such as aggressive warbles, distress calls, and echolocation.'
+        },
+        {
+            'name': 'Efuscus',
+            'image_file': 'Efuscus.jpg',
+            'call_file': 'Efuscus.txt',
+            'description': 'Eptesicus fuscus (big brown bat) is a species found across North America. Their calls range from frequency-modulated sweeps to quasi-constant frequency calls.'
+        }
+    ]
+    
+    # Import each species
+    for species_data in default_species:
+        # Create a unique name for this team
+        unique_name = f"{species_data['name']} - {team.name}"
+        
+        # Skip if species already exists for this team
+        if Species.objects.filter(name=unique_name).exists():
+            logger.info(f"Species {unique_name} already exists")
+            continue
+            
+        try:
+            # Create the species with a unique name
+            species = Species.objects.create(
+                name=unique_name,
+                description=species_data['description'],
+                created_by=user,
+                team=team
+            )
+            logger.info(f"Created species {species.name} for team {team.name}")
+            
+            # Add the image if it exists
+            # Use explicit paths for Docker container
+            image_paths = [
+                f"/app/static/{species_data['image_file']}",
+                f"/home/ubuntu/battycoda/static/{species_data['image_file']}",
+            ]
+            
+            image_found = False
+            for image_path in image_paths:
+                logger.info(f"Looking for image at {image_path}")
+                if os.path.exists(image_path):
+                    logger.info(f"Found image at {image_path}")
+                    with open(image_path, 'rb') as img_file:
+                        species.image.save(species_data['image_file'], File(img_file), save=True)
+                    logger.info(f"Saved image for {species.name}")
+                    image_found = True
+                    break
+                    
+            if not image_found:
+                logger.warning(f"Image file not found for {species_data['name']}")
+            
+            # Parse call types from the text file
+            call_paths = [
+                f"/app/static/{species_data['call_file']}",
+                f"/home/ubuntu/battycoda/static/{species_data['call_file']}",
+            ]
+            
+            call_file_found = False
+            for call_path in call_paths:
+                logger.info(f"Looking for call file at {call_path}")
+                if os.path.exists(call_path):
+                    logger.info(f"Found call file at {call_path}")
+                    call_count = 0
+                    
+                    with open(call_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                        logger.info(f"Read {len(file_content)} bytes from {call_path}")
+                        
+                        # Process each line 
+                        for line in file_content.splitlines():
+                            line = line.strip()
+                            if not line:
+                                continue
+                                
+                            if ',' in line:
+                                short_name, long_name = line.split(',', 1)
+                            elif '|' in line:
+                                short_name, long_name = line.split('|', 1)
+                            elif '\t' in line:
+                                short_name, long_name = line.split('\t', 1)
+                            else:
+                                # If no separator, use whole line as short_name and leave long_name empty
+                                short_name = line
+                                long_name = ""
+                                
+                            short_name = short_name.strip()
+                            long_name = long_name.strip()
+                            
+                            # Create the call
+                            Call.objects.create(
+                                species=species,
+                                short_name=short_name,
+                                long_name=long_name if long_name else None
+                            )
+                            call_count += 1
+                    
+                    logger.info(f"Created {call_count} calls for species {species.name}")
+                    call_file_found = True
+                    break
+            
+            if not call_file_found:
+                logger.warning(f"Call file not found for {species_data['name']}")
+            
+            created_species.append(species)
+            
+        except Exception as e:
+            logger.error(f"Error importing species {species_data['name']}: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+    return created_species

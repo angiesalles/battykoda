@@ -21,7 +21,7 @@
                     <h5 class="mb-0">Current Team Members</h5>
                 </div>
                 <div class="card-body">
-                    {% if team_members %}
+                    {% if team_memberships %}
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -33,12 +33,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for member in team_members %}
+                                    {% for membership in team_memberships %}
                                         <tr>
-                                            <td>{{ member.user.username }}</td>
-                                            <td>{{ member.user.email }}</td>
+                                            <td>{{ membership.user.username }}</td>
+                                            <td>{{ membership.user.email }}</td>
                                             <td>
-                                                {% if member.is_admin %}
+                                                {% if membership.is_admin %}
                                                     <span class="badge bg-primary">Yes</span>
                                                 {% else %}
                                                     <span class="badge bg-secondary">No</span>
@@ -48,9 +48,9 @@
                                                 <div class="btn-group">
                                                     <form method="post">
                                                         {% csrf_token %}
-                                                        <input type="hidden" name="user_id" value="{{ member.id }}">
+                                                        <input type="hidden" name="user_id" value="{{ membership.user.id }}">
                                                         <button type="submit" name="toggle_admin" class="btn btn-sm btn-outline-primary">
-                                                            {% if member.is_admin %}
+                                                            {% if membership.is_admin %}
                                                                 <i class="fas fa-user-minus"></i> Remove Admin
                                                             {% else %}
                                                                 <i class="fas fa-user-shield"></i> Make Admin
@@ -59,7 +59,7 @@
                                                     </form>
                                                     <form method="post" class="ms-2">
                                                         {% csrf_token %}
-                                                        <input type="hidden" name="user_id" value="{{ member.id }}">
+                                                        <input type="hidden" name="user_id" value="{{ membership.user.id }}">
                                                         <button type="submit" name="remove_user" class="btn btn-sm btn-outline-danger">
                                                             <i class="fas fa-user-minus"></i> Remove
                                                         </button>
@@ -99,8 +99,8 @@
                                 <tbody>
                                     {% for user in non_team_users %}
                                         <tr>
-                                            <td>{{ user.user.username }}</td>
-                                            <td>{{ user.user.email }}</td>
+                                            <td>{{ user.username }}</td>
+                                            <td>{{ user.email }}</td>
                                             <td>
                                                 <form method="post">
                                                     {% csrf_token %}
@@ -120,6 +120,13 @@
                             No available users to add to this team.
                         </div>
                     {% endif %}
+                </div>
+                
+                <div class="card-footer bg-light">
+                    <p class="mb-0">
+                        <i class="fas fa-info-circle text-info me-1"></i>
+                        You can also <a href="{% url 'battycoda_app:invite_user' %}">invite new users</a> to join your team.
+                    </p>
                 </div>
             </div>
         </div>

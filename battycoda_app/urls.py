@@ -36,6 +36,7 @@ urlpatterns = [
     path('tasks/batches/create/', views.create_task_batch_view, name='create_task_batch'),
     path('tasks/next/', views.get_next_task_view, name='get_next_task'),
     path('tasks/last/', views.get_last_task_view, name='get_last_task'),
+    path('tasks/batch/<int:batch_id>/annotate/', views.get_next_task_from_batch_view, name='annotate_batch'),
     path('tasks/annotate/<int:task_id>/', views.task_annotation_view, name='annotate_task'),
     
     # Species management routes
@@ -43,6 +44,7 @@ urlpatterns = [
     path('species/<int:species_id>/', views.species_detail_view, name='species_detail'),
     path('species/create/', views.create_species_view, name='create_species'),
     path('species/<int:species_id>/edit/', views.edit_species_view, name='edit_species'),
+    path('species/parse-calls-file/', views.parse_calls_file_view, name='parse_calls_file'),
     
     # Project management routes
     path('projects/', views.project_list_view, name='project_list'),
@@ -56,4 +58,13 @@ urlpatterns = [
     path('teams/create/', views.create_team_view, name='create_team'),
     path('teams/<int:team_id>/edit/', views.edit_team_view, name='edit_team'),
     path('teams/<int:team_id>/members/', views.manage_team_members_view, name='manage_team_members'),
+    path('teams/switch/<int:team_id>/', views.switch_team_view, name='switch_team'),
+    
+    # Team users and invitations
+    path('users/', views.team_users_view, name='team_users'),
+    path('users/invite/', views.invite_user_view, name='invite_user'),
+    path('invitation/<str:token>/', views.accept_invitation_view, name='accept_invitation'),
+    
+    # Debug route
+    path('debug/teams/', views.debug_teams_view, name='debug_teams'),
 ]

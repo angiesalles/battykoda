@@ -43,6 +43,12 @@
                         {% endwith %}
                         {% endwith %}
                         
+                        <div class="mt-3">
+                            <a href="{% url 'battycoda_app:annotate_batch' batch.id %}" class="btn btn-primary">
+                                <i class="fas fa-tasks"></i> Annotate Tasks
+                            </a>
+                        </div>
+                        
                         <div class="mt-2 small">
                             <span class="badge bg-warning">Pending: {{ tasks|count_by_status:"pending" }}</span>
                             <span class="badge bg-info ms-1">In Progress: {{ tasks|count_by_status:"in_progress" }}</span>

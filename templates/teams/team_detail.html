@@ -28,7 +28,7 @@
                 <div class="card-body">
                     <p><strong>Description:</strong> {{ team.description|default:"No description provided" }}</p>
                     <p><strong>Created At:</strong> {{ team.created_at|date:"F d, Y" }}</p>
-                    <p><strong>Total Members:</strong> {{ members.count }}</p>
+                    <p><strong>Total Members:</strong> {{ team.team_memberships.count }}</p>
                 </div>
             </div>
 
@@ -42,7 +42,7 @@
                     {% endif %}
                 </div>
                 <div class="card-body">
-                    {% if members %}
+                    {% if team.team_memberships.all %}
                         <div class="table-responsive">
                             <table class="table table-sm">
                                 <thead>
@@ -53,12 +53,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for member in members %}
+                                    {% for membership in team.team_memberships.all %}
                                         <tr>
-                                            <td>{{ member.user.username }}</td>
-                                            <td>{{ member.user.email }}</td>
+                                            <td>{{ membership.user.username }}</td>
+                                            <td>{{ membership.user.email }}</td>
                                             <td>
-                                                {% if member.is_admin %}
+                                                {% if membership.is_admin %}
                                                     <span class="badge bg-primary">Admin</span>
                                                 {% else %}
                                                     <span class="badge bg-secondary">Member</span>

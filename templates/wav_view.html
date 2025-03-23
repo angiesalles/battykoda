@@ -203,8 +203,7 @@
                 {% for call_type in call_types %}
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" id="{{ call_type|slugify }}" name="type_call" value="{{ call_type }}">
-                    <label class="form-check-label" for="{{ call_type|slugify }}" 
-                           title="{{ call_descriptions|get_item:call_type }}">
+                    <label class="form-check-label" for="{{ call_type|slugify }}">
                         {{ call_type }}
                     </label>
                 </div>
@@ -252,13 +251,14 @@
             <div class="mt-3">
                 <p>Species template:</p>
                 <div id="species-template-container">
-                    <!-- Try direct static path, fallback to our test endpoint -->
+                    <!-- Only show species template if available -->
+                    {% if species %}
                     <img id="species-template" class="img-fluid" alt="Species Template" 
-                         src="{% static 'broken_image.png' %}" 
-                         {% if species %}
-                         data-species-img="{% static species|add:'.jpg' %}" 
-                         onload="if (this.getAttribute('data-species-img')) this.src = this.getAttribute('data-species-img');"
-                         {% endif %}>
+                         src="{% static species|add:'.jpg' %}"
+                         onerror="this.style.display='none'; this.parentNode.innerHTML += '<div class=\'text-muted\'>No template image available</div>'">
+                    {% else %}
+                    <div class="text-muted">No species selected</div>
+                    {% endif %}
                 </div>
             </div>
         </div>

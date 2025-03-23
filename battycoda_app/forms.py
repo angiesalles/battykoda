@@ -41,7 +41,7 @@ class TaskBatchForm(forms.ModelForm):
     
     class Meta:
         model = TaskBatch
-        fields = ['name', 'species', 'project', 'wav_file', 'team']
+        fields = ['name', 'species', 'project', 'wav_file']
         # hidden wav_file_name field that will be auto-populated from the wav_file
         
     def __init__(self, *args, **kwargs):
@@ -62,20 +62,12 @@ class TaskBatchForm(forms.ModelForm):
                 # Filter querysets
                 self.fields['species'].queryset = self.fields['species'].queryset.filter(team=profile.team)
                 self.fields['project'].queryset = self.fields['project'].queryset.filter(team=profile.team)
-                
-                # Set team field to user's team
-                self.fields['team'].queryset = Team.objects.filter(id=profile.team.id)
-                self.fields['team'].initial = profile.team
-                
-                # Only disable if not admin
-                if not profile.is_admin:
-                    self.fields['team'].disabled = True
 
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
         fields = ['wav_file_name', 'onset', 'offset', 'species', 'project', 'status', 
-                  'is_done', 'label', 'classification_result', 'confidence', 'notes', 'team']
+                  'is_done', 'label', 'classification_result', 'confidence', 'notes']
         widgets = {
             'onset': forms.NumberInput(attrs={'step': '0.01'}),
             'offset': forms.NumberInput(attrs={'step': '0.01'}),
@@ -101,14 +93,6 @@ class TaskForm(forms.ModelForm):
                 # Filter querysets
                 self.fields['species'].queryset = self.fields['species'].queryset.filter(team=profile.team)
                 self.fields['project'].queryset = self.fields['project'].queryset.filter(team=profile.team)
-                
-                # Set team field to user's team
-                self.fields['team'].queryset = Team.objects.filter(id=profile.team.id)
-                self.fields['team'].initial = profile.team
-                
-                # Only disable if not admin
-                if not profile.is_admin:
-                    self.fields['team'].disabled = True
         
 class TaskUpdateForm(forms.ModelForm):
     """Form for updating task status and labels"""
@@ -127,36 +111,24 @@ class SpeciesForm(forms.ModelForm):
     
     class Meta:
         model = Species
-        fields = ['name', 'scientific_name', 'description', 'image', 'team']
+        fields = ['name', 'description', 'image']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
-        
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-        
-        if user:
-            # Get or create user profile
-            from .models import UserProfile
-            profile, created = UserProfile.objects.get_or_create(user=user)
-            
-            # Filter and set team field based on user's profile
-            if profile.team:
-                self.fields['team'].queryset = Team.objects.filter(id=profile.team.id)
-                self.fields['team'].initial = profile.team
-                
-                # Only disable if not admin
-                if not profile.is_admin:
-                    self.fields['team'].disabled = True
+
+class SpeciesEditForm(forms.ModelForm):
+    """Form for editing species without calls file upload"""
+    class Meta:
+        model = Species
+        fields = ['name', 'description', 'image']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+        }
 
 class CallForm(forms.ModelForm):
     class Meta:
         model = Call
-        fields = ['short_name', 'long_name', 'description']
-        widgets = {
-            'description': forms.Textarea(attrs={'rows': 2}),
-        }
+        fields = ['short_name', 'long_name']
 
 class CallFormSet(forms.BaseModelFormSet):
     def __init__(self, *args, **kwargs):
@@ -174,28 +146,10 @@ CallFormSetFactory = forms.modelformset_factory(
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'description', 'team']
+        fields = ['name', 'description']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
-        
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-        
-        if user:
-            # Get or create user profile
-            from .models import UserProfile
-            profile, created = UserProfile.objects.get_or_create(user=user)
-            
-            # Filter and set team field based on user's profile
-            if profile.team:
-                self.fields['team'].queryset = Team.objects.filter(id=profile.team.id)
-                self.fields['team'].initial = profile.team
-                
-                # Only disable if not admin
-                if not profile.is_admin:
-                    self.fields['team'].disabled = True
             
 class TeamForm(forms.ModelForm):
     class Meta:
@@ -204,3 +158,9 @@ class TeamForm(forms.ModelForm):
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+        
+class TeamInvitationForm(forms.Form):
+    email = forms.EmailField(
+        label='Email Address',
+        help_text='Enter the email address of the person you want to invite to your team'
+    )

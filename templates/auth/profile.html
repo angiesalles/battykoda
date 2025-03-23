@@ -24,21 +24,52 @@
     <div style="margin-bottom: 20px;">
         <div class="section-title">Team Information</div>
         <div style="margin-left: 10px;">
-            {% if profile.team %}
-                <p><strong>Team:</strong> <a href="{% url 'battycoda_app:team_detail' profile.team.id %}">{{ profile.team.name }}</a></p>
-                <p><strong>Role:</strong> {% if profile.is_admin %}Team Administrator{% else %}Team Member{% endif %}</p>
+            {% if team_memberships %}
+                <p><strong>Active Team:</strong> 
+                    {% if active_team %}
+                        <a href="{% url 'battycoda_app:team_detail' active_team.id %}">{{ active_team.name }}</a>
+                    {% else %}
+                        None selected
+                    {% endif %}
+                </p>
+                
+                <p><strong>Your Teams:</strong></p>
+                <div class="list-group" style="margin-bottom: 15px;">
+                    {% for membership in team_memberships %}
+                    <div class="list-group-item" style="background-color: #333; border-color: #444; margin-bottom: 4px;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{% url 'battycoda_app:team_detail' membership.team.id %}" class="text-white">
+                                    {{ membership.team.name }}
+                                </a>
+                                {% if membership.team.id == active_team.id %}
+                                <span class="badge bg-success ms-2">Active</span>
+                                {% endif %}
+                                {% if membership.is_admin %}
+                                <span class="badge bg-info ms-2">Admin</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                {% if membership.team.id != active_team.id %}
+                                <a href="{% url 'battycoda_app:switch_team' membership.team.id %}" class="btn btn-sm btn-outline-light">
+                                    Switch to this team
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <p><a href="{% url 'battycoda_app:team_list' %}" class="btn btn-primary btn-sm">Manage Teams</a></p>
             {% else %}
                 <p>You are not assigned to any team yet. Please contact an administrator.</p>
             {% endif %}
         </div>
     </div>
     
-    <div style="margin-bottom: 20px;">
-        <div class="section-title">Your Storage</div>
-        <div style="margin-left: 10px;">
-            <a href="{% url 'battycoda_app:user_directory' username=user.username %}" class="button">Browse My Files</a>
-        </div>
-    </div>
+    <!-- Removed User Storage section as the user_directory URL is no longer available -->
+    <!-- According to urls.py Line 20: "Directory and file browsing functionality removed" -->
     
     <div style="margin-top: 30px;">
         <h3>Account Actions</h3>

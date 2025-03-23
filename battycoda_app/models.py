@@ -11,26 +11,130 @@ class Team(models.Model):
     
     def __str__(self):
         return self.name
+        
+class TeamInvitation(models.Model):
+    """Team invitation model for inviting users via email"""
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='invitations')
+    email = models.EmailField()
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invitations')
+    token = models.CharField(max_length=255, unique=True, help_text="Unique token for invitation link")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    accepted = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"Invitation to {self.team.name} for {self.email}"
+    
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return self.expires_at < timezone.now()
+
+# New model for team membership
+class TeamMembership(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='team_memberships')
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='team_memberships')
+    is_admin = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('user', 'team')
+        
+    def __str__(self):
+        return f"{self.user.username} in {self.team.name} ({'Admin' if self.is_admin else 'Member'})"
 
 # Create your models here.
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='members', null=True)
     is_admin = models.BooleanField(default=False, help_text="Designates whether this user is an administrator of their team")
-    # Cloudflare fields
-    cloudflare_id = models.CharField(max_length=255, blank=True, null=True)
-    is_cloudflare_user = models.BooleanField(default=False)
-    cloudflare_email = models.EmailField(blank=True, null=True)
-    last_cloudflare_login = models.DateTimeField(blank=True, null=True)
+    # Authentication fields (previously Cloudflare fields, kept for data compatibility)
+    cloudflare_id = models.CharField(max_length=255, blank=True, null=True, help_text="Deprecated - kept for data compatibility")
+    is_cloudflare_user = models.BooleanField(default=False, help_text="Deprecated - kept for data compatibility")
+    cloudflare_email = models.EmailField(blank=True, null=True, help_text="Deprecated - kept for data compatibility")
+    last_cloudflare_login = models.DateTimeField(blank=True, null=True, help_text="Deprecated - kept for data compatibility")
     
     def __str__(self):
         return self.user.username
+        
+    @property
+    def available_teams(self):
+        """Get all teams the user is a member of through TeamMembership"""
+        # Get teams from memberships
+        membership_teams = Team.objects.filter(team_memberships__user=self.user).order_by('name')
+        
+        # Move current team to the front if it exists
+        if self.team:
+            result = list(membership_teams)
+            if self.team in result:
+                result.remove(self.team)
+            return [self.team] + result
+            
+        return membership_teams
+    
+    @property
+    def is_admin_of_team(self, team_id):
+        """Check if user is admin of the specified team"""
+        return TeamMembership.objects.filter(
+            user=self.user,
+            team_id=team_id,
+            is_admin=True
+        ).exists()
 
 # Create user profile when user is created
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
-        UserProfile.objects.create(user=instance)
+        import logging
+        logger = logging.getLogger('battycoda.models')
+        
+        # First create the profile
+        profile = UserProfile.objects.create(user=instance)
+        
+        # Create a new team for this user
+        team_name = f"{instance.username}'s Team"
+        team = Team.objects.create(
+            name=team_name,
+            description=f"Personal team for {instance.username}"
+        )
+        
+        # Assign the user to their own team and make them an admin
+        profile.team = team
+        profile.is_admin = True
+        profile.save()
+        
+        # Create team membership record
+        TeamMembership.objects.create(
+            user=instance,
+            team=team,
+            is_admin=True
+        )
+        
+        # Create a demo project for the user
+        try:
+            # Import here to avoid circular imports
+            Project = sender.objects.model._meta.apps.get_model('battycoda_app', 'Project')
+            
+            # Generate a unique project name
+            project_name = f"Demo Project - {instance.username}"
+            
+            Project.objects.create(
+                name=project_name,
+                description=f"Demo project created automatically for {instance.username}",
+                created_by=instance,
+                team=team
+            )
+            logger.info(f"Created demo project '{project_name}' for user {instance.username}")
+        except Exception as e:
+            logger.error(f"Error creating demo project for user {instance.username}: {str(e)}")
+            
+        # Import default species in a separate try block
+        try:
+            from .utils import import_default_species
+            created_species = import_default_species(instance)
+            logger.info(f"Created {len(created_species)} default species for user {instance.username}")
+        except Exception as e:
+            logger.error(f"Error importing default species for user {instance.username}: {str(e)}")
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
@@ -39,7 +143,7 @@ def save_user_profile(sender, instance, **kwargs):
 # Species model for bat species
 class Species(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    scientific_name = models.CharField(max_length=255, blank=True, null=True)
+    # scientific_name field removed
     description = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to='species_images/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -57,8 +161,8 @@ class Species(models.Model):
 class Call(models.Model):
     species = models.ForeignKey(Species, on_delete=models.CASCADE, related_name='calls')
     short_name = models.CharField(max_length=50)
-    long_name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
+    long_name = models.CharField(max_length=255, blank=True, null=True)
+    # description field removed
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:

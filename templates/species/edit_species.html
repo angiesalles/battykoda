@@ -21,17 +21,7 @@
             {% endif %}
         </div>
         
-        <div style="margin-bottom: 15px;">
-            <label for="id_scientific_name" style="display: block; margin-bottom: 5px;">Scientific Name:</label>
-            {{ form.scientific_name }}
-            {% if form.scientific_name.errors %}
-            <div style="color: #e57373; margin-top: 5px;">
-                {% for error in form.scientific_name.errors %}
-                {{ error }}
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+        <!-- Scientific Name field removed -->
         
         <div style="margin-bottom: 15px;">
             <label for="id_description" style="display: block; margin-bottom: 5px;">Description:</label>
@@ -64,18 +54,6 @@
         
         <h3>Call Types</h3>
         
-        <div style="margin-bottom: 15px;">
-            <label for="id_calls_file" style="display: block; margin-bottom: 5px;">Import Calls from File:</label>
-            {{ form.calls_file }}
-            <p style="font-size: 0.8em; margin-top: 5px;">Upload a text file with call types (one per line, format: short_name,long_name)</p>
-            {% if form.calls_file.errors %}
-            <div style="color: #e57373; margin-top: 5px;">
-                {% for error in form.calls_file.errors %}
-                {{ error }}
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
         
         <div style="margin-bottom: 20px; padding: 15px; background-color: #2a2a2a; border-radius: 5px;">
             <h4 style="margin-top: 0;">Edit Call Types</h4>
@@ -86,7 +64,6 @@
                     <tr>
                         <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Short Name</th>
                         <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Long Name</th>
-                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Description</th>
                         <th style="text-align: center; padding: 8px; border-bottom: 1px solid #333;">Delete</th>
                     </tr>
                 </thead>
@@ -113,16 +90,7 @@
                             </div>
                             {% endif %}
                         </td>
-                        <td style="padding: 8px; border-bottom: 1px solid #333;">
-                            {{ call_form.description }}
-                            {% if call_form.description.errors %}
-                            <div style="color: #e57373; margin-top: 5px;">
-                                {% for error in call_form.description.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </td>
+                        <!-- Description field removed -->
                         <td style="padding: 8px; border-bottom: 1px solid #333; text-align: center;">
                             {{ call_form.DELETE }}
                             {{ call_form.id }}
@@ -159,8 +127,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('id_' + prefix + '-TOTAL_FORMS').value = formCount;
     }
     
-    // Add new call form
-    addCallButton.addEventListener('click', function() {
+    // Function to add a new call form with pre-filled values
+    function addCallFormWithValues(shortName = '', longName = '', description = '') {
         // Clone the first form
         const callForms = document.querySelectorAll('.call-form');
         if (callForms.length === 0) {
@@ -194,13 +162,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        // Set values if provided
+        const shortNameInput = newForm.querySelector('input[name$="-short_name"]');
+        const longNameInput = newForm.querySelector('input[name$="-long_name"]');
+        const descriptionInput = newForm.querySelector('textarea[name$="-description"]');
+        
+        if (shortNameInput && shortName) shortNameInput.value = shortName;
+        if (longNameInput && longName) longNameInput.value = longName;
+        if (descriptionInput && description) descriptionInput.value = description;
+        
         // Add the new form to the table
         callFormsetTable.appendChild(newForm);
         
         // Increment form count
         formCount++;
         updateFormCount();
+    }
+    
+    // Add empty call form
+    addCallButton.addEventListener('click', function() {
+        addCallFormWithValues();
     });
+    
+    // No file loading functionality in edit mode
 });
 </script>
 {% endblock %}
