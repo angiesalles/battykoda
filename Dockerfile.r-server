@@ -1,0 +1,25 @@
+# Dockerfile for R-direct server
+FROM r-base:latest
+
+# Install required system dependencies
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libfftw3-dev \
+    libsndfile1-dev \
+    libxml2-dev \
+    libsodium-dev \
+    pkg-config
+
+# Install required R packages
+RUN R -e "install.packages(c('plumber', 'class'), repos='https://cloud.r-project.org')"
+RUN R -e "install.packages('warbleR', repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+# Create necessary directories
+WORKDIR /app
+
+# Expose the port
+EXPOSE 8100
+
+# Command will be specified in docker-compose.yml
+CMD ["Rscript", "/app/r_server_direct.R"]

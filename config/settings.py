@@ -30,21 +30,26 @@ if env_file.exists():
 SECRET_KEY = 'django-insecure-r)5pg=&w_$mad+)iuy(o8zv9!f4saom0@#=tw$(@_b&xa51oga'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True  # Temporarily enable for troubleshooting
+# Get debug setting from environment, default to False for security
+DEBUG = os.environ.get('DJANGO_DEBUG', '0').lower() in ['true', 't', '1', 'yes', 'y']
 
-ALLOWED_HOSTS = ['*']  # Allow all hosts for now
+# Get domain name from environment
+DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')
+
+# Allow the domain name, www subdomain, localhost, and internal docker IPs
+ALLOWED_HOSTS = [DOMAIN_NAME, f'www.{DOMAIN_NAME}', 'localhost', '127.0.0.1', '[::1]']
 
 # CSRF trusted origins
 CSRF_TRUSTED_ORIGINS = ['http://*', 'https://*', 'https://battycoda.com', 'https://*.batlab.org', 'https://*.boergens.net', 'https://boergens.net', 'http://localhost', 'http://127.0.0.1']
 
 # Security settings for HTTPS - temporarily disabled until HTTPS is fully set up
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = False  # Temporarily disable until HTTPS is set up
-SESSION_COOKIE_SECURE = False  # Temporarily disable until HTTPS is set up
-CSRF_COOKIE_SECURE = False  # Temporarily disable until HTTPS is set up
-# SECURE_HSTS_SECONDS = 31536000  # Commented out until HTTPS is fully configured
-# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-# SECURE_HSTS_PRELOAD = True
+SECURE_SSL_REDIRECT = True  # Temporarily disable until HTTPS is set up
+SESSION_COOKIE_SECURE = True  # Temporarily disable until HTTPS is set up
+CSRF_COOKIE_SECURE = True  # Temporarily disable until HTTPS is set up
+SECURE_HSTS_SECONDS = 31536000  # Commented out until HTTPS is fully configured
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
 
 
 # Application definition

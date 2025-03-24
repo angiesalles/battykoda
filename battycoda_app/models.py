@@ -220,6 +220,131 @@ class TaskBatch(models.Model):
         return self.name
 
 
+# Classifier model for storing algorithm information
+class Classifier(models.Model):
+    name = models.CharField(max_length=255, help_text="Name of the classification algorithm")
+    description = models.TextField(blank=True, null=True, help_text="Description of how the algorithm works")
+    
+    # Response format choices
+    RESPONSE_FORMAT_CHOICES = (
+        ("full_probability", "Full Probability Distribution"),
+        ("highest_only", "Highest Probability Only"),
+    )
+    response_format = models.CharField(
+        max_length=20,
+        choices=RESPONSE_FORMAT_CHOICES,
+        help_text="Format of the response returned by this algorithm"
+    )
+    
+    # Celery task to call
+    celery_task = models.CharField(
+        max_length=255, 
+        help_text="Fully qualified Celery task name to execute this algorithm",
+        default="battycoda_app.audio.tasks.run_call_detection"
+    )
+    
+    # External service parameters
+    service_url = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        help_text="URL of the external service, if applicable"
+    )
+    endpoint = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        help_text="Endpoint path for the service"
+    )
+    
+    # Admin only flag
+    is_active = models.BooleanField(default=True, help_text="Whether this classifier is currently active")
+    created_at = models.DateTimeField(auto_now_add=True)
+    team = models.ForeignKey(
+        Team, 
+        on_delete=models.SET_NULL, 
+        related_name="classifiers", 
+        null=True,
+        blank=True,
+        help_text="Team that owns this classifier. If null, it's available to all teams"
+    )
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        ordering = ["name"]
+
+
+class DetectionRun(models.Model):
+    name = models.CharField(max_length=255)
+    batch = models.ForeignKey(TaskBatch, on_delete=models.CASCADE, related_name="detection_runs")
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="detection_runs")
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="detection_runs", null=True)
+    
+    # Algorithm type choices (for backward compatibility)
+    ALGORITHM_TYPE_CHOICES = (
+        ("full_probability", "Full Probability Distribution"),
+        ("highest_only", "Highest Probability Only"),
+    )
+    algorithm_type = models.CharField(
+        max_length=20, 
+        choices=ALGORITHM_TYPE_CHOICES, 
+        default="highest_only",
+        help_text="Whether the algorithm returns full probability distributions or only the highest probability"
+    )
+    
+    # Link to the classifier used
+    classifier = models.ForeignKey(
+        Classifier, 
+        on_delete=models.CASCADE, 
+        related_name="detection_runs",
+        null=True, 
+        blank=True,
+        help_text="The classifier algorithm used for this detection run"
+    )
+    
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    progress = models.FloatField(default=0.0, help_text="Progress percentage from 0-100")
+    error_message = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return f"{self.name} - {self.batch.name}"
+
+# Detection Result model for storing individual call detection probabilities
+class DetectionResult(models.Model):
+    detection_run = models.ForeignKey(DetectionRun, on_delete=models.CASCADE, related_name="results")
+    task = models.ForeignKey("Task", on_delete=models.CASCADE, related_name="detection_results")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ["task__onset"]
+    
+    def __str__(self):
+        return f"Detection for {self.task}"
+
+# Call probability model for storing probability for each call type
+class CallProbability(models.Model):
+    detection_result = models.ForeignKey(DetectionResult, on_delete=models.CASCADE, related_name="probabilities")
+    call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name="probabilities")
+    probability = models.FloatField(help_text="Probability value between 0-1")
+    
+    class Meta:
+        ordering = ["-probability"]
+    
+    def __str__(self):
+        return f"{self.call.short_name}: {self.probability:.2f}"
+
 # Task model for storing bat vocalization analysis tasks
 class Task(models.Model):
     # File information

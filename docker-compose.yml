@@ -14,14 +14,10 @@ services:
       - .env.local
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
+      - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
-      - AWS_SES_REGION_NAME=${AWS_SES_REGION_NAME}
-      - AWS_SES_ACCESS_KEY_ID=${AWS_SES_ACCESS_KEY_ID}
-      - AWS_SES_SECRET_ACCESS_KEY=${AWS_SES_SECRET_ACCESS_KEY}
-      - AWS_SES_CONFIGURATION_SET=${AWS_SES_CONFIGURATION_SET}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
     depends_on:
       - redis
     restart: unless-stopped
@@ -41,16 +37,14 @@ services:
       - data-volume:/app/media:rw
       - /home/ubuntu/template:/template:ro
     working_dir: /app
+    env_file:
+      - .env.local
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
+      - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
-      - AWS_SES_REGION_NAME=${AWS_SES_REGION_NAME}
-      - AWS_SES_ACCESS_KEY_ID=${AWS_SES_ACCESS_KEY_ID}
-      - AWS_SES_SECRET_ACCESS_KEY=${AWS_SES_SECRET_ACCESS_KEY}
-      - AWS_SES_CONFIGURATION_SET=${AWS_SES_CONFIGURATION_SET}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
     depends_on:
       - redis
     restart: unless-stopped
@@ -68,8 +62,11 @@ services:
     volumes:
       - ./:/app:rw
     working_dir: /app
+    env_file:
+      - .env.local
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
+      - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
@@ -93,7 +90,9 @@ services:
     restart: unless-stopped
 
   r-server-direct:
-    image: rocker/r-base:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.r-server
     ports:
       - "8100:8100"
     volumes:
@@ -104,20 +103,6 @@ services:
     command: >
       bash -c "
         Rscript r_server_direct.R
-      "
-
-  r-server-original:
-    image: rocker/r-base:latest
-    ports:
-      - "8101:8101"
-    volumes:
-      - ./:/app:rw
-      - r-libs:/usr/local/lib/R/site-library
-    working_dir: /app
-    restart: unless-stopped
-    command: >
-      bash -c "
-        Rscript r_prediction_server.R --port 8101
       "
 
 volumes:

@@ -156,7 +156,7 @@ This will start all required services:
 - Django web application on port 8060
 - Celery workers for task processing
 - Redis server for messaging
-- R servers for audio analysis (ports 8100 and 8101)
+- R server for audio analysis (port 8100)
 - Flower dashboard for monitoring Celery tasks (port 5555)
 
 ## Application Structure
@@ -214,8 +214,7 @@ battycoda/
 │   └── teams/                  # Team management templates
 ├── manage.py                   # Django management script
 ├── requirements.txt            # Python dependencies
-├── r_prediction_server.R       # R server for predictions
-├── r_server_direct.R           # Direct R server for audio analysis
+├── r_server_direct.R           # R server for audio analysis
 ├── setup_r_packages.R          # R package installation script
 └── docker-compose.yml          # Docker Compose configuration
 ```
@@ -619,16 +618,15 @@ Access the dashboard at `http://localhost:5555` when running with Docker.
 
 BattyCoda integrates with R for advanced audio analysis and machine learning classification.
 
-### R Servers
+### R Server
 
-Two R servers are provided:
+An R server is provided:
 
-1. **r_server_direct.R**: Direct R server using Plumber for API endpoints
-2. **r_prediction_server.R**: R server for predictions using the original model
+**r_server_direct.R**: R server using Plumber for API endpoints
 
 ### R API Endpoints
 
-The R servers provide several API endpoints:
+The R server provides several API endpoints:
 
 - `/ping`: Check if the server is running
 - `/classify`: Classify a bat call
@@ -652,7 +650,6 @@ The `docker-compose.yml` file defines several services:
 - **flower**: Flower dashboard for monitoring Celery tasks
 - **redis**: Redis server for message brokering
 - **r-server-direct**: R server using Plumber for API endpoints
-- **r-server-original**: R server for predictions using the original model
 
 ### Docker Volumes
 

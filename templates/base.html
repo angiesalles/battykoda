@@ -176,6 +176,7 @@
         <a href="{% url 'battycoda_app:task_list' %}">Tasks</a>
         <a href="{% url 'battycoda_app:species_list' %}">Species</a>
         <a href="{% url 'battycoda_app:project_list' %}">Projects</a>
+        <a href="{% url 'battycoda_app:automation_home' %}">Automation</a>
         {% if user.profile.is_admin and user.profile.team %}
         <a href="{% url 'battycoda_app:team_users' %}">Users</a>
         {% endif %}

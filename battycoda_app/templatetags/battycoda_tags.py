@@ -99,3 +99,17 @@ def count_done(queryset):
         if hasattr(item, "is_done") and item.is_done:
             count += 1
     return count
+
+
+@register.filter
+def multiply(value, arg):
+    """
+    Multiplies the value by the argument, similar to mul but works with template variable chains
+
+    Usage:
+        {{ value|multiply:100 }}
+    """
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return 0

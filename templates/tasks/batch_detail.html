@@ -44,9 +44,14 @@
                         {% endwith %}
                         
                         <div class="mt-3">
-                            <a href="{% url 'battycoda_app:annotate_batch' batch.id %}" class="btn btn-primary">
-                                <i class="fas fa-tasks"></i> Annotate Tasks
-                            </a>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{% url 'battycoda_app:annotate_batch' batch.id %}" class="btn btn-primary">
+                                    <i class="fas fa-tasks"></i> Annotate Tasks
+                                </a>
+                                <a href="{% url 'battycoda_app:create_detection_run_for_batch' batch_id=batch.id %}" class="btn btn-info">
+                                    <i class="fas fa-robot"></i> Run Automated Detection
+                                </a>
+                            </div>
                         </div>
                         
                         <div class="mt-2 small">

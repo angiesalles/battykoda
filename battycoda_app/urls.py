@@ -1,6 +1,7 @@
 from django.urls import path, re_path
 
 from . import views
+from . import views_automation
 
 app_name = "battycoda_app"
 
@@ -34,6 +35,15 @@ urlpatterns = [
     path("tasks/last/", views.get_last_task_view, name="get_last_task"),
     path("tasks/batch/<int:batch_id>/annotate/", views.get_next_task_from_batch_view, name="annotate_batch"),
     path("tasks/annotate/<int:task_id>/", views.task_annotation_view, name="annotate_task"),
+    # Automation routes
+    path("automation/", views_automation.automation_home_view, name="automation_home"),
+    path("automation/runs/", views_automation.detection_run_list_view, name="detection_run_list"),
+    path("automation/runs/<int:run_id>/", views_automation.detection_run_detail_view, name="detection_run_detail"),
+    path("automation/runs/create/", views_automation.create_detection_run_view, name="create_detection_run"),
+    path("automation/runs/create/<int:batch_id>/", views_automation.create_detection_run_view, name="create_detection_run_for_batch"),
+    path("automation/runs/<int:run_id>/status/", views_automation.detection_run_status_view, name="detection_run_status"),
+    path("automation/runs/<int:run_id>/apply/", views_automation.apply_detection_results_view, name="apply_detection_results"),
+    path("automation/runs/<int:run_id>/apply/<int:task_id>/", views_automation.apply_detection_results_view, name="apply_detection_result_for_task"),
     # Species management routes
     path("species/", views.species_list_view, name="species_list"),
     path("species/<int:species_id>/", views.species_detail_view, name="species_detail"),

@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Classification Run | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-4">Create Classification Run</h1>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Automation</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'battycoda_app:detection_run_list' %}">Classification Runs</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Create</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h4 class="mb-0">New Classification Run</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'battycoda_app:create_detection_run' %}">
+                        {% csrf_token %}
+                        
+                        <input type="hidden" name="batch_id" value="{{ batch.id }}">
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Run Name</label>
+                            <input type="text" class="form-control bg-dark text-white border-secondary" 
+                                   id="name" name="name" 
+                                   placeholder="Detection Run for {{ batch.name }}" 
+                                   value="Detection Run for {{ batch.name }}">
+                            <div class="form-text text-muted">Give your detection run a descriptive name</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="classifier_id" class="form-label">Classifier</label>
+                            <select class="form-select bg-dark text-white border-secondary" 
+                                   id="classifier_id" name="classifier_id" required>
+                                {% for classifier in classifiers %}
+                                    <option value="{{ classifier.id }}" 
+                                    {% if default_classifier and default_classifier.id == classifier.id %}selected{% endif %}>
+                                        {{ classifier.name }} 
+                                        ({{ classifier.get_response_format_display }})
+                                    </option>
+                                {% empty %}
+                                    <option disabled selected>No classifiers found</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text text-muted">
+                                Select the classifier to use for this classification run
+                            </div>
+                        </div>
+                        
+                        
+                        <div class="mb-4">
+                            <h5>Task Batch Information</h5>
+                            <table class="table table-dark">
+                                <tr>
+                                    <th>Batch</th>
+                                    <td>{{ batch.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Species</th>
+                                    <td>{{ batch.species.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>WAV File</th>
+                                    <td>{{ batch.wav_file_name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Task Count</th>
+                                    <td>{{ batch.tasks.count }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading">Classification Process</h5>
+                            <p>When you start a classification run:</p>
+                            <ol class="mb-0">
+                                <li>Each task in the batch will be analyzed by the selected classifier</li>
+                                <li>The system will calculate probabilities for each possible call type</li>
+                                <li>Results will be available for review once processing is complete</li>
+                                <li>You can apply classification results automatically or review them manually</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="text-end">
+                            <a href="{% url 'battycoda_app:task_batch_detail' batch_id=batch.id %}" class="btn btn-secondary me-2">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-play me-1"></i> Start Classification Run
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

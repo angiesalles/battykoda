@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block title %}Automation Dashboard | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-4">Automation Dashboard</h1>
+            <p class="lead">Use automated call detection models to analyze your audio data.</p>
+            
+            <div class="d-flex justify-content-end mb-3">
+                <a href="{% url 'battycoda_app:create_detection_run' %}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle me-1"></i> New Detection Run
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card bg-dark text-white mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Recent Detection Runs</h4>
+                </div>
+                <div class="card-body">
+                    {% if recent_runs %}
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Batch</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for run in recent_runs %}
+                                <tr>
+                                    <td>{{ run.name }}</td>
+                                    <td>
+                                        <a href="{% url 'battycoda_app:task_batch_detail' batch_id=run.batch.id %}">
+                                            {{ run.batch.name }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if run.status == 'pending' %}
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                        {% elif run.status == 'in_progress' %}
+                                        <span class="badge bg-info">In Progress</span>
+                                        {% elif run.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                        {% elif run.status == 'failed' %}
+                                        <span class="badge bg-danger">Failed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar {% if run.status == 'failed' %}bg-danger{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ run.progress }}%;" 
+                                                 aria-valuenow="{{ run.progress }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="100">
+                                                {{ run.progress|floatformat:1 }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ run.created_at|date:"M d, Y H:i" }}</td>
+                                    <td>
+                                        <a href="{% url 'battycoda_app:detection_run_detail' run_id=run.id %}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                        {% if run.status == 'completed' %}
+                                        <a href="{% url 'battycoda_app:apply_detection_results' run_id=run.id %}" 
+                                           class="btn btn-sm btn-success">
+                                            <i class="fas fa-check"></i> Apply
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p>No recent detection runs found. <a href="{% url 'battycoda_app:create_detection_run' %}">Create one</a> to get started.</p>
+                    {% endif %}
+                    
+                    {% if recent_runs %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'battycoda_app:detection_run_list' %}" class="btn btn-outline-light">
+                            View All Detection Runs
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card bg-dark text-white mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">About Call Detection</h4>
+                </div>
+                <div class="card-body">
+                    <p>The automated call detection system helps you:</p>
+                    <ul>
+                        <li>Process large amounts of bat call data efficiently</li>
+                        <li>Get probability scores for different call types</li>
+                        <li>Automatically label tasks based on detection results</li>
+                        <li>Track detection progress and review results</li>
+                    </ul>
+                    <p>To use call detection:</p>
+                    <ol>
+                        <li>Create a new detection run for a task batch</li>
+                        <li>Monitor progress as the system analyzes your data</li>
+                        <li>Review detection results with probability scores</li>
+                        <li>Apply detection results to automatically label tasks</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card bg-dark text-white mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Quick Actions</h4>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="{% url 'battycoda_app:create_detection_run' %}" class="btn btn-primary">
+                            <i class="fas fa-play me-1"></i> Start New Detection Run
+                        </a>
+                        <a href="{% url 'battycoda_app:detection_run_list' %}" class="btn btn-info">
+                            <i class="fas fa-list me-1"></i> View All Detection Runs
+                        </a>
+                        <a href="{% url 'battycoda_app:task_batch_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-folder me-1"></i> Browse Task Batches
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh progress bars for in-progress runs
+document.addEventListener('DOMContentLoaded', function() {
+    const inProgressRows = document.querySelectorAll('tr:has(.badge.bg-info)');
+    
+    if (inProgressRows.length > 0) {
+        setInterval(function() {
+            inProgressRows.forEach(function(row) {
+                const runId = row.getAttribute('data-run-id');
+                if (!runId) return;
+                
+                fetch(`/automation/runs/${runId}/status/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const progressBar = row.querySelector('.progress-bar');
+                            const statusBadge = row.querySelector('.badge');
+                            
+                            progressBar.style.width = `${data.progress}%`;
+                            progressBar.setAttribute('aria-valuenow', data.progress);
+                            progressBar.textContent = `${data.progress.toFixed(1)}%`;
+                            
+                            if (data.status !== 'in_progress') {
+                                window.location.reload(); // Refresh when status changes
+                            }
+                        }
+                    });
+            });
+        }, 5000); // Check every 5 seconds
+    }
+});
+</script>
+{% endblock %}
