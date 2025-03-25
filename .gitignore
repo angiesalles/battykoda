@@ -1,4 +1,4 @@
-.env.local
+.env
 *.pid
 .venv
 *__pycache__*

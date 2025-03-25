@@ -157,6 +157,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 os.makedirs(MEDIA_ROOT / 'audio_cache', exist_ok=True)
 os.makedirs(MEDIA_ROOT / 'home', exist_ok=True)
 
+# File upload settings - read from same environment variable as Nginx
+MAX_UPLOAD_SIZE_MB = int(os.environ.get('MAX_UPLOAD_SIZE_MB', 100))
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024  # Convert MB to bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
+
 # Celery configuration
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://redis:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')

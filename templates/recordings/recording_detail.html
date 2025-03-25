@@ -1,0 +1,319 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BattyCoda - {{ recording.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'battycoda_app:recording_list' %}">Recordings</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ recording.name }}</li>
+            </ol>
+        </nav>
+        <div class="btn-group" role="group">
+            <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-primary">
+                <i class="fas fa-cut"></i> Segment Recording
+            </a>
+            <a href="{% url 'battycoda_app:edit_recording' recording_id=recording.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-edit"></i> Edit Recording
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Recording information card -->
+        <div class="col-md-4">
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Recording Information</h5>
+                </div>
+                <div class="card-body">
+                    <h2 class="h3 card-title mb-3">{{ recording.name }}</h2>
+                    {% if recording.description %}
+                    <p class="card-text">{{ recording.description }}</p>
+                    <hr class="my-3">
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <div class="fw-bold text-muted small mb-1">File Details</div>
+                        <p class="mb-0"><strong>File:</strong> {{ recording.wav_file.name|default:"Unknown" }}</p>
+                        <p class="mb-0"><strong>Duration:</strong> {{ recording.duration|default:"Unknown"|floatformat:2 }} seconds</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="fw-bold text-muted small mb-1">Recording Metadata</div>
+                        <p class="mb-0"><strong>Species:</strong> {{ recording.species.name }}</p>
+                        <p class="mb-0"><strong>Project:</strong> {{ recording.project.name }}</p>
+                        {% if recording.recorded_date %}
+                        <p class="mb-0"><strong>Date:</strong> {{ recording.recorded_date|date:"M d, Y" }}</p>
+                        {% endif %}
+                        {% if recording.location %}
+                        <p class="mb-0"><strong>Location:</strong> {{ recording.location }}</p>
+                        {% endif %}
+                        {% if recording.equipment %}
+                        <p class="mb-0"><strong>Equipment:</strong> {{ recording.equipment }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    {% if recording.environmental_conditions %}
+                    <div class="mb-3">
+                        <div class="fw-bold text-muted small mb-1">Environmental Conditions</div>
+                        <p class="mb-0">{{ recording.environmental_conditions }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div>
+                        <div class="fw-bold text-muted small mb-1">Created By</div>
+                        <p class="mb-0">{{ recording.created_by.username }} on {{ recording.created_at|date:"M d, Y" }}</p>
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <a href="{{ recording.wav_file.url }}" class="btn btn-outline-primary" target="_blank">
+                        <i class="fas fa-download"></i> Download Recording
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Audio Player Card -->
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Audio Playback</h5>
+                </div>
+                <div class="card-body">
+                    <audio id="audio-player" controls preload="auto" class="w-100">
+                        <source src="{{ recording.wav_file.url }}" type="audio/wav">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Spectrogram and segments section -->
+        <div class="col-md-8">
+            <!-- Spectrogram card -->
+            <div class="card bg-dark mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Spectrogram</h5>
+                    <span id="spectrogram-status" class="badge bg-info">Loading...</span>
+                </div>
+                <div class="card-body text-center p-1">
+                    <div id="spectrogram-container" style="min-height: 300px; position: relative;">
+                        {% if spectrogram_url %}
+                            <img src="{{ spectrogram_url }}" class="img-fluid rounded" id="spectrogram-image" alt="Spectrogram for {{ recording.name }}">
+                        {% else %}
+                            <div id="spectrogram-loading" class="d-flex flex-column justify-content-center align-items-center" style="min-height: 300px;">
+                                <div class="spinner-border text-primary mb-3" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="text-muted">Generating spectrogram...</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Segments card -->
+            <div class="card bg-dark">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Segments</h5>
+                    <div>
+                        <span class="badge bg-info me-2">{{ segments|length }} Total</span>
+                        {% if segments %}
+                        <a href="{% url 'battycoda_app:create_tasks_from_segments' recording_id=recording.id %}" class="btn btn-sm btn-success">
+                            <i class="fas fa-tasks"></i> Create Tasks
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if segments %}
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Time Range</th>
+                                    <th>Duration</th>
+                                    <th>Call Type</th>
+                                    <th>Has Task</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for segment in segments %}
+                                <tr>
+                                    <td>{{ segment.id }}</td>
+                                    <td>{{ segment.name|default:"Segment "|add:segment.id|stringformat:"s" }}</td>
+                                    <td>{{ segment.onset|floatformat:2 }}s - {{ segment.offset|floatformat:2 }}s</td>
+                                    <td>{{ segment.duration|floatformat:2 }}s</td>
+                                    <td>
+                                        {% if segment.call_type %}
+                                        <span class="badge bg-primary">{{ segment.call_type.short_name }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Unclassified</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if segment.task %}
+                                        <a href="{% url 'battycoda_app:task_detail' task_id=segment.task.id %}" class="badge bg-success text-decoration-none">
+                                            <i class="fas fa-check"></i> Yes
+                                        </a>
+                                        {% else %}
+                                        <span class="badge bg-danger">No</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary play-segment" 
+                                                    data-onset="{{ segment.onset }}" 
+                                                    data-offset="{{ segment.offset }}"
+                                                    title="Play Segment">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                            <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-outline-warning" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center p-4">
+                        <div class="mb-3">
+                            <i class="fas fa-cut fa-4x text-muted"></i>
+                        </div>
+                        <h5>No segments found</h5>
+                        <p class="text-muted">Create segments to identify bat calls in this recording</p>
+                        <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-primary">
+                            <i class="fas fa-cut"></i> Segment Recording
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const audioPlayer = document.getElementById('audio-player');
+    
+    // Check if spectrogram is still loading
+    {% if not spectrogram_url %}
+    function checkSpectrogramStatus() {
+        fetch("{% url 'battycoda_app:recording_spectrogram_status' recording_id=recording.id %}")
+            .then(response => response.json())
+            .then(data => {
+                const statusBadge = document.getElementById('spectrogram-status');
+                
+                if (data.success) {
+                    if (data.status === 'completed') {
+                        // Spectrogram is ready, display it
+                        const container = document.getElementById('spectrogram-container');
+                        const loading = document.getElementById('spectrogram-loading');
+                        
+                        if (loading) {
+                            container.removeChild(loading);
+                        }
+                        
+                        const img = document.createElement('img');
+                        img.src = data.url;
+                        img.classList.add('img-fluid', 'rounded');
+                        img.id = 'spectrogram-image';
+                        img.alt = 'Spectrogram for {{ recording.name }}';
+                        container.appendChild(img);
+                        
+                        // Update status
+                        statusBadge.textContent = 'Complete';
+                        statusBadge.classList.remove('bg-info');
+                        statusBadge.classList.add('bg-success');
+                        
+                        // Stop checking
+                        clearInterval(checkInterval);
+                    } else if (data.status === 'processing') {
+                        // Still processing
+                        statusBadge.textContent = 'Processing...';
+                    }
+                } else {
+                    // Error occurred
+                    statusBadge.textContent = 'Error';
+                    statusBadge.classList.remove('bg-info');
+                    statusBadge.classList.add('bg-danger');
+                    
+                    // Create error message
+                    const container = document.getElementById('spectrogram-container');
+                    const loading = document.getElementById('spectrogram-loading');
+                    
+                    if (loading) {
+                        container.removeChild(loading);
+                    }
+                    
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'd-flex flex-column justify-content-center align-items-center';
+                    errorDiv.style.minHeight = '300px';
+                    errorDiv.innerHTML = `
+                        <div class="text-danger mb-3">
+                            <i class="fas fa-exclamation-triangle fa-3x"></i>
+                        </div>
+                        <p class="text-danger">Error generating spectrogram: ${data.error || 'Unknown error'}</p>
+                    `;
+                    container.appendChild(errorDiv);
+                    
+                    // Stop checking
+                    clearInterval(checkInterval);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking spectrogram status:', error);
+            });
+    }
+    
+    // Check immediately and then every 3 seconds
+    checkSpectrogramStatus();
+    const checkInterval = setInterval(checkSpectrogramStatus, 3000);
+    {% endif %}
+    
+    // Set up play segment buttons
+    const playSegmentButtons = document.querySelectorAll('.play-segment');
+    playSegmentButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const onset = parseFloat(this.dataset.onset);
+            const offset = parseFloat(this.dataset.offset);
+            
+            // Set the current time and play
+            audioPlayer.currentTime = onset;
+            
+            // Play the audio
+            audioPlayer.play();
+            
+            // Set timeout to pause at the end of the segment
+            const duration = offset - onset;
+            setTimeout(() => {
+                audioPlayer.pause();
+            }, duration * 1000);
+        });
+    });
+});
+</script>
+{% endblock %}
+
+{% endblock %}

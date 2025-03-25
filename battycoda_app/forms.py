@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 
-from .models import Call, Project, Species, Task, TaskBatch, Team, UserProfile
+from .models import Call, Project, Recording, Segment, Species, Task, TaskBatch, Team, UserProfile
 
 
 class UserRegisterForm(UserCreationForm):
@@ -181,3 +181,124 @@ class TeamInvitationForm(forms.Form):
     email = forms.EmailField(
         label="Email Address", help_text="Enter the email address of the person you want to invite to your team"
     )
+
+
+class RecordingForm(forms.ModelForm):
+    """Form for creating and editing recordings"""
+    recorded_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        required=False,
+        help_text="Date when the recording was made"
+    )
+    
+    class Meta:
+        model = Recording
+        fields = [
+            "name", "description", "wav_file", "recorded_date",
+            "location", "equipment", "environmental_conditions",
+            "species", "project"
+        ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "environmental_conditions": forms.Textarea(attrs={"rows": 3}),
+        }
+        
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+        
+        # Set empty label for dropdowns
+        self.fields["species"].empty_label = "Select a species"
+        self.fields["project"].empty_label = "Select a project"
+        
+        if user:
+            # Get or create user profile
+            profile, created = UserProfile.objects.get_or_create(user=user)
+            
+            # Filter species and projects by user's team
+            if profile.team:
+                self.fields["species"].queryset = self.fields["species"].queryset.filter(team=profile.team)
+                self.fields["project"].queryset = self.fields["project"].queryset.filter(team=profile.team)
+
+
+class SegmentForm(forms.ModelForm):
+    """Form for creating and editing segments in recordings"""
+    
+    class Meta:
+        model = Segment
+        fields = ["name", "onset", "offset", "call_type", "notes"]
+        widgets = {
+            "onset": forms.NumberInput(attrs={"step": "0.01", "class": "form-control"}),
+            "offset": forms.NumberInput(attrs={"step": "0.01", "class": "form-control"}),
+            "notes": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+        }
+        
+    def __init__(self, *args, **kwargs):
+        recording = kwargs.pop("recording", None)
+        super().__init__(*args, **kwargs)
+        
+        # Limit call types to those associated with the recording's species
+        if recording and recording.species:
+            self.fields["call_type"].queryset = Call.objects.filter(species=recording.species)
+        else:
+            self.fields["call_type"].queryset = Call.objects.none()
+            
+        # Set empty label for call_type
+        self.fields["call_type"].empty_label = "Select a call type (optional)"
+        self.fields["call_type"].required = False
+        
+    def clean(self):
+        cleaned_data = super().clean()
+        onset = cleaned_data.get("onset")
+        offset = cleaned_data.get("offset")
+        
+        # Ensure offset is greater than onset
+        if onset is not None and offset is not None:
+            if offset <= onset:
+                raise forms.ValidationError("Offset time must be greater than onset time")
+        
+        return cleaned_data
+
+
+class SegmentFormSet(forms.BaseModelFormSet):
+    """Formset for managing multiple segments"""
+    def __init__(self, *args, **kwargs):
+        recording = kwargs.pop("recording", None)
+        super().__init__(*args, **kwargs)
+        
+        for form in self.forms:
+            form.fields["call_type"].queryset = Call.objects.filter(species=recording.species) if recording else Call.objects.none()
+            form.fields["call_type"].empty_label = "Select a call type (optional)"
+            form.fields["call_type"].required = False
+    
+    def clean(self):
+        """Validate that segments don't overlap"""
+        if any(self.errors):
+            # Don't validate formset if individual forms have errors
+            return
+            
+        segments = []
+        for form in self.forms:
+            if self.can_delete and self._should_delete_form(form):
+                continue
+                
+            onset = form.cleaned_data.get("onset")
+            offset = form.cleaned_data.get("offset")
+            
+            if onset is not None and offset is not None:
+                # Check for overlap with other segments
+                for other_onset, other_offset in segments:
+                    if max(onset, other_onset) < min(offset, other_offset):
+                        raise forms.ValidationError("Segments cannot overlap")
+                
+                segments.append((onset, offset))
+
+
+# Create formset factory for segments
+SegmentFormSetFactory = forms.modelformset_factory(
+    Segment, 
+    form=SegmentForm,
+    formset=SegmentFormSet,
+    extra=1,
+    can_delete=True
+)

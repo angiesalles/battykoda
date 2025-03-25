@@ -12,6 +12,7 @@ from django.conf import settings
 
 import numpy as np
 import scipy.signal
+import soundfile as sf
 from celery import current_app, group, shared_task
 from PIL import Image
 
@@ -114,6 +115,116 @@ def prefetch_spectrograms(self, path, base_args, call_range):
     return {"status": "disabled", "message": "Prefetching is disabled for performance reasons"}
 
 
+@shared_task(bind=True, name="battycoda_app.audio.tasks.generate_recording_spectrogram")
+def generate_recording_spectrogram(self, recording_id):
+    """
+    Generate a full spectrogram for a recording.
+    
+    Args:
+        recording_id: ID of the Recording model
+        
+    Returns:
+        dict: Result with the spectrogram file path
+    """
+    import hashlib
+    import os
+    import tempfile
+    
+    from django.conf import settings
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-interactive backend
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import soundfile as sf
+    from PIL import Image
+    
+    from ..models import Recording
+    
+    logger.info(f"Generating full spectrogram for recording {recording_id}")
+    
+    try:
+        # Get the recording
+        recording = Recording.objects.get(id=recording_id)
+        
+        # Get the WAV file path
+        wav_path = recording.wav_file.path
+        
+        # Create a hash of the file path for caching
+        file_hash = hashlib.md5(wav_path.encode()).hexdigest()
+        
+        # Create the output directory and filename
+        output_dir = os.path.join(settings.MEDIA_ROOT, 'spectrograms', 'recordings')
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f"{file_hash}.png")
+        
+        # Check if file already exists
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            logger.info(f"Spectrogram already exists at {output_path}")
+            return {
+                "status": "success", 
+                "file_path": output_path,
+                "recording_id": recording_id,
+                "cached": True
+            }
+        
+        # Load the audio file
+        audio_data, sample_rate = sf.read(wav_path)
+        
+        # For very long recordings, downsample to improve performance
+        max_duration_samples = 10 * 60 * sample_rate  # 10 minutes maximum
+        if len(audio_data) > max_duration_samples:
+            # Downsample by taking every nth sample
+            downsample_factor = int(len(audio_data) / max_duration_samples) + 1
+            audio_data = audio_data[::downsample_factor]
+            effective_sample_rate = sample_rate / downsample_factor
+            logger.info(f"Downsampled recording from {len(audio_data)*downsample_factor} to {len(audio_data)} samples")
+        else:
+            effective_sample_rate = sample_rate
+        
+        # If stereo, convert to mono by averaging channels
+        if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+            audio_data = np.mean(audio_data, axis=1)
+        
+        # Generate spectrogram
+        plt.figure(figsize=(20, 10))
+        plt.specgram(audio_data, Fs=effective_sample_rate, cmap='viridis')
+        plt.title(f"Spectrogram: {recording.name}")
+        plt.xlabel('Time (s)')
+        plt.ylabel('Frequency (Hz)')
+        plt.colorbar(label='Intensity')
+        
+        # Save the figure to a temporary file first
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            temp_path = tmp_file.name
+            plt.savefig(temp_path, dpi=100, bbox_inches='tight')
+            plt.close()
+        
+        # Convert with PIL for final processing and compression
+        with Image.open(temp_path) as img:
+            # Apply any image processing here if needed
+            img.save(output_path, format="PNG", optimize=True)
+        
+        # Clean up temporary file
+        os.unlink(temp_path)
+        
+        logger.info(f"Generated spectrogram at {output_path}")
+        return {
+            "status": "success", 
+            "file_path": output_path,
+            "recording_id": recording_id,
+            "cached": False
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating recording spectrogram: {str(e)}")
+        logger.error(traceback.format_exc())
+        return {
+            "status": "error",
+            "message": str(e),
+            "recording_id": recording_id
+        }
+
+
 @shared_task(bind=True, name="battycoda_app.audio.tasks.run_call_detection")
 def run_call_detection(self, detection_run_id):
     """
@@ -133,7 +244,6 @@ def run_call_detection(self, detection_run_id):
     import json
     import time
     import tempfile
-    import soundfile as sf
     import numpy as np
     
     logger.info(f"Starting call detection for run {detection_run_id}")

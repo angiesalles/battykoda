@@ -2,6 +2,7 @@ from django.urls import path, re_path
 
 from . import views
 from . import views_automation
+from . import views_recordings
 
 app_name = "battycoda_app"
 
@@ -68,4 +69,20 @@ urlpatterns = [
     path("invitation/<str:token>/", views.accept_invitation_view, name="accept_invitation"),
     # Debug route
     path("debug/teams/", views.debug_teams_view, name="debug_teams"),
+    
+    # Recordings management
+    path("recordings/", views_recordings.recording_list_view, name="recording_list"),
+    path("recordings/<int:recording_id>/", views_recordings.recording_detail_view, name="recording_detail"),
+    path("recordings/create/", views_recordings.create_recording_view, name="create_recording"),
+    path("recordings/<int:recording_id>/edit/", views_recordings.edit_recording_view, name="edit_recording"),
+    path("recordings/<int:recording_id>/delete/", views_recordings.delete_recording_view, name="delete_recording"),
+    path("recordings/<int:recording_id>/segment/", views_recordings.segment_recording_view, name="segment_recording"),
+    path("recordings/<int:recording_id>/spectrogram-status/", views_recordings.recording_spectrogram_status_view, name="recording_spectrogram_status"),
+    path("recordings/<int:recording_id>/waveform-data/", views_recordings.get_audio_waveform_data, name="recording_waveform_data"),
+    path("recordings/<int:recording_id>/create-tasks/", views_recordings.create_tasks_from_segments_view, name="create_tasks_from_segments"),
+    
+    # Segment management
+    path("segments/<int:recording_id>/add/", views_recordings.add_segment_view, name="add_segment"),
+    path("segments/<int:segment_id>/edit/", views_recordings.edit_segment_view, name="edit_segment"),
+    path("segments/<int:segment_id>/delete/", views_recordings.delete_segment_view, name="delete_segment"),
 ]

@@ -1,0 +1,1238 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BattyCoda - Segment Recording{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'battycoda_app:recording_list' %}">Recordings</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'battycoda_app:recording_detail' recording_id=recording.id %}">{{ recording.name }}</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Segment</li>
+            </ol>
+        </nav>
+        <div class="btn-group" role="group">
+            <button id="create-tasks-btn" class="btn btn-success" {% if not segments %}disabled{% endif %}>
+                <i class="fas fa-tasks"></i> Create Tasks
+            </button>
+            <a href="{% url 'battycoda_app:recording_detail' recording_id=recording.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Recording
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Waveform and segmentation tools -->
+        <div class="col-lg-8">
+            <div class="card bg-dark mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Waveform Segmentation: {{ recording.name }}</h5>
+                    <span class="badge bg-info">{{ recording.duration|default:"0"|floatformat:2 }}s</span>
+                </div>
+                <div class="card-body p-2">
+                    <!-- Audio visualization and segmentation interface -->
+                    <div id="waveform-container" class="mb-3" style="height: 200px; background-color: #1a1a1a;">
+                        <div id="loading-waveform" class="d-flex justify-content-center align-items-center h-100">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Timeline visualization -->
+                    <div id="timeline-container" class="position-relative mb-3" style="height: 30px; background-color: #1a1a1a;">
+                        <!-- Timeline markers will be added here via JavaScript -->
+                    </div>
+                    
+                    <!-- Audio controls -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="btn-group">
+                            <button id="play-btn" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Play
+                            </button>
+                            <button id="pause-btn" class="btn btn-secondary" disabled>
+                                <i class="fas fa-pause"></i> Pause
+                            </button>
+                            <button id="stop-btn" class="btn btn-secondary" disabled>
+                                <i class="fas fa-stop"></i> Stop
+                            </button>
+                        </div>
+                        
+                        <div class="d-flex align-items-center">
+                            <span id="current-time" class="badge bg-dark me-2">0.00s</span>
+                            <div class="progress flex-grow-1" style="width: 150px; height: 10px;">
+                                <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <span id="total-time" class="badge bg-dark ms-2">{{ recording.duration|default:"0"|floatformat:2 }}s</span>
+                        </div>
+                        
+                        <div class="btn-group">
+                            <button id="zoom-in-btn" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-search-plus"></i> Zoom In
+                            </button>
+                            <button id="zoom-out-btn" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-search-minus"></i> Zoom Out
+                            </button>
+                            <button id="reset-zoom-btn" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-expand"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Segmentation actions -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="btn-group">
+                            <button id="add-segment-btn" class="btn btn-success">
+                                <i class="fas fa-plus"></i> Add Segment
+                            </button>
+                            <button id="set-start-btn" class="btn btn-outline-info">
+                                <i class="fas fa-chevron-left"></i> Set Start
+                            </button>
+                            <button id="set-end-btn" class="btn btn-outline-info">
+                                <i class="fas fa-chevron-right"></i> Set End
+                            </button>
+                        </div>
+                        
+                        <div>
+                            <span id="selection-range" class="badge bg-info">No Selection</span>
+                        </div>
+                        
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="auto-segment-toggle">
+                            <label class="form-check-label" for="auto-segment-toggle">Auto-segment on play</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Spectrogram visualization - currently disabled -->
+            <div class="card bg-dark mb-4" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Spectrogram</h5>
+                    <span id="spectrogram-status" class="badge bg-info">Disabled</span>
+                </div>
+                <div class="card-body text-center p-1">
+                    <div id="spectrogram-container" style="min-height: 200px; position: relative;">
+                        <div class="alert alert-secondary">
+                            Spectrogram generation is disabled for this view.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Segments panel -->
+        <div class="col-lg-4">
+            <div class="card bg-dark">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Segments</h5>
+                    <div>
+                        <span id="segments-count" class="badge bg-info me-2">{{ segments|length }}</span>
+                        <button id="clear-segments-btn" class="btn btn-sm btn-danger" {% if not segments %}disabled{% endif %}>
+                            <i class="fas fa-trash-alt"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
+                    <div id="segments-container">
+                        {% if segments %}
+                            <table class="table table-dark table-hover table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Time Range</th>
+                                        <th>Duration</th>
+                                        <th>Call Type</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="segments-list">
+                                    {% for segment in segments %}
+                                    <tr id="segment-row-{{ segment.id }}" data-segment-id="{{ segment.id }}">
+                                        <td>{{ segment.id }}</td>
+                                        <td>{{ segment.onset|floatformat:2 }}s - {{ segment.offset|floatformat:2 }}s</td>
+                                        <td>{{ segment.duration|floatformat:2 }}s</td>
+                                        <td>
+                                            {% if segment.call_type %}
+                                            <span class="badge bg-primary">{{ segment.call_type.short_name }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Unclassified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary play-segment-btn" 
+                                                        data-onset="{{ segment.onset }}" 
+                                                        data-offset="{{ segment.offset }}">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                                <button class="btn btn-outline-warning edit-segment-btn" 
+                                                        data-segment-id="{{ segment.id }}"
+                                                        data-segment-name="{{ segment.name|default:'' }}"
+                                                        data-segment-onset="{{ segment.onset }}"
+                                                        data-segment-offset="{{ segment.offset }}"
+                                                        data-segment-call-type="{{ segment.call_type.id|default:'' }}"
+                                                        data-segment-notes="{{ segment.notes|default:'' }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-segment-btn" 
+                                                        data-segment-id="{{ segment.id }}">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div id="no-segments-message" class="text-center p-4">
+                                <div class="mb-3">
+                                    <i class="fas fa-cut fa-4x text-muted"></i>
+                                </div>
+                                <h5>No segments found</h5>
+                                <p class="text-muted">Create segments by selecting regions on the waveform</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Segment form card (initially hidden) -->
+            <div id="segment-form-card" class="card bg-dark mt-4" style="display: none;">
+                <div class="card-header">
+                    <h5 id="segment-form-title" class="mb-0">Add New Segment</h5>
+                </div>
+                <div class="card-body">
+                    <form id="segment-form">
+                        {% csrf_token %}
+                        <input type="hidden" id="segment-id-input" name="segment_id" value="">
+                        
+                        <div class="mb-3">
+                            <label for="segment-name-input" class="form-label">Name (optional)</label>
+                            <input type="text" class="form-control bg-dark text-light border-secondary" id="segment-name-input" name="name" placeholder="e.g., Call 1">
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <label for="segment-onset-input" class="form-label">Start Time (s)*</label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary" id="segment-onset-input" name="onset" step="0.01" required>
+                            </div>
+                            <div class="col-6">
+                                <label for="segment-offset-input" class="form-label">End Time (s)*</label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary" id="segment-offset-input" name="offset" step="0.01" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="segment-call-type-input" class="form-label">Call Type</label>
+                            <select class="form-select bg-dark text-light border-secondary" id="segment-call-type-input" name="call_type">
+                                <option value="">-- Select Call Type --</option>
+                                {% for call in recording.species.calls.all %}
+                                    <option value="{{ call.id }}">{{ call.short_name }}{% if call.long_name %} ({{ call.long_name }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="segment-notes-input" class="form-label">Notes</label>
+                            <textarea class="form-control bg-dark text-light border-secondary" id="segment-notes-input" name="notes" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" id="cancel-segment-btn" class="btn btn-outline-secondary">Cancel</button>
+                            <button type="submit" id="save-segment-btn" class="btn btn-primary">Save Segment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Audio element (hidden) -->
+<audio id="audio-player" src="{{ recording.wav_file.url }}" preload="auto" style="display: none;"></audio>
+
+<!-- Confirm Clear Segments Modal -->
+<div class="modal fade" id="clear-segments-modal" tabindex="-1" aria-labelledby="clear-segments-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="clear-segments-modal-label">Confirm Delete All Segments</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete all segments? This action cannot be undone.</p>
+                <p>If segments have associated tasks, the tasks will be disconnected from their source segments.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirm-clear-segments-btn" class="btn btn-danger">Delete All Segments</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Tasks Modal -->
+<div class="modal fade" id="create-tasks-modal" tabindex="-1" aria-labelledby="create-tasks-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title" id="create-tasks-modal-label">Create Tasks from Segments</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>This will create a new task for each segment that doesn't already have an associated task.</p>
+                <p>The tasks will be grouped into a new batch.</p>
+                <hr>
+                <p>Number of segments: <span id="create-tasks-count" class="badge bg-info">{{ segments|length }}</span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="{% url 'battycoda_app:create_tasks_from_segments' recording_id=recording.id %}" class="btn btn-success">Create Tasks</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM elements
+    const audioPlayer = document.getElementById('audio-player');
+    const playBtn = document.getElementById('play-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const progressBar = document.getElementById('progress-bar');
+    const currentTimeEl = document.getElementById('current-time');
+    const totalTimeEl = document.getElementById('total-time');
+    const waveformContainer = document.getElementById('waveform-container');
+    const timelineContainer = document.getElementById('timeline-container');
+    const segmentsContainer = document.getElementById('segments-container');
+    const segmentsList = document.getElementById('segments-list');
+    const noSegmentsMessage = document.getElementById('no-segments-message');
+    const segmentsCountBadge = document.getElementById('segments-count');
+    const loadingWaveform = document.getElementById('loading-waveform');
+    const selectionRangeEl = document.getElementById('selection-range');
+    
+    // Buttons
+    const setStartBtn = document.getElementById('set-start-btn');
+    const setEndBtn = document.getElementById('set-end-btn');
+    const addSegmentBtn = document.getElementById('add-segment-btn');
+    const clearSegmentsBtn = document.getElementById('clear-segments-btn');
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const resetZoomBtn = document.getElementById('reset-zoom-btn');
+    const createTasksBtn = document.getElementById('create-tasks-btn');
+    
+    // Form elements
+    const segmentFormCard = document.getElementById('segment-form-card');
+    const segmentForm = document.getElementById('segment-form');
+    const segmentFormTitle = document.getElementById('segment-form-title');
+    const segmentIdInput = document.getElementById('segment-id-input');
+    const segmentNameInput = document.getElementById('segment-name-input');
+    const segmentOnsetInput = document.getElementById('segment-onset-input');
+    const segmentOffsetInput = document.getElementById('segment-offset-input');
+    const segmentCallTypeInput = document.getElementById('segment-call-type-input');
+    const segmentNotesInput = document.getElementById('segment-notes-input');
+    const cancelSegmentBtn = document.getElementById('cancel-segment-btn');
+    const autoSegmentToggle = document.getElementById('auto-segment-toggle');
+    
+    // Modal buttons
+    const confirmClearSegmentsBtn = document.getElementById('confirm-clear-segments-btn');
+    
+    // State
+    let currentTime = 0;
+    let duration = {{ recording.duration|default:0 }};
+    let isPlaying = false;
+    let selectionStart = null;
+    let selectionEnd = null;
+    let waveformData = null;
+    let segments = [];
+    let zoomLevel = 1;
+    let zoomOffset = 0;
+    
+    // Initialize segments from server data
+    {% for segment in segments %}
+    segments.push({
+        id: {{ segment.id }},
+        name: "{{ segment.name|default:'' }}",
+        onset: {{ segment.onset }},
+        offset: {{ segment.offset }},
+        call_type: {% if segment.call_type %}"{{ segment.call_type.id }}"{% else %}null{% endif %},
+        notes: "{{ segment.notes|default:'' }}"
+    });
+    {% endfor %}
+    
+    // Load waveform data
+    async function loadWaveformData() {
+        try {
+            const response = await fetch("{% url 'battycoda_app:recording_waveform_data' recording_id=recording.id %}");
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            // Always update duration if available, even on error
+            if (data.duration !== undefined && data.duration !== null) {
+                duration = data.duration || 0;
+                totalTimeEl.textContent = duration.toFixed(2) + 's';
+            }
+            
+            if (data.success) {
+                waveformData = data.waveform;
+                
+                // Hide loading indicator
+                loadingWaveform.style.display = 'none';
+                
+                // Draw waveform
+                drawWaveform();
+                drawTimeline();
+                updateSegmentsDisplay();
+            } else {
+                throw new Error(data.error || 'Failed to load waveform data');
+            }
+        } catch (error) {
+            console.error('Error loading waveform data:', error);
+            // Hide loading indicator
+            loadingWaveform.style.display = 'none';
+            
+            waveformContainer.innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    Error loading waveform: ${error.message}
+                </div>
+            `;
+            
+            // Still attempt to draw the timeline with empty data
+            drawTimeline();
+        }
+    }
+    
+    // Draw waveform
+    function drawWaveform() {
+        if (!waveformData) return;
+        
+        // Create canvas
+        waveformContainer.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        canvas.width = waveformContainer.clientWidth;
+        canvas.height = waveformContainer.clientHeight;
+        waveformContainer.appendChild(canvas);
+        
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, width, height);
+        
+        // Calculate visible range based on zoom
+        const visibleDataPoints = waveformData.length / zoomLevel;
+        const startIdx = Math.floor(zoomOffset * waveformData.length);
+        const endIdx = Math.min(startIdx + visibleDataPoints, waveformData.length);
+        
+        // Draw waveform
+        ctx.beginPath();
+        ctx.strokeStyle = '#4dabf7';
+        ctx.lineWidth = 1;
+        
+        const step = Math.max(1, Math.floor((endIdx - startIdx) / width));
+        for (let i = 0; i < width; i++) {
+            const dataIdx = startIdx + Math.floor(i * (endIdx - startIdx) / width);
+            if (dataIdx < waveformData.length) {
+                const value = waveformData[dataIdx];
+                const y = (0.5 - value / 2) * height;
+                if (i === 0) {
+                    ctx.moveTo(i, y);
+                } else {
+                    ctx.lineTo(i, y);
+                }
+            }
+        }
+        ctx.stroke();
+        
+        // Draw centerline
+        ctx.beginPath();
+        ctx.strokeStyle = '#6c757d';
+        ctx.lineWidth = 0.5;
+        ctx.moveTo(0, height / 2);
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+        
+        // Draw selection
+        if (selectionStart !== null && selectionEnd !== null) {
+            const startX = (selectionStart / duration) * width / zoomLevel - zoomOffset * width;
+            const endX = (selectionEnd / duration) * width / zoomLevel - zoomOffset * width;
+            
+            ctx.fillStyle = 'rgba(255, 193, 7, 0.3)';
+            ctx.fillRect(startX, 0, endX - startX, height);
+            
+            // Draw selection boundaries
+            ctx.beginPath();
+            ctx.strokeStyle = '#ffc107';
+            ctx.lineWidth = 2;
+            ctx.moveTo(startX, 0);
+            ctx.lineTo(startX, height);
+            ctx.moveTo(endX, 0);
+            ctx.lineTo(endX, height);
+            ctx.stroke();
+        }
+        
+        // Draw cursor at current time
+        const cursorX = (currentTime / duration) * width / zoomLevel - zoomOffset * width;
+        ctx.beginPath();
+        ctx.strokeStyle = '#fd7e14';
+        ctx.lineWidth = 2;
+        ctx.moveTo(cursorX, 0);
+        ctx.lineTo(cursorX, height);
+        ctx.stroke();
+        
+        // Add click event listener to canvas
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const timePos = (x / width) * duration * zoomLevel + (zoomOffset * duration);
+            
+            // Set current time
+            currentTime = Math.max(0, Math.min(duration, timePos));
+            audioPlayer.currentTime = currentTime;
+            updateTimeDisplay();
+            drawWaveform();
+        });
+    }
+    
+    // Draw timeline
+    function drawTimeline() {
+        // Clear timeline
+        timelineContainer.innerHTML = '';
+        
+        // If no waveform data or duration, draw a simple timeline
+        if (!waveformData || !duration) {
+            // Draw a simple timeline with 0 and duration markers
+            const simpleDuration = duration || 60; // Default 60 seconds if no duration available
+            const width = timelineContainer.clientWidth;
+            
+            // Start marker (0s)
+            const startMarker = document.createElement('div');
+            startMarker.className = 'position-absolute';
+            startMarker.style.left = '0px';
+            startMarker.style.top = '0';
+            startMarker.style.bottom = '0';
+            startMarker.style.width = '1px';
+            startMarker.style.backgroundColor = '#6c757d';
+            
+            const startLabel = document.createElement('div');
+            startLabel.className = 'position-absolute text-light small';
+            startLabel.style.left = '0px';
+            startLabel.style.bottom = '0';
+            startLabel.textContent = '0.0s';
+            
+            // End marker
+            const endMarker = document.createElement('div');
+            endMarker.className = 'position-absolute';
+            endMarker.style.left = (width - 1) + 'px';
+            endMarker.style.top = '0';
+            endMarker.style.bottom = '0';
+            endMarker.style.width = '1px';
+            endMarker.style.backgroundColor = '#6c757d';
+            
+            const endLabel = document.createElement('div');
+            endLabel.className = 'position-absolute text-light small';
+            endLabel.style.left = (width - 30) + 'px';
+            endLabel.style.bottom = '0';
+            endLabel.textContent = simpleDuration.toFixed(1) + 's';
+            
+            timelineContainer.appendChild(startMarker);
+            timelineContainer.appendChild(startLabel);
+            timelineContainer.appendChild(endMarker);
+            timelineContainer.appendChild(endLabel);
+            
+            // Skip the rest if we don't have proper data
+            return;
+        }
+        
+        // Calculate visible range based on zoom
+        const visibleDuration = duration / zoomLevel;
+        const startTime = zoomOffset * duration;
+        const endTime = Math.min(startTime + visibleDuration, duration);
+        
+        // Calculate number of markers
+        const width = timelineContainer.clientWidth;
+        const maxMarkers = 10;
+        const timeStep = Math.ceil(visibleDuration / maxMarkers);
+        
+        // Draw time markers
+        for (let time = Math.floor(startTime); time <= endTime; time += timeStep) {
+            const markerX = ((time - startTime) / visibleDuration) * width;
+            
+            const marker = document.createElement('div');
+            marker.className = 'position-absolute';
+            marker.style.left = markerX + 'px';
+            marker.style.top = '0';
+            marker.style.bottom = '0';
+            marker.style.width = '1px';
+            marker.style.backgroundColor = '#6c757d';
+            
+            const label = document.createElement('div');
+            label.className = 'position-absolute text-light small';
+            label.style.left = (markerX - 10) + 'px';
+            label.style.bottom = '0';
+            label.textContent = time.toFixed(1) + 's';
+            
+            timelineContainer.appendChild(marker);
+            timelineContainer.appendChild(label);
+        }
+        
+        // Draw segments
+        segments.forEach(segment => {
+            const segmentStart = ((segment.onset - startTime) / visibleDuration) * width;
+            const segmentEnd = ((segment.offset - startTime) / visibleDuration) * width;
+            
+            // Skip segments outside the visible range
+            if (segmentEnd < 0 || segmentStart > width) {
+                return;
+            }
+            
+            const segmentMarker = document.createElement('div');
+            segmentMarker.className = 'position-absolute';
+            segmentMarker.style.left = Math.max(0, segmentStart) + 'px';
+            segmentMarker.style.width = (segmentEnd - segmentStart) + 'px';
+            segmentMarker.style.top = '5px';
+            segmentMarker.style.height = '20px';
+            segmentMarker.style.backgroundColor = '#007bff';
+            segmentMarker.style.opacity = '0.7';
+            segmentMarker.style.borderRadius = '2px';
+            segmentMarker.title = `Segment ${segment.id}: ${segment.onset.toFixed(2)}s - ${segment.offset.toFixed(2)}s`;
+            
+            timelineContainer.appendChild(segmentMarker);
+        });
+    }
+    
+    // Update time display
+    function updateTimeDisplay() {
+        // Ensure currentTime is a valid number
+        const time = Number.isFinite(currentTime) ? currentTime : 0;
+        currentTimeEl.textContent = time.toFixed(2) + 's';
+        
+        // Avoid division by zero if duration is not set
+        const percentage = duration ? ((time / duration) * 100) : 0;
+        progressBar.style.width = percentage + '%';
+    }
+    
+    // Update selection display
+    function updateSelectionDisplay() {
+        if (selectionStart !== null && selectionEnd !== null) {
+            // Ensure both values are numbers and not null before using toFixed
+            const start = Number.isFinite(selectionStart) ? selectionStart : 0;
+            const end = Number.isFinite(selectionEnd) ? selectionEnd : 0;
+            const selectionDuration = end - start;
+            selectionRangeEl.textContent = `Selection: ${start.toFixed(2)}s - ${end.toFixed(2)}s (${selectionDuration.toFixed(2)}s)`;
+        } else {
+            selectionRangeEl.textContent = 'No Selection';
+        }
+    }
+    
+    // Update segments table
+    function updateSegmentsDisplay() {
+        // Update count
+        segmentsCountBadge.textContent = segments.length;
+        
+        // Toggle visibility of no segments message and clear button
+        if (segments.length === 0) {
+            if (segmentsList) {
+                // Create no segments message if it doesn't exist
+                if (!noSegmentsMessage) {
+                    const msgDiv = document.createElement('div');
+                    msgDiv.id = 'no-segments-message';
+                    msgDiv.className = 'text-center p-4';
+                    msgDiv.innerHTML = `
+                        <div class="mb-3">
+                            <i class="fas fa-cut fa-4x text-muted"></i>
+                        </div>
+                        <h5>No segments found</h5>
+                        <p class="text-muted">Create segments by selecting regions on the waveform</p>
+                    `;
+                    segmentsContainer.innerHTML = '';
+                    segmentsContainer.appendChild(msgDiv);
+                } else {
+                    noSegmentsMessage.style.display = 'block';
+                }
+            }
+            clearSegmentsBtn.disabled = true;
+            createTasksBtn.disabled = true;
+        } else {
+            if (noSegmentsMessage) {
+                noSegmentsMessage.style.display = 'none';
+            }
+            
+            // Create table if it doesn't exist
+            if (!segmentsList) {
+                const table = document.createElement('table');
+                table.className = 'table table-dark table-hover table-striped mb-0';
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Time Range</th>
+                            <th>Duration</th>
+                            <th>Call Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="segments-list"></tbody>
+                `;
+                segmentsContainer.innerHTML = '';
+                segmentsContainer.appendChild(table);
+            }
+            
+            clearSegmentsBtn.disabled = false;
+            createTasksBtn.disabled = false;
+        }
+        
+        // Redraw waveform and timeline to show segments
+        drawWaveform();
+        drawTimeline();
+    }
+    
+    // Add a new segment
+    async function addSegment(segment) {
+        try {
+            const formData = new FormData();
+            formData.append('name', segment.name || '');
+            formData.append('onset', segment.onset);
+            formData.append('offset', segment.offset);
+            formData.append('call_type', segment.call_type || '');
+            formData.append('notes', segment.notes || '');
+            
+            const response = await fetch("{% url 'battycoda_app:add_segment' recording_id=recording.id %}", {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Add the new segment with ID from server
+                segments.push({
+                    id: data.segment.id,
+                    name: segment.name || '',
+                    onset: segment.onset,
+                    offset: segment.offset,
+                    call_type: segment.call_type || null,
+                    notes: segment.notes || ''
+                });
+                
+                // Add row to table if table exists
+                if (segmentsList) {
+                    const row = document.createElement('tr');
+                    row.id = `segment-row-${data.segment.id}`;
+                    row.dataset.segmentId = data.segment.id;
+                    row.innerHTML = `
+                        <td>${data.segment.id}</td>
+                        <td>${data.segment.onset.toFixed(2)}s - ${data.segment.offset.toFixed(2)}s</td>
+                        <td>${(data.segment.offset - data.segment.onset).toFixed(2)}s</td>
+                        <td>
+                            ${data.segment.call_type ? 
+                              `<span class="badge bg-primary">${data.segment.call_type}</span>` : 
+                              `<span class="badge bg-secondary">Unclassified</span>`}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary play-segment-btn" 
+                                        data-onset="${data.segment.onset}" 
+                                        data-offset="${data.segment.offset}">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="btn btn-outline-warning edit-segment-btn" 
+                                        data-segment-id="${data.segment.id}"
+                                        data-segment-name="${segment.name || ''}"
+                                        data-segment-onset="${data.segment.onset}"
+                                        data-segment-offset="${data.segment.offset}"
+                                        data-segment-call-type="${segment.call_type || ''}"
+                                        data-segment-notes="${segment.notes || ''}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger delete-segment-btn" 
+                                        data-segment-id="${data.segment.id}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    segmentsList.appendChild(row);
+                    
+                    // Add event listeners to buttons
+                    addSegmentButtonListeners(row);
+                }
+                
+                // Update display
+                updateSegmentsDisplay();
+                
+                return data.segment;
+            } else {
+                throw new Error(data.errors || 'Failed to add segment');
+            }
+        } catch (error) {
+            console.error('Error adding segment:', error);
+            alert('Error adding segment: ' + error.message);
+            return null;
+        }
+    }
+    
+    // Edit a segment
+    async function editSegment(segment) {
+        try {
+            const formData = new FormData();
+            formData.append('name', segment.name || '');
+            formData.append('onset', segment.onset);
+            formData.append('offset', segment.offset);
+            formData.append('call_type', segment.call_type || '');
+            formData.append('notes', segment.notes || '');
+            
+            const response = await fetch(`{% url 'battycoda_app:edit_segment' segment_id=0 %}`.replace('0', segment.id), {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Update the segment in the array
+                const index = segments.findIndex(s => s.id === segment.id);
+                if (index !== -1) {
+                    segments[index] = {
+                        id: segment.id,
+                        name: segment.name || '',
+                        onset: segment.onset,
+                        offset: segment.offset,
+                        call_type: segment.call_type || null,
+                        notes: segment.notes || ''
+                    };
+                }
+                
+                // Update row in table if it exists
+                const row = document.getElementById(`segment-row-${segment.id}`);
+                if (row) {
+                    row.cells[1].textContent = `${data.segment.onset.toFixed(2)}s - ${data.segment.offset.toFixed(2)}s`;
+                    row.cells[2].textContent = `${(data.segment.offset - data.segment.onset).toFixed(2)}s`;
+                    
+                    // Update call type cell
+                    if (data.segment.call_type) {
+                        row.cells[3].innerHTML = `<span class="badge bg-primary">${data.segment.call_type}</span>`;
+                    } else {
+                        row.cells[3].innerHTML = `<span class="badge bg-secondary">Unclassified</span>`;
+                    }
+                    
+                    // Update data attributes for buttons
+                    const editBtn = row.querySelector('.edit-segment-btn');
+                    if (editBtn) {
+                        editBtn.dataset.segmentName = segment.name || '';
+                        editBtn.dataset.segmentOnset = data.segment.onset;
+                        editBtn.dataset.segmentOffset = data.segment.offset;
+                        editBtn.dataset.segmentCallType = segment.call_type || '';
+                        editBtn.dataset.segmentNotes = segment.notes || '';
+                    }
+                    
+                    // Update play button data
+                    const playBtn = row.querySelector('.play-segment-btn');
+                    if (playBtn) {
+                        playBtn.dataset.onset = data.segment.onset;
+                        playBtn.dataset.offset = data.segment.offset;
+                    }
+                }
+                
+                // Update display
+                updateSegmentsDisplay();
+                
+                return data.segment;
+            } else {
+                throw new Error(data.errors || 'Failed to update segment');
+            }
+        } catch (error) {
+            console.error('Error updating segment:', error);
+            alert('Error updating segment: ' + error.message);
+            return null;
+        }
+    }
+    
+    // Delete a segment
+    async function deleteSegment(segmentId) {
+        try {
+            const response = await fetch(`{% url 'battycoda_app:delete_segment' segment_id=0 %}`.replace('0', segmentId), {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Remove the segment from the array
+                segments = segments.filter(s => s.id !== segmentId);
+                
+                // Remove row from table if it exists
+                const row = document.getElementById(`segment-row-${segmentId}`);
+                if (row) {
+                    row.remove();
+                }
+                
+                // Update display
+                updateSegmentsDisplay();
+                
+                return true;
+            } else {
+                throw new Error(data.error || 'Failed to delete segment');
+            }
+        } catch (error) {
+            console.error('Error deleting segment:', error);
+            alert('Error deleting segment: ' + error.message);
+            return false;
+        }
+    }
+    
+    // Add event listeners to segment table row buttons
+    function addSegmentButtonListeners(row) {
+        // Play button
+        const playBtn = row.querySelector('.play-segment-btn');
+        if (playBtn) {
+            playBtn.addEventListener('click', function() {
+                const onset = parseFloat(this.dataset.onset);
+                const offset = parseFloat(this.dataset.offset);
+                
+                // Set current time and play
+                currentTime = onset;
+                audioPlayer.currentTime = onset;
+                audioPlayer.play();
+                isPlaying = true;
+                updatePlayButtons();
+                
+                // Stop at the end of the segment
+                const duration = offset - onset;
+                setTimeout(() => {
+                    if (isPlaying && currentTime >= offset) {
+                        audioPlayer.pause();
+                        isPlaying = false;
+                        updatePlayButtons();
+                    }
+                }, duration * 1000);
+            });
+        }
+        
+        // Edit button
+        const editBtn = row.querySelector('.edit-segment-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', function() {
+                // Set form values
+                segmentIdInput.value = this.dataset.segmentId;
+                segmentNameInput.value = this.dataset.segmentName || '';
+                segmentOnsetInput.value = this.dataset.segmentOnset;
+                segmentOffsetInput.value = this.dataset.segmentOffset;
+                segmentCallTypeInput.value = this.dataset.segmentCallType || '';
+                segmentNotesInput.value = this.dataset.segmentNotes || '';
+                
+                // Show form
+                segmentFormTitle.textContent = 'Edit Segment';
+                segmentFormCard.style.display = 'block';
+                
+                // Scroll to form
+                segmentFormCard.scrollIntoView({ behavior: 'smooth' });
+            });
+        }
+        
+        // Delete button
+        const deleteBtn = row.querySelector('.delete-segment-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                if (confirm('Are you sure you want to delete this segment?')) {
+                    deleteSegment(this.dataset.segmentId);
+                }
+            });
+        }
+    }
+    
+    // Spectrogram status checking - disabled
+    function checkSpectrogramStatus() {
+        // Function disabled - spectrogram generation is not needed for this view
+        console.log("Spectrogram generation is disabled");
+        return;
+    }
+    
+    // Update play/pause buttons state
+    function updatePlayButtons() {
+        if (isPlaying) {
+            playBtn.disabled = true;
+            pauseBtn.disabled = false;
+            stopBtn.disabled = false;
+        } else {
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+        }
+    }
+    
+    // Event Listeners
+    
+    // Audio player time update
+    audioPlayer.addEventListener('timeupdate', function() {
+        currentTime = audioPlayer.currentTime;
+        updateTimeDisplay();
+        drawWaveform();
+    });
+    
+    // Audio player ended
+    audioPlayer.addEventListener('ended', function() {
+        isPlaying = false;
+        updatePlayButtons();
+    });
+    
+    // Play button
+    playBtn.addEventListener('click', function() {
+        audioPlayer.play();
+        isPlaying = true;
+        updatePlayButtons();
+    });
+    
+    // Pause button
+    pauseBtn.addEventListener('click', function() {
+        audioPlayer.pause();
+        isPlaying = false;
+        updatePlayButtons();
+    });
+    
+    // Stop button
+    stopBtn.addEventListener('click', function() {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+        currentTime = 0;
+        isPlaying = false;
+        updateTimeDisplay();
+        updatePlayButtons();
+        drawWaveform();
+    });
+    
+    // Set start button
+    setStartBtn.addEventListener('click', function() {
+        selectionStart = currentTime;
+        if (selectionEnd === null || selectionEnd < selectionStart) {
+            selectionEnd = Math.min(currentTime + 0.5, duration);
+        }
+        updateSelectionDisplay();
+        drawWaveform();
+    });
+    
+    // Set end button
+    setEndBtn.addEventListener('click', function() {
+        selectionEnd = currentTime;
+        if (selectionStart === null || selectionStart > selectionEnd) {
+            selectionStart = Math.max(currentTime - 0.5, 0);
+        }
+        updateSelectionDisplay();
+        drawWaveform();
+    });
+    
+    // Add segment button
+    addSegmentBtn.addEventListener('click', function() {
+        if (selectionStart !== null && selectionEnd !== null) {
+            // Set form values
+            segmentIdInput.value = '';
+            segmentNameInput.value = '';
+            segmentOnsetInput.value = selectionStart.toFixed(2);
+            segmentOffsetInput.value = selectionEnd.toFixed(2);
+            segmentCallTypeInput.value = '';
+            segmentNotesInput.value = '';
+            
+            // Show form
+            segmentFormTitle.textContent = 'Add New Segment';
+            segmentFormCard.style.display = 'block';
+            
+            // Scroll to form
+            segmentFormCard.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            alert('Please select a region on the waveform first by setting start and end points.');
+        }
+    });
+    
+    // Segment form submission
+    segmentForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Validate form
+        const onset = parseFloat(segmentOnsetInput.value);
+        const offset = parseFloat(segmentOffsetInput.value);
+        
+        if (isNaN(onset) || isNaN(offset)) {
+            alert('Start and end times must be valid numbers.');
+            return;
+        }
+        
+        if (onset >= offset) {
+            alert('End time must be greater than start time.');
+            return;
+        }
+        
+        if (onset < 0 || offset > duration) {
+            alert(`Time values must be between 0 and ${duration.toFixed(2)} seconds.`);
+            return;
+        }
+        
+        // Create segment object
+        const segment = {
+            name: segmentNameInput.value,
+            onset: onset,
+            offset: offset,
+            call_type: segmentCallTypeInput.value,
+            notes: segmentNotesInput.value
+        };
+        
+        // Add or update segment
+        if (segmentIdInput.value) {
+            // Edit existing segment
+            segment.id = segmentIdInput.value;
+            await editSegment(segment);
+        } else {
+            // Add new segment
+            await addSegment(segment);
+        }
+        
+        // Hide form
+        segmentFormCard.style.display = 'none';
+        
+        // Clear selection
+        selectionStart = null;
+        selectionEnd = null;
+        updateSelectionDisplay();
+        drawWaveform();
+    });
+    
+    // Cancel segment button
+    cancelSegmentBtn.addEventListener('click', function() {
+        segmentFormCard.style.display = 'none';
+    });
+    
+    // Clear segments button
+    clearSegmentsBtn.addEventListener('click', function() {
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('clear-segments-modal'));
+        modal.show();
+    });
+    
+    // Confirm clear segments button
+    confirmClearSegmentsBtn.addEventListener('click', async function() {
+        // Delete all segments
+        const promises = segments.map(segment => deleteSegment(segment.id));
+        await Promise.all(promises);
+        
+        // Hide modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('clear-segments-modal'));
+        modal.hide();
+    });
+    
+    // Zoom buttons
+    zoomInBtn.addEventListener('click', function() {
+        zoomLevel = Math.min(zoomLevel * 1.5, 10);
+        drawWaveform();
+        drawTimeline();
+    });
+    
+    zoomOutBtn.addEventListener('click', function() {
+        zoomLevel = Math.max(zoomLevel / 1.5, 1);
+        zoomOffset = 0;
+        drawWaveform();
+        drawTimeline();
+    });
+    
+    resetZoomBtn.addEventListener('click', function() {
+        zoomLevel = 1;
+        zoomOffset = 0;
+        drawWaveform();
+        drawTimeline();
+    });
+    
+    // Create tasks button
+    createTasksBtn.addEventListener('click', function() {
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('create-tasks-modal'));
+        document.getElementById('create-tasks-count').textContent = segments.length;
+        modal.show();
+    });
+    
+    // Auto-segment toggle
+    audioPlayer.addEventListener('playing', function() {
+        if (autoSegmentToggle.checked) {
+            // Clear selection
+            selectionStart = currentTime;
+            selectionEnd = null;
+        }
+    });
+    
+    audioPlayer.addEventListener('pause', function() {
+        if (autoSegmentToggle.checked && selectionStart !== null) {
+            selectionEnd = currentTime;
+            
+            // Only create segment if it's at least 0.1 seconds long
+            if (selectionEnd - selectionStart >= 0.1) {
+                // Auto add segment
+                const segment = {
+                    name: '',
+                    onset: selectionStart,
+                    offset: selectionEnd,
+                    call_type: '',
+                    notes: ''
+                };
+                
+                addSegment(segment);
+                
+                // Clear selection
+                selectionStart = null;
+                selectionEnd = null;
+                updateSelectionDisplay();
+            }
+        }
+    });
+    
+    // Window resize event
+    window.addEventListener('resize', function() {
+        drawWaveform();
+        drawTimeline();
+    });
+    
+    // Add event listeners to existing segment buttons
+    if (segmentsList) {
+        const rows = segmentsList.querySelectorAll('tr');
+        rows.forEach(row => {
+            addSegmentButtonListeners(row);
+        });
+    }
+    
+    // Initialize
+    loadWaveformData();
+    updateTimeDisplay();
+    updateSelectionDisplay();
+    
+    // Spectrogram checking disabled
+    // No need to check for spectrogram status
+});
+</script>
+{% endblock %}
+
+{% endblock %}

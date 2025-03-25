@@ -1,19 +1,18 @@
-version: '3.8'
-
+# BattyCoda Docker Compose Configuration
 services:
   web:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.web
     network_mode: host
     volumes:
       - ./:/app:rw
       - data-volume:/app/media:rw
       - /home/ubuntu/template:/template:ro
       - ./data:/data:rw
-    working_dir: /app
     env_file:
-      - .env.local
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
       - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
@@ -21,26 +20,19 @@ services:
     depends_on:
       - redis
     restart: unless-stopped
-    command: >
-      bash -c "
-        echo 'Installing dependencies...' &&
-        pip install -r requirements.txt &&
-        echo 'Starting web server...' &&
-        gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 --log-level debug config.wsgi:application
-      "
 
   celery:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
     network_mode: host
     volumes:
       - ./:/app:rw
       - data-volume:/app/media:rw
       - /home/ubuntu/template:/template:ro
-    working_dir: /app
     env_file:
-      - .env.local
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
       - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
@@ -48,24 +40,17 @@ services:
     depends_on:
       - redis
     restart: unless-stopped
-    command: >
-      bash -c "
-        echo 'Installing dependencies...' &&
-        pip install -r requirements.txt &&
-        echo 'Starting Celery worker...' &&
-        celery -A config worker --loglevel=info
-      "
 
   flower:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.flower
     network_mode: host
     volumes:
       - ./:/app:rw
-    working_dir: /app
     env_file:
-      - .env.local
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
       - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
@@ -74,13 +59,6 @@ services:
       - redis
       - celery
     restart: unless-stopped
-    command: >
-      bash -c "
-        echo 'Installing dependencies...' &&
-        pip install -r requirements.txt &&
-        echo 'Starting Flower...' &&
-        celery -A config flower --port=5555
-      "
 
   redis:
     image: redis:latest
@@ -92,18 +70,12 @@ services:
   r-server-direct:
     build:
       context: .
-      dockerfile: Dockerfile.r-server
-    ports:
-      - "8100:8100"
+      dockerfile: Dockerfile.r_full
+    network_mode: host  # Use host network mode for direct port access
     volumes:
-      - ./:/app:rw
-      - r-libs:/usr/local/lib/R/site-library
-    working_dir: /app
+      - ./:/app:rw  # Mount project directory to access R scripts
+      - r-libs:/usr/local/lib/R/site-library  # Persist R package installations
     restart: unless-stopped
-    command: >
-      bash -c "
-        Rscript r_server_direct.R
-      "
 
 volumes:
   data-volume:

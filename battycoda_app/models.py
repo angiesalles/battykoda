@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 # Team model for user grouping and permissions
@@ -344,6 +345,138 @@ class CallProbability(models.Model):
     
     def __str__(self):
         return f"{self.call.short_name}: {self.probability:.2f}"
+
+# Recording model for storing full audio recordings
+class Recording(models.Model):
+    # Recording file
+    name = models.CharField(max_length=255, help_text="Name of the recording")
+    description = models.TextField(blank=True, null=True, help_text="Description of the recording")
+    wav_file = models.FileField(upload_to="recordings/", help_text="WAV file for the recording")
+    duration = models.FloatField(blank=True, null=True, help_text="Duration of the recording in seconds")
+    
+    # Recording metadata
+    recorded_date = models.DateField(blank=True, null=True, help_text="Date when the recording was made")
+    location = models.CharField(max_length=255, blank=True, null=True, help_text="Location where the recording was made")
+    equipment = models.CharField(max_length=255, blank=True, null=True, help_text="Equipment used for recording")
+    environmental_conditions = models.TextField(blank=True, null=True, help_text="Environmental conditions during recording")
+    
+    # Organization and permissions
+    species = models.ForeignKey(Species, on_delete=models.CASCADE, related_name="recordings", 
+                              help_text="Species associated with this recording")
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="recordings",
+                              help_text="Project this recording belongs to")
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="recordings", null=True,
+                           help_text="Team that owns this recording")
+    
+    # Creation metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recordings")
+    
+    class Meta:
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return self.name
+    
+    def save(self, *args, **kwargs):
+        """Override save to extract duration if not provided"""
+        if not self.duration and self.wav_file:
+            try:
+                import soundfile as sf
+                info = sf.info(self.wav_file.path)
+                self.duration = info.duration
+            except Exception as e:
+                import logging
+                logger = logging.getLogger("battycoda.models")
+                logger.error(f"Error getting audio duration: {str(e)}")
+        
+        super().save(*args, **kwargs)
+    
+    def get_segments(self):
+        """Get all segments for this recording, sorted by onset time"""
+        return Segment.objects.filter(recording=self).order_by('onset')
+
+
+# Segment model for marking regions in recordings
+class Segment(models.Model):
+    # Link to recording
+    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="segments",
+                                 help_text="Recording this segment belongs to")
+    
+    # Segment information
+    name = models.CharField(max_length=255, blank=True, null=True, help_text="Optional name for this segment")
+    onset = models.FloatField(help_text="Start time of the segment in seconds")
+    offset = models.FloatField(help_text="End time of the segment in seconds")
+    
+    # Classification information
+    call_type = models.ForeignKey(Call, on_delete=models.SET_NULL, related_name="segments", 
+                                 null=True, blank=True, help_text="Call type classification")
+    
+    # Task created from this segment (if any) - using string reference to avoid circular import
+    task = models.OneToOneField('battycoda_app.Task', on_delete=models.SET_NULL, related_name="source_segment", 
+                              null=True, blank=True, help_text="Task created from this segment, if any")
+    
+    # Creation metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="segments")
+    
+    # Notes
+    notes = models.TextField(blank=True, null=True, help_text="Notes about this segment")
+    
+    class Meta:
+        ordering = ["onset"]
+    
+    def __str__(self):
+        return f"{self.recording.name} ({self.onset:.2f}s - {self.offset:.2f}s)"
+    
+    def duration(self):
+        """Calculate segment duration"""
+        return self.offset - self.onset
+    
+    def create_task(self):
+        """Create a Task from this segment"""
+        if self.task:
+            return self.task
+        
+        # Create a new batch if needed or use the existing one
+        from django.utils.text import slugify
+        batch_name = f"Batch from {self.recording.name} - {timezone.now().strftime('%Y%m%d-%H%M%S')}"
+        
+        batch = TaskBatch.objects.create(
+            name=batch_name,
+            description=f"Automatically created from recording segments at {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            created_by=self.created_by,
+            wav_file_name=self.recording.wav_file.name,
+            wav_file=self.recording.wav_file,
+            species=self.recording.species,
+            project=self.recording.project,
+            team=self.recording.team
+        )
+        
+        # Import the Task model here to avoid circular imports
+        from battycoda_app.models import Task
+        
+        # Create task
+        task = Task.objects.create(
+            wav_file_name=self.recording.wav_file.name,
+            onset=self.onset,
+            offset=self.offset,
+            species=self.recording.species,
+            project=self.recording.project,
+            batch=batch,
+            created_by=self.created_by,
+            team=self.recording.team,
+            label=self.call_type.short_name if self.call_type else None,
+            notes=self.notes
+        )
+        
+        # Link the task back to this segment
+        self.task = task
+        self.save()
+        
+        return task
+
 
 # Task model for storing bat vocalization analysis tasks
 class Task(models.Model):

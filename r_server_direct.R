@@ -5,19 +5,10 @@
 # Using direct KNN approach that avoids mlr3 compatibility issues
 #
 
-# Load required packages
-required_packages <- c("plumber", "warbleR", "class")
-new_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
-
-if (length(new_packages) > 0) {
-  cat("Installing required packages:", paste(new_packages, collapse = ", "), "\n")
-  install.packages(new_packages, repos = "https://cloud.r-project.org")
-}
-
-# Load the packages
-for (pkg in required_packages) {
-  library(pkg, character.only = TRUE)
-}
+# Load required packages - all should be pre-installed
+library(plumber)
+library(warbleR)
+library(class)
 
 # Settings for debugging
 DEBUG_MODE <- TRUE # Set to TRUE to enable detailed logging

@@ -172,6 +172,7 @@
     <div class="nav-links">
         <a href="{% url 'battycoda_app:index' %}">Home</a>
         {% if user.is_authenticated %}
+        <a href="{% url 'battycoda_app:recording_list' %}">Recordings</a>
         <a href="{% url 'battycoda_app:task_batch_list' %}">Task Batches</a>
         <a href="{% url 'battycoda_app:task_list' %}">Tasks</a>
         <a href="{% url 'battycoda_app:species_list' %}">Species</a>
