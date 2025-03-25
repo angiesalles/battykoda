@@ -27,11 +27,12 @@ if env_file.exists():
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-r)5pg=&w_$mad+)iuy(o8zv9!f4saom0@#=tw$(@_b&xa51oga'
+# The SECRET_KEY must be provided via environment variable
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Temporarily enabling DEBUG to troubleshoot
-DEBUG = True
+# Debug mode should be False in production
+DEBUG = False
 
 # Get domain name from environment
 DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')
