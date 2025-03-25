@@ -9,7 +9,6 @@ services:
       - ./:/app:rw
       - data-volume:/app/media:rw
       - /home/ubuntu/template:/template:ro
-      - ./data:/data:rw
     env_file:
       - .env
     environment:
@@ -67,17 +66,15 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
-  r-server-direct:
+  r-server:
     build:
       context: .
-      dockerfile: Dockerfile.r_full
+      dockerfile: Dockerfile.r_ubuntu
     network_mode: host  # Use host network mode for direct port access
     volumes:
       - ./:/app:rw  # Mount project directory to access R scripts
-      - r-libs:/usr/local/lib/R/site-library  # Persist R package installations
     restart: unless-stopped
 
 volumes:
   data-volume:
   redis-data:
-  r-libs:

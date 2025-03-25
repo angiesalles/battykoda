@@ -207,8 +207,7 @@ def import_default_species(user):
             # Add the image if it exists
             # Use explicit paths for Docker container
             image_paths = [
-                f"/app/static/{species_data['image_file']}",
-                f"/home/ubuntu/battycoda/static/{species_data['image_file']}",
+                f"/app/data/species_images/{species_data['image_file']}",
             ]
 
             image_found = False
@@ -227,8 +226,7 @@ def import_default_species(user):
 
             # Parse call types from the text file
             call_paths = [
-                f"/app/static/{species_data['call_file']}",
-                f"/home/ubuntu/battycoda/static/{species_data['call_file']}",
+                f"/app/data/species_images/{species_data['call_file']}",
             ]
 
             call_file_found = False
@@ -329,10 +327,9 @@ def create_demo_task_batch(user):
 
         # Define the paths to the sample files
         sample_paths = {
-            "wav": ["/app/static/bat1_angie_19.wav", "/home/ubuntu/battycoda/static/bat1_angie_19.wav"],
+            "wav": ["/app/data/sample_audio/bat1_angie_19.wav"],
             "pickle": [
-                "/app/static/bat1_angie_19.wav.pickle",
-                "/home/ubuntu/battycoda/static/bat1_angie_19.wav.pickle",
+                "/app/data/sample_audio/bat1_angie_19.wav.pickle",
             ],
         }
 

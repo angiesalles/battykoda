@@ -24,7 +24,7 @@ debug_log <- function(...) {
 
 # Global variables
 MODEL_LOADED <- FALSE
-MODEL_PATH <- "static/mymodel.RData"
+MODEL_PATH <- "data/models/mymodel.RData"
 TRAIN_DATA <- NULL
 
 # Load the model once at startup

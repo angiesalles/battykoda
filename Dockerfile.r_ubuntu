@@ -36,6 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng16-16 \
     libharfbuzz-dev \
     libharfbuzz0b \
+    libfribidi-dev \
+    libfribidi0 \
     libsndfile1-dev \
     libsox-dev \
     ffmpeg \
@@ -56,4 +58,9 @@ RUN R -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); \
     # Install all packages with their dependencies \
     install.packages(c("class", "plumber", "warbleR"), dependencies = TRUE, quiet = FALSE, Ncpus = num_cpus)'
 
+# Expose port for the R plumber API
+EXPOSE 8100
+
+# Default command to run the R server
+CMD ["Rscript", "/app/r_server_direct.R"]
 
