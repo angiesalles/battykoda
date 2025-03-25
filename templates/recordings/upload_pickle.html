@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Pickle File | {{ recording.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3>Upload Pickle File for Segmentation</h3>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">Recording: {{ recording.name }}</h5>
+                    <p class="card-text">
+                        Upload a pickle file containing onset and offset data to automatically create segments for this recording.
+                    </p>
+                    
+                    <p class="alert alert-info">
+                        <strong>Note:</strong> The pickle file should contain onset and offset timestamps as either:
+                        <ul>
+                            <li>A dictionary with 'onsets' and 'offsets' keys</li>
+                            <li>A list or tuple where the first element is onsets and the second is offsets</li>
+                        </ul>
+                        Each onset/offset pair will create a new segment in the recording.
+                    </p>
+                    
+                    <form method="post" enctype="multipart/form-data" id="pickle-upload-form">
+                        {% csrf_token %}
+                        <div class="form-group mb-3">
+                            <label for="pickle_file">Pickle File:</label>
+                            <input type="file" name="pickle_file" id="pickle_file" class="form-control" required>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'battycoda_app:segment_recording' recording.id %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Upload and Process</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+$(document).ready(function() {
+    // Handle form submission
+    $('#pickle-upload-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Show loading indicator
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.text();
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
+        
+        // Create FormData object
+        const formData = new FormData(this);
+        
+        // Submit form via AJAX
+        $.ajax({
+            url: "{% url 'battycoda_app:upload_pickle_segments' recording.id %}",
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    const message = response.message || 'Pickle file processed successfully.';
+                    const alert = `<div class="alert alert-success">${message}</div>`;
+                    $('#pickle-upload-form').before(alert);
+                    
+                    // Redirect after short delay
+                    setTimeout(function() {
+                        window.location.href = response.redirect_url || "{% url 'battycoda_app:segment_recording' recording.id %}";
+                    }, 1500);
+                } else {
+                    // Show error message
+                    const errorMsg = response.error || 'An unknown error occurred.';
+                    const alert = `<div class="alert alert-danger">Error: ${errorMsg}</div>`;
+                    $('#pickle-upload-form').before(alert);
+                    submitBtn.prop('disabled', false).text(originalText);
+                }
+            },
+            error: function(xhr, status, error) {
+                // Show error message
+                let errorMsg = 'Server error occurred.';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    errorMsg = response.error || errorMsg;
+                } catch (e) {
+                    console.error('Error parsing response:', e);
+                }
+                
+                const alert = `<div class="alert alert-danger">Error: ${errorMsg}</div>`;
+                $('#pickle-upload-form').before(alert);
+                submitBtn.prop('disabled', false).text(originalText);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

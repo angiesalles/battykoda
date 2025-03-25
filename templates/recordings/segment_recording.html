@@ -17,6 +17,9 @@
             <button id="create-tasks-btn" class="btn btn-success" {% if not segments %}disabled{% endif %}>
                 <i class="fas fa-tasks"></i> Create Tasks
             </button>
+            <a href="{% url 'battycoda_app:upload_pickle_segments' recording_id=recording.id %}" class="btn btn-primary">
+                <i class="fas fa-file-upload"></i> Upload Pickle
+            </a>
             <a href="{% url 'battycoda_app:recording_detail' recording_id=recording.id %}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Recording
             </a>

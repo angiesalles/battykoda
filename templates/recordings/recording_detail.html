@@ -201,9 +201,14 @@
                         </div>
                         <h5>No segments found</h5>
                         <p class="text-muted">Create segments to identify bat calls in this recording</p>
-                        <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-primary">
-                            <i class="fas fa-cut"></i> Segment Recording
-                        </a>
+                        <div class="d-flex justify-content-center gap-2">
+                            <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-primary">
+                                <i class="fas fa-cut"></i> Segment Recording
+                            </a>
+                            <a href="{% url 'battycoda_app:upload_pickle_segments' recording_id=recording.id %}" class="btn btn-outline-primary">
+                                <i class="fas fa-file-upload"></i> Upload Pickle File
+                            </a>
+                        </div>
                     </div>
                     {% endif %}
                 </div>

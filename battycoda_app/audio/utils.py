@@ -3,6 +3,7 @@ Utility functions for audio processing in BattyCoda.
 """
 import logging
 import os
+import pickle
 import shutil
 import tempfile
 import traceback
@@ -265,3 +266,68 @@ def overview_hwin():
 def normal_hwin():
     """Returns the half-window size for detailed view in milliseconds."""
     return 8
+
+
+def process_pickle_file(pickle_file):
+    """Process a pickle file that contains onset and offset data.
+    
+    Args:
+        pickle_file: A file-like object containing pickle-serialized data
+        
+    Returns:
+        tuple: (onsets, offsets) as lists of floats
+        
+    Raises:
+        ValueError: If the pickle file format is not recognized or contains invalid data
+        Exception: For any other errors during processing
+    """
+    try:
+        # Load the pickle file
+        pickle_data = pickle.load(pickle_file)
+
+        # Extract onsets and offsets based on data format
+        if isinstance(pickle_data, dict):
+            onsets = pickle_data.get("onsets", [])
+            offsets = pickle_data.get("offsets", [])
+        elif isinstance(pickle_data, list) and len(pickle_data) >= 2:
+            # Assume first item is onsets, second is offsets
+            onsets = pickle_data[0]
+            offsets = pickle_data[1]
+        elif isinstance(pickle_data, tuple) and len(pickle_data) >= 2:
+            # Assume first item is onsets, second is offsets
+            onsets = pickle_data[0]
+            offsets = pickle_data[1]
+        else:
+            # Unrecognized format
+            logger.error(f"Pickle file format not recognized: {type(pickle_data)}")
+            raise ValueError("Pickle file format not recognized. Expected a dictionary with 'onsets' and 'offsets' keys, or a list/tuple with at least 2 elements.")
+
+        # Convert to lists if they're NumPy arrays or other iterables
+        if isinstance(onsets, np.ndarray):
+            onsets = onsets.tolist()
+        elif not isinstance(onsets, list):
+            onsets = list(onsets)
+
+        if isinstance(offsets, np.ndarray):
+            offsets = offsets.tolist()
+        elif not isinstance(offsets, list):
+            offsets = list(offsets)
+
+        # Validate data
+        if len(onsets) == 0 or len(offsets) == 0:
+            raise ValueError("Pickle file does not contain required onset and offset lists.")
+
+        # Check if lists are the same length
+        if len(onsets) != len(offsets):
+            raise ValueError("Onsets and offsets lists must have the same length.")
+            
+        # Convert numpy types to Python native types if needed
+        onsets = [float(onset) for onset in onsets]
+        offsets = [float(offset) for offset in offsets]
+        
+        return onsets, offsets
+
+    except Exception as e:
+        logger.error(f"Error processing pickle file: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise

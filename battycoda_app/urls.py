@@ -77,6 +77,7 @@ urlpatterns = [
     path("recordings/<int:recording_id>/edit/", views_recordings.edit_recording_view, name="edit_recording"),
     path("recordings/<int:recording_id>/delete/", views_recordings.delete_recording_view, name="delete_recording"),
     path("recordings/<int:recording_id>/segment/", views_recordings.segment_recording_view, name="segment_recording"),
+    path("recordings/<int:recording_id>/upload-pickle/", views_recordings.upload_pickle_segments_view, name="upload_pickle_segments"),
     path("recordings/<int:recording_id>/spectrogram-status/", views_recordings.recording_spectrogram_status_view, name="recording_spectrogram_status"),
     path("recordings/<int:recording_id>/waveform-data/", views_recordings.get_audio_waveform_data, name="recording_waveform_data"),
     path("recordings/<int:recording_id>/create-tasks/", views_recordings.create_tasks_from_segments_view, name="create_tasks_from_segments"),

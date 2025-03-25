@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .audio.tasks import generate_recording_spectrogram
+from .audio.utils import process_pickle_file
 from .forms import RecordingForm, SegmentForm, SegmentFormSetFactory
 from .models import Recording, Segment, UserProfile
 
@@ -437,6 +438,76 @@ def recording_spectrogram_status_view(request, recording_id):
     except Exception as e:
         logger.error(f"Error checking spectrogram status: {str(e)}")
         return JsonResponse({"success": False, "status": "error", "error": str(e)})
+
+
+@login_required
+def upload_pickle_segments_view(request, recording_id):
+    """Upload a pickle file to create segments for a recording"""
+    recording = get_object_or_404(Recording, id=recording_id)
+    
+    # Check permission
+    profile = request.user.profile
+    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+        messages.error(request, "You don't have permission to add segments to this recording.")
+        return redirect("battycoda_app:recording_detail", recording_id=recording.id)
+    
+    if request.method == "POST" and request.FILES.get("pickle_file"):
+        pickle_file = request.FILES["pickle_file"]
+        
+        try:
+            # Process the pickle file
+            onsets, offsets = process_pickle_file(pickle_file)
+            
+            # Create segments from the onset/offset pairs
+            segments_created = 0
+            with transaction.atomic():
+                for i in range(len(onsets)):
+                    try:
+                        # Create segment name
+                        segment_name = f"Segment {i+1}"
+                        
+                        # Create and save the segment
+                        segment = Segment(
+                            recording=recording,
+                            name=segment_name,
+                            onset=onsets[i],
+                            offset=offsets[i],
+                            created_by=request.user
+                        )
+                        segment.save()
+                        segments_created += 1
+                    except Exception as e:
+                        logger.error(f"Error creating segment {i}: {str(e)}")
+                        logger.error(traceback.format_exc())
+                        raise  # Re-raise to trigger transaction rollback
+            
+            # Return appropriate response based on request type
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({
+                    "success": True,
+                    "message": f"Successfully created {segments_created} segments.",
+                    "redirect_url": reverse("battycoda_app:segment_recording", kwargs={"recording_id": recording.id})
+                })
+            
+            messages.success(request, f"Successfully created {segments_created} segments from pickle file.")
+            return redirect("battycoda_app:segment_recording", recording_id=recording.id)
+            
+        except Exception as e:
+            logger.error(f"Error processing pickle file: {str(e)}")
+            
+            # Return appropriate error response
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"success": False, "error": str(e)})
+            
+            messages.error(request, f"Error processing pickle file: {str(e)}")
+            return redirect("battycoda_app:segment_recording", recording_id=recording.id)
+    
+    # GET request - render upload form
+    context = {
+        "recording": recording,
+    }
+    
+    return render(request, "recordings/upload_pickle.html", context)
 
 
 @login_required

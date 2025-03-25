@@ -67,12 +67,11 @@ services:
     restart: unless-stopped
 
   r-server:
-    build:
-      context: .
-      dockerfile: Dockerfile.r_ubuntu
+    image: r_ubuntu:with_mychanges  # Use our committed image with changes
     network_mode: host  # Use host network mode for direct port access
     volumes:
       - ./:/app:rw  # Mount project directory to access R scripts
+    command: ["Rscript", "/app/r_server_direct.R"]
     restart: unless-stopped
 
 volumes:
