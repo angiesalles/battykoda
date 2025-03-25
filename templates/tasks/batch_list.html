@@ -34,7 +34,7 @@
                                 <th>WAV File</th>
                                 <th>Species</th>
                                 <th>Project</th>
-                                <th>Team</th>
+                                <th>Group</th>
                                 <th>Created</th>
                                 <th>Actions</th>
                             </tr>
@@ -47,7 +47,7 @@
                                 <td>{{ batch.wav_file_name }}</td>
                                 <td>{{ batch.species }}</td>
                                 <td>{{ batch.project }}</td>
-                                <td>{{ batch.team.name|default:"--" }}</td>
+                                <td>{{ batch.group.name|default:"--" }}</td>
                                 <td>{{ batch.created_at|date:"M d, Y" }}</td>
                                 <td>
                                     <a href="{% url 'battycoda_app:task_batch_detail' batch.id %}" class="btn btn-sm btn-outline-info">View</a>

@@ -5,8 +5,8 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 
-# Team model for user grouping and permissions
-class Team(models.Model):
+# Group model for user grouping and permissions
+class Group(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -15,10 +15,10 @@ class Team(models.Model):
         return self.name
 
 
-class TeamInvitation(models.Model):
-    """Team invitation model for inviting users via email"""
+class GroupInvitation(models.Model):
+    """Group invitation model for inviting users via email"""
 
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="invitations")
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="invitations")
     email = models.EmailField()
     invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_invitations")
     token = models.CharField(max_length=255, unique=True, help_text="Unique token for invitation link")
@@ -27,7 +27,7 @@ class TeamInvitation(models.Model):
     accepted = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Invitation to {self.team.name} for {self.email}"
+        return f"Invitation to {self.group.name} for {self.email}"
 
     @property
     def is_expired(self):
@@ -36,26 +36,26 @@ class TeamInvitation(models.Model):
         return self.expires_at < timezone.now()
 
 
-# New model for team membership
-class TeamMembership(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="team_memberships")
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="team_memberships")
+# New model for group membership
+class GroupMembership(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="group_memberships")
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="group_memberships")
     is_admin = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("user", "team")
+        unique_together = ("user", "group")
 
     def __str__(self):
-        return f"{self.user.username} in {self.team.name} ({'Admin' if self.is_admin else 'Member'})"
+        return f"{self.user.username} in {self.group.name} ({'Admin' if self.is_admin else 'Member'})"
 
 
 # Create your models here.
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="members", null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="members", null=True)
     is_admin = models.BooleanField(
-        default=False, help_text="Designates whether this user is an administrator of their team"
+        default=False, help_text="Designates whether this user is an administrator of their group"
     )
     # Authentication fields (previously Cloudflare fields, kept for data compatibility)
     cloudflare_id = models.CharField(
@@ -71,24 +71,24 @@ class UserProfile(models.Model):
         return self.user.username
 
     @property
-    def available_teams(self):
-        """Get all teams the user is a member of through TeamMembership"""
-        # Get teams from memberships
-        membership_teams = Team.objects.filter(team_memberships__user=self.user).order_by("name")
+    def available_groups(self):
+        """Get all groups the user is a member of through GroupMembership"""
+        # Get groups from memberships
+        membership_groups = Group.objects.filter(group_memberships__user=self.user).order_by("name")
 
-        # Move current team to the front if it exists
-        if self.team:
-            result = list(membership_teams)
-            if self.team in result:
-                result.remove(self.team)
-            return [self.team] + result
+        # Move current group to the front if it exists
+        if self.group:
+            result = list(membership_groups)
+            if self.group in result:
+                result.remove(self.group)
+            return [self.group] + result
 
-        return membership_teams
+        return membership_groups
 
     @property
-    def is_admin_of_team(self, team_id):
-        """Check if user is admin of the specified team"""
-        return TeamMembership.objects.filter(user=self.user, team_id=team_id, is_admin=True).exists()
+    def is_admin_of_group(self, group_id):
+        """Check if user is admin of the specified group"""
+        return GroupMembership.objects.filter(user=self.user, group_id=group_id, is_admin=True).exists()
 
 
 # Create user profile when user is created
@@ -102,17 +102,17 @@ def create_user_profile(sender, instance, created, **kwargs):
         # First create the profile
         profile = UserProfile.objects.create(user=instance)
 
-        # Create a new team for this user
-        team_name = f"{instance.username}'s Team"
-        team = Team.objects.create(name=team_name, description=f"Personal team for {instance.username}")
+        # Create a new group for this user
+        group_name = f"{instance.username}'s Group"
+        group = Group.objects.create(name=group_name, description=f"Personal group for {instance.username}")
 
-        # Assign the user to their own team and make them an admin
-        profile.team = team
+        # Assign the user to their own group and make them an admin
+        profile.group = group
         profile.is_admin = True
         profile.save()
 
-        # Create team membership record
-        TeamMembership.objects.create(user=instance, team=team, is_admin=True)
+        # Create group membership record
+        GroupMembership.objects.create(user=instance, group=group, is_admin=True)
 
         # Create a demo project for the user
         try:
@@ -126,7 +126,7 @@ def create_user_profile(sender, instance, created, **kwargs):
                 name=project_name,
                 description=f"Demo project created automatically for {instance.username}",
                 created_by=instance,
-                team=team,
+                group=group,
             )
             logger.info(f"Created demo project '{project_name}' for user {instance.username}")
         except Exception as e:
@@ -167,7 +167,7 @@ class Species(models.Model):
     image = models.ImageField(upload_to="species_images/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="species")
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="species", null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="species", null=True)
 
     class Meta:
         verbose_name_plural = "Species"
@@ -199,7 +199,7 @@ class Project(models.Model):
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="projects", null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="projects", null=True)
 
     def __str__(self):
         return self.name
@@ -215,7 +215,7 @@ class TaskBatch(models.Model):
     species = models.ForeignKey(Species, on_delete=models.CASCADE, related_name="task_batches")
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="task_batches")
     wav_file = models.FileField(upload_to="task_batches/", null=True, blank=True)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="task_batches", null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="task_batches", null=True)
 
     def __str__(self):
         return self.name
@@ -261,13 +261,13 @@ class Classifier(models.Model):
     # Admin only flag
     is_active = models.BooleanField(default=True, help_text="Whether this classifier is currently active")
     created_at = models.DateTimeField(auto_now_add=True)
-    team = models.ForeignKey(
-        Team, 
+    group = models.ForeignKey(
+        Group, 
         on_delete=models.SET_NULL, 
         related_name="classifiers", 
         null=True,
         blank=True,
-        help_text="Team that owns this classifier. If null, it's available to all teams"
+        help_text="Group that owns this classifier. If null, it's available to all groups"
     )
     
     def __str__(self):
@@ -282,7 +282,7 @@ class DetectionRun(models.Model):
     batch = models.ForeignKey(TaskBatch, on_delete=models.CASCADE, related_name="detection_runs")
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="detection_runs")
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="detection_runs", null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="detection_runs", null=True)
     
     # Algorithm type choices (for backward compatibility)
     ALGORITHM_TYPE_CHOICES = (
@@ -365,8 +365,8 @@ class Recording(models.Model):
                               help_text="Species associated with this recording")
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="recordings",
                               help_text="Project this recording belongs to")
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="recordings", null=True,
-                           help_text="Team that owns this recording")
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="recordings", null=True,
+                           help_text="Group that owns this recording")
     
     # Creation metadata
     created_at = models.DateTimeField(auto_now_add=True)
@@ -451,7 +451,7 @@ class Segment(models.Model):
             wav_file=self.recording.wav_file,
             species=self.recording.species,
             project=self.recording.project,
-            team=self.recording.team
+            group=self.recording.group
         )
         
         # Import the Task model here to avoid circular imports
@@ -466,7 +466,7 @@ class Segment(models.Model):
             project=self.recording.project,
             batch=batch,
             created_by=self.created_by,
-            team=self.recording.team,
+            group=self.recording.group,
             label=self.call_type.short_name if self.call_type else None,
             notes=self.notes
         )
@@ -498,7 +498,7 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="tasks", null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="tasks", null=True)
 
     # Task status and completion
     STATUS_CHOICES = (

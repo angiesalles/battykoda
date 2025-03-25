@@ -17,16 +17,16 @@ def task_list_view(request):
     # Get user profile
     profile = request.user.profile
 
-    # Filter tasks by team if the user is in a team
-    if profile.team:
+    # Filter tasks by group if the user is in a group
+    if profile.group:
         if profile.is_admin:
-            # Admin sees all tasks in their team
-            tasks = Task.objects.filter(team=profile.team).order_by("-created_at")
+            # Admin sees all tasks in their group
+            tasks = Task.objects.filter(group=profile.group).order_by("-created_at")
         else:
             # Regular user only sees their own tasks
             tasks = Task.objects.filter(created_by=request.user).order_by("-created_at")
     else:
-        # Fallback to showing only user's tasks if no team is assigned
+        # Fallback to showing only user's tasks if no group is assigned
         tasks = Task.objects.filter(created_by=request.user).order_by("-created_at")
 
     context = {
@@ -43,13 +43,13 @@ def task_detail_view(request, task_id):
     task = get_object_or_404(Task, id=task_id)
 
     # Check if user has permission to view this task
-    if task.created_by != request.user and (not request.user.profile.team or task.team != request.user.profile.team):
+    if task.created_by != request.user and (not request.user.profile.group or task.group != request.user.profile.group):
         messages.error(request, "You don't have permission to view this task.")
         return redirect("battycoda_app:task_list")
 
-    # For editing, check if the user is the creator or a team admin
+    # For editing, check if the user is the creator or a group admin
     can_edit = (task.created_by == request.user) or (
-        request.user.profile.is_admin and task.team == request.user.profile.team
+        request.user.profile.is_admin and task.group == request.user.profile.group
     )
 
     if request.method == "POST" and can_edit:
@@ -75,8 +75,8 @@ def create_task_view(request):
             task = form.save(commit=False)
             task.created_by = request.user
 
-            # Always set team to user's active team
-            task.team = request.user.profile.team
+            # Always set group to user's active group
+            task.group = request.user.profile.group
             task.save()
 
             messages.success(request, "Task created successfully.")

@@ -10,20 +10,20 @@ from battycoda_app.models import (
     Species,
     Task,
     TaskBatch,
-    Team,
-    TeamInvitation,
-    TeamMembership,
+    Group,
+    GroupInvitation,
+    GroupMembership,
     UserProfile,
 )
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 
-class TeamModelTest(BattycodaTestCase):
+class GroupModelTest(BattycodaTestCase):
     def setUp(self):
-        self.team = Team.objects.create(name="Test Team", description="A test team")
+        self.group = Group.objects.create(name="Test Group", description="A test group")
 
-    def test_team_str_method(self):
-        self.assertEqual(str(self.team), "Test Team")
+    def test_group_str_method(self):
+        self.assertEqual(str(self.group), "Test Group")
 
 
 class UserProfileModelTest(BattycodaTestCase):
@@ -32,19 +32,19 @@ class UserProfileModelTest(BattycodaTestCase):
         # User profile is created by signal
         self.profile = UserProfile.objects.get(user=self.user)
 
-        # Create additional team
-        self.team2 = Team.objects.create(name="Second Team", description="Second team for testing")
-        TeamMembership.objects.create(user=self.user, team=self.team2, is_admin=False)
+        # Create additional group
+        self.group2 = Group.objects.create(name="Second Group", description="Second group for testing")
+        GroupMembership.objects.create(user=self.user, group=self.group2, is_admin=False)
 
     def test_profile_str_method(self):
         self.assertEqual(str(self.profile), "testuser")
 
-    def test_available_teams(self):
-        # User should have access to their personal team and the second team
-        self.assertEqual(len(self.profile.available_teams), 2)
-        # Personal team should be first
-        self.assertEqual(self.profile.available_teams[0], self.profile.team)
-        self.assertTrue(self.team2 in self.profile.available_teams)
+    def test_available_groups(self):
+        # User should have access to their personal group and the second group
+        self.assertEqual(len(self.profile.available_groups), 2)
+        # Personal group should be first
+        self.assertEqual(self.profile.available_groups[0], self.profile.group)
+        self.assertTrue(self.group2 in self.profile.available_groups)
 
     def test_user_profile_creation_signal(self):
         # Test that UserProfile is created for new user
@@ -53,29 +53,29 @@ class UserProfileModelTest(BattycodaTestCase):
         # Verify profile was created
         self.assertTrue(UserProfile.objects.filter(user=new_user).exists())
 
-        # Verify personal team was created
+        # Verify personal group was created
         user_profile = UserProfile.objects.get(user=new_user)
-        self.assertIsNotNone(user_profile.team)
-        self.assertEqual(user_profile.team.name, "newuser's Team")
+        self.assertIsNotNone(user_profile.group)
+        self.assertEqual(user_profile.group.name, "newuser's Group")
 
-        # Verify user is admin of personal team
+        # Verify user is admin of personal group
         self.assertTrue(user_profile.is_admin)
 
-        # Verify team membership was created
-        self.assertTrue(TeamMembership.objects.filter(user=new_user, team=user_profile.team).exists())
+        # Verify group membership was created
+        self.assertTrue(GroupMembership.objects.filter(user=new_user, group=user_profile.group).exists())
 
         # Verify demo project was created
         self.assertTrue(Project.objects.filter(created_by=new_user).exists())
 
 
-class TeamInvitationModelTest(BattycodaTestCase):
+class GroupInvitationModelTest(BattycodaTestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
-        self.team = Team.objects.create(name="Test Team", description="Test team")
+        self.group = Group.objects.create(name="Test Group", description="Test group")
 
         # Create an invitation
-        self.invitation = TeamInvitation.objects.create(
-            team=self.team,
+        self.invitation = GroupInvitation.objects.create(
+            group=self.group,
             email="invited@example.com",
             invited_by=self.user,
             token="testtoken123",
@@ -83,8 +83,8 @@ class TeamInvitationModelTest(BattycodaTestCase):
         )
 
         # Create an expired invitation
-        self.expired_invitation = TeamInvitation.objects.create(
-            team=self.team,
+        self.expired_invitation = GroupInvitation.objects.create(
+            group=self.group,
             email="expired@example.com",
             invited_by=self.user,
             token="expiredtoken",
@@ -92,7 +92,7 @@ class TeamInvitationModelTest(BattycodaTestCase):
         )
 
     def test_invitation_str_method(self):
-        self.assertEqual(str(self.invitation), f"Invitation to {self.team.name} for invited@example.com")
+        self.assertEqual(str(self.invitation), f"Invitation to {self.group.name} for invited@example.com")
 
     def test_is_expired_property(self):
         self.assertFalse(self.invitation.is_expired)
@@ -102,10 +102,10 @@ class TeamInvitationModelTest(BattycodaTestCase):
 class SpeciesModelTest(BattycodaTestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
-        self.team = Team.objects.create(name="Test Team", description="Test team")
+        self.group = Group.objects.create(name="Test Group", description="Test group")
 
         self.species = Species.objects.create(
-            name="Test Species", description="A test species", created_by=self.user, team=self.team
+            name="Test Species", description="A test species", created_by=self.user, group=self.group
         )
 
     def test_species_str_method(self):
@@ -119,10 +119,10 @@ class SpeciesModelTest(BattycodaTestCase):
 class CallModelTest(BattycodaTestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
-        self.team = Team.objects.create(name="Test Team", description="Test team")
+        self.group = Group.objects.create(name="Test Group", description="Test group")
 
         self.species = Species.objects.create(
-            name="Test Species", description="A test species", created_by=self.user, team=self.team
+            name="Test Species", description="A test species", created_by=self.user, group=self.group
         )
 
         self.call = Call.objects.create(species=self.species, short_name="TC", long_name="Test Call")
@@ -137,10 +137,10 @@ class CallModelTest(BattycodaTestCase):
 class ProjectModelTest(BattycodaTestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
-        self.team = Team.objects.create(name="Test Team", description="Test team")
+        self.group = Group.objects.create(name="Test Group", description="Test group")
 
         self.project = Project.objects.create(
-            name="Test Project", description="A test project", created_by=self.user, team=self.team
+            name="Test Project", description="A test project", created_by=self.user, group=self.group
         )
 
     def test_project_str_method(self):
@@ -150,14 +150,14 @@ class ProjectModelTest(BattycodaTestCase):
 class TaskBatchModelTest(BattycodaTestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
-        self.team = Team.objects.create(name="Test Team", description="Test team")
+        self.group = Group.objects.create(name="Test Group", description="Test group")
 
         self.species = Species.objects.create(
-            name="Test Species", description="A test species", created_by=self.user, team=self.team
+            name="Test Species", description="A test species", created_by=self.user, group=self.group
         )
 
         self.project = Project.objects.create(
-            name="Test Project", description="A test project", created_by=self.user, team=self.team
+            name="Test Project", description="A test project", created_by=self.user, group=self.group
         )
 
         self.batch = TaskBatch.objects.create(
@@ -167,7 +167,7 @@ class TaskBatchModelTest(BattycodaTestCase):
             wav_file_name="test.wav",
             species=self.species,
             project=self.project,
-            team=self.team,
+            group=self.group,
         )
 
     def test_batch_str_method(self):
@@ -177,14 +177,14 @@ class TaskBatchModelTest(BattycodaTestCase):
 class TaskModelTest(BattycodaTestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
-        self.team = Team.objects.create(name="Test Team", description="Test team")
+        self.group = Group.objects.create(name="Test Group", description="Test group")
 
         self.species = Species.objects.create(
-            name="Test Species", description="A test species", created_by=self.user, team=self.team
+            name="Test Species", description="A test species", created_by=self.user, group=self.group
         )
 
         self.project = Project.objects.create(
-            name="Test Project", description="A test project", created_by=self.user, team=self.team
+            name="Test Project", description="A test project", created_by=self.user, group=self.group
         )
 
         self.batch = TaskBatch.objects.create(
@@ -194,7 +194,7 @@ class TaskModelTest(BattycodaTestCase):
             wav_file_name="test.wav",
             species=self.species,
             project=self.project,
-            team=self.team,
+            group=self.group,
         )
 
         # Create test task
@@ -206,7 +206,7 @@ class TaskModelTest(BattycodaTestCase):
             project=self.project,
             batch=self.batch,
             created_by=self.user,
-            team=self.team,
+            group=self.group,
             status="pending",
         )
 

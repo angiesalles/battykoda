@@ -13,7 +13,7 @@
                 <div class="d-flex align-items-center mb-2">
                     <h4 class="mb-0">Task #{{ task.id }}</h4>
                     {% if task.created_by != request.user %}
-                        <span class="badge bg-info ms-2">Team</span>
+                        <span class="badge bg-info ms-2">Group</span>
                     {% endif %}
                 </div>
                 
@@ -23,7 +23,7 @@
                     <p class="small text-light mb-1">{{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</p>
                     <p class="small text-muted mb-1">By: {{ task.created_by.username }}
                     {% if task.created_by == request.user %}(you){% endif %}</p>
-                    <p class="small text-muted mb-1">Team: {{ task.team.name|default:"None" }}</p>
+                    <p class="small text-muted mb-1">Group: {{ task.group.name|default:"None" }}</p>
                     <p class="small text-muted mb-1">Project: {{ task.project }}</p>
                 </div>
                 

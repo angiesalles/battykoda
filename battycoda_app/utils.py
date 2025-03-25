@@ -143,7 +143,7 @@ def available_species():
 
 
 def import_default_species(user):
-    """Import default species (Carollia and Efuscus) for a new user's team
+    """Import default species (Carollia and Efuscus) for a new user's group
 
     Args:
         user: The User object to import species for
@@ -163,10 +163,10 @@ def import_default_species(user):
 
     logger.info(f"Importing default species for user {user.username}")
 
-    # Get the user's team
-    team = user.profile.team
-    if not team:
-        logger.warning(f"User {user.username} has no team, skipping species import")
+    # Get the user's group
+    group = user.profile.group
+    if not group:
+        logger.warning(f"User {user.username} has no group, skipping species import")
         return []
 
     created_species = []
@@ -189,10 +189,10 @@ def import_default_species(user):
 
     # Import each species
     for species_data in default_species:
-        # Create a unique name for this team
-        unique_name = f"{species_data['name']} - {team.name}"
+        # Create a unique name for this group
+        unique_name = f"{species_data['name']} - {group.name}"
 
-        # Skip if species already exists for this team
+        # Skip if species already exists for this group
         if Species.objects.filter(name=unique_name).exists():
             logger.info(f"Species {unique_name} already exists")
             continue
@@ -200,9 +200,9 @@ def import_default_species(user):
         try:
             # Create the species with a unique name
             species = Species.objects.create(
-                name=unique_name, description=species_data["description"], created_by=user, team=team
+                name=unique_name, description=species_data["description"], created_by=user, group=group
             )
-            logger.info(f"Created species {species.name} for team {team.name}")
+            logger.info(f"Created species {species.name} for group {group.name}")
 
             # Add the image if it exists
             # Use explicit paths for Docker container
@@ -303,23 +303,23 @@ def create_demo_task_batch(user):
 
     logger.info(f"Creating demo task batch for user {user.username}")
 
-    # Get the user's team and profile
+    # Get the user's group and profile
     profile = user.profile
-    team = profile.team
-    if not team:
-        logger.warning(f"User {user.username} has no team, skipping task batch creation")
+    group = profile.group
+    if not group:
+        logger.warning(f"User {user.username} has no group, skipping task batch creation")
         return None
 
     # Find the user's demo project
     try:
-        project = Project.objects.filter(team=team, name__contains="Demo Project").first()
+        project = Project.objects.filter(group=group, name__contains="Demo Project").first()
 
         if not project:
             logger.warning(f"No demo project found for {user.username}, skipping task batch creation")
             return None
 
         # Find the Carollia species
-        species = Species.objects.filter(team=team, name__contains="Carollia").first()
+        species = Species.objects.filter(group=group, name__contains="Carollia").first()
 
         if not species:
             logger.warning(f"No Carollia species found for {user.username}, skipping task batch creation")
@@ -366,7 +366,7 @@ def create_demo_task_batch(user):
             wav_file_name="bat1_angie_19.wav",
             species=species,
             project=project,
-            team=team,
+            group=group,
         )
 
         # Save the batch to get an ID
@@ -421,7 +421,7 @@ def create_demo_task_batch(user):
                             project=batch.project,
                             batch=batch,
                             created_by=user,
-                            team=team,
+                            group=group,
                             status="pending",
                         )
                         task.save()

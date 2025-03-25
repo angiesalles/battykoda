@@ -3,16 +3,16 @@
 {% block content %}
 <div class="container my-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Teams</h1>
-        <!-- Any user can create a team -->
-        <a href="{% url 'battycoda_app:create_team' %}" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Create Team
+        <h1>Groups</h1>
+        <!-- Any user can create a group -->
+        <a href="{% url 'battycoda_app:create_group' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create Group
         </a>
     </div>
 
     <div class="card shadow-sm">
         <div class="card-body">
-            {% if teams %}
+            {% if groups %}
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
@@ -24,30 +24,30 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for team in teams %}
+                            {% for group in groups %}
                                 <tr>
                                     <td>
-                                        <a href="{% url 'battycoda_app:team_detail' team.id %}">
-                                            {{ team.name }}
+                                        <a href="{% url 'battycoda_app:group_detail' group.id %}">
+                                            {{ group.name }}
                                         </a>
                                     </td>
-                                    <td>{{ team.description|truncatechars:100 }}</td>
-                                    <td>{{ team.created_at|date:"M d, Y" }}</td>
+                                    <td>{{ group.description|truncatechars:100 }}</td>
+                                    <td>{{ group.created_at|date:"M d, Y" }}</td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="{% url 'battycoda_app:team_detail' team.id %}" 
+                                            <a href="{% url 'battycoda_app:group_detail' group.id %}" 
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> View
                                             </a>
-                                            {% with is_team_admin=False %}
-                                              {% for membership in user.team_memberships.all %}
-                                                {% if membership.team.id == team.id and membership.is_admin %}
-                                                  {% with is_team_admin=True %}
-                                                    <a href="{% url 'battycoda_app:edit_team' team.id %}" 
+                                            {% with is_group_admin=False %}
+                                              {% for membership in user.group_memberships.all %}
+                                                {% if membership.group.id == group.id and membership.is_admin %}
+                                                  {% with is_group_admin=True %}
+                                                    <a href="{% url 'battycoda_app:edit_group' group.id %}" 
                                                       class="btn btn-sm btn-outline-secondary">
                                                       <i class="fas fa-edit"></i> Edit
                                                     </a>
-                                                    <a href="{% url 'battycoda_app:manage_team_members' team.id %}" 
+                                                    <a href="{% url 'battycoda_app:manage_group_members' group.id %}" 
                                                       class="btn btn-sm btn-outline-secondary">
                                                       <i class="fas fa-users"></i> Manage Members
                                                     </a>
@@ -64,7 +64,7 @@
                 </div>
             {% else %}
                 <div class="alert alert-info" role="alert">
-                    No teams found.
+                    No groups found.
                 </div>
             {% endif %}
         </div>

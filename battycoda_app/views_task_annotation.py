@@ -17,11 +17,11 @@ logger = logging.getLogger("battycoda.views_task_annotation")
 @login_required
 def task_annotation_view(request, task_id):
     """Show the annotation interface for a specific task"""
-    # Get the task - allow team members to access tasks from the same team
+    # Get the task - allow group members to access tasks from the same group
     task = get_object_or_404(Task, id=task_id)
 
     # Check if user has permission to view this task
-    if task.created_by != request.user and (not request.user.profile.team or task.team != request.user.profile.team):
+    if task.created_by != request.user and (not request.user.profile.group or task.group != request.user.profile.group):
         messages.error(request, "You don't have permission to view this task.")
         return redirect("battycoda_app:task_list")
 
@@ -81,14 +81,14 @@ def task_annotation_view(request, task_id):
         try:
             species_obj = Species.objects.get(name=species)
         except Species.DoesNotExist:
-            # If not found, try with team-based naming format
+            # If not found, try with group-based naming format
             # Look for a species that starts with the species name followed by " - "
             species_obj = Species.objects.filter(name__startswith=f"{species} - ").first()
 
-            # If still not found, try looking up by team
-            if not species_obj and hasattr(request.user, "profile") and request.user.profile.team:
+            # If still not found, try looking up by group
+            if not species_obj and hasattr(request.user, "profile") and request.user.profile.group:
                 species_obj = Species.objects.filter(
-                    name__startswith=f"{species} - ", team=request.user.profile.team
+                    name__startswith=f"{species} - ", group=request.user.profile.group
                 ).first()
 
             if not species_obj:

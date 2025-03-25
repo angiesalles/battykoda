@@ -24,16 +24,16 @@ def task_batch_list_view(request):
     # Get user profile
     profile = request.user.profile
 
-    # Filter batches by team if the user is in a team
-    if profile.team:
+    # Filter batches by group if the user is in a group
+    if profile.group:
         if profile.is_admin:
-            # Admin sees all batches in their team
-            batches = TaskBatch.objects.filter(team=profile.team).order_by("-created_at")
+            # Admin sees all batches in their group
+            batches = TaskBatch.objects.filter(group=profile.group).order_by("-created_at")
         else:
             # Regular user only sees their own batches
             batches = TaskBatch.objects.filter(created_by=request.user).order_by("-created_at")
     else:
-        # Fallback to showing only user's batches if no team is assigned
+        # Fallback to showing only user's batches if no group is assigned
         batches = TaskBatch.objects.filter(created_by=request.user).order_by("-created_at")
 
     context = {
@@ -50,9 +50,9 @@ def task_batch_detail_view(request, batch_id):
     batch = get_object_or_404(TaskBatch, id=batch_id)
 
     # Check if the user has permission to view this batch
-    # Either they created it or they're in the same team
+    # Either they created it or they're in the same group
     profile = request.user.profile
-    if batch.created_by != request.user and (not profile.team or batch.team != profile.team):
+    if batch.created_by != request.user and (not profile.group or batch.group != profile.group):
         messages.error(request, "You don't have permission to view this batch.")
         return redirect("battycoda_app:task_batch_list")
 
@@ -80,12 +80,12 @@ def create_task_batch_view(request):
             # Get user profile
             profile, created = UserProfile.objects.get_or_create(user=request.user)
 
-            # Set team to user's current active team
-            if profile.team:
-                batch.team = profile.team
+            # Set group to user's current active group
+            if profile.group:
+                batch.group = profile.group
             else:
-                # This is a critical issue - user must have a team
-                messages.error(request, "You must be assigned to a team to create a task batch")
+                # This is a critical issue - user must have a group
+                messages.error(request, "You must be assigned to a group to create a task batch")
                 return redirect("battycoda_app:create_task_batch")
 
             # Get the WAV file from the form and set the wav_file_name from it
@@ -166,7 +166,7 @@ def create_task_batch_view(request):
                                 project=batch.project,
                                 batch=batch,
                                 created_by=request.user,
-                                team=profile.team,
+                                group=profile.group,
                                 status="pending",
                             )
                             task.save()

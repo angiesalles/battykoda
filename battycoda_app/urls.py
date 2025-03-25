@@ -56,19 +56,19 @@ urlpatterns = [
     path("projects/<int:project_id>/", views.project_detail_view, name="project_detail"),
     path("projects/create/", views.create_project_view, name="create_project"),
     path("projects/<int:project_id>/edit/", views.edit_project_view, name="edit_project"),
-    # Team management routes
-    path("teams/", views.team_list_view, name="team_list"),
-    path("teams/<int:team_id>/", views.team_detail_view, name="team_detail"),
-    path("teams/create/", views.create_team_view, name="create_team"),
-    path("teams/<int:team_id>/edit/", views.edit_team_view, name="edit_team"),
-    path("teams/<int:team_id>/members/", views.manage_team_members_view, name="manage_team_members"),
-    path("teams/switch/<int:team_id>/", views.switch_team_view, name="switch_team"),
-    # Team users and invitations
-    path("users/", views.team_users_view, name="team_users"),
+    # Group management routes
+    path("groups/", views.group_list_view, name="group_list"),
+    path("groups/<int:group_id>/", views.group_detail_view, name="group_detail"),
+    path("groups/create/", views.create_group_view, name="create_group"),
+    path("groups/<int:group_id>/edit/", views.edit_group_view, name="edit_group"),
+    path("groups/<int:group_id>/members/", views.manage_group_members_view, name="manage_group_members"),
+    path("groups/switch/<int:group_id>/", views.switch_group_view, name="switch_group"),
+    # Group users and invitations
+    path("users/", views.group_users_view, name="group_users"),
     path("users/invite/", views.invite_user_view, name="invite_user"),
     path("invitation/<str:token>/", views.accept_invitation_view, name="accept_invitation"),
     # Debug route
-    path("debug/teams/", views.debug_teams_view, name="debug_teams"),
+    path("debug/groups/", views.debug_groups_view, name="debug_groups"),
     
     # Recordings management
     path("recordings/", views_recordings.recording_list_view, name="recording_list"),

@@ -3,7 +3,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
 
-from battycoda_app.models import Project, Species, Task, TaskBatch, Team, UserProfile
+from battycoda_app.models import Project, Species, Task, TaskBatch, Group, UserProfile
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 
@@ -19,22 +19,22 @@ class TaskViewsTest(BattycodaTestCase):
         self.user2 = User.objects.create_user(username="testuser2", email="test2@example.com", password="password123")
         self.profile2 = UserProfile.objects.get(user=self.user2)
 
-        # Create a test team
-        self.team = Team.objects.create(name="Test Team", description="A test team")
+        # Create a test group
+        self.group = Group.objects.create(name="Test Group", description="A test group")
 
-        # Set as active team for user1
-        self.profile.team = self.team
+        # Set as active group for user1
+        self.profile.group = self.group
         self.profile.is_admin = True
         self.profile.save()
 
         # Create test species
         self.species = Species.objects.create(
-            name="Test Species", description="A test species", created_by=self.user, team=self.team
+            name="Test Species", description="A test species", created_by=self.user, group=self.group
         )
 
         # Create test project
         self.project = Project.objects.create(
-            name="Test Project", description="A test project", created_by=self.user, team=self.team
+            name="Test Project", description="A test project", created_by=self.user, group=self.group
         )
 
         # Create test batch
@@ -45,7 +45,7 @@ class TaskViewsTest(BattycodaTestCase):
             wav_file_name="test.wav",
             species=self.species,
             project=self.project,
-            team=self.team,
+            group=self.group,
         )
 
         # Create test tasks
@@ -57,7 +57,7 @@ class TaskViewsTest(BattycodaTestCase):
             project=self.project,
             batch=self.batch,
             created_by=self.user,
-            team=self.team,
+            group=self.group,
             status="pending",
         )
 
@@ -69,7 +69,7 @@ class TaskViewsTest(BattycodaTestCase):
             project=self.project,
             batch=self.batch,
             created_by=self.user,
-            team=self.team,
+            group=self.group,
             status="in_progress",
         )
 
@@ -105,7 +105,7 @@ class TaskViewsTest(BattycodaTestCase):
             species=self.species,
             project=self.project,
             created_by=self.user2,
-            team=self.team,
+            group=self.group,
             status="pending",
         )
 

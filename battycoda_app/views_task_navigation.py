@@ -16,12 +16,12 @@ def get_next_task_from_batch_view(request, batch_id):
     # Get the batch
     batch = get_object_or_404(TaskBatch, id=batch_id)
 
-    # Get user profile and team
+    # Get user profile and group
     profile = request.user.profile
 
     # Check if user has access to this batch
-    if profile.team and batch.team == profile.team:
-        # User has access via team membership
+    if profile.group and batch.group == profile.group:
+        # User has access via group membership
         pass
     elif batch.created_by == request.user:
         # User created the batch
@@ -48,26 +48,26 @@ def get_next_task_from_batch_view(request, batch_id):
 def get_next_task_view(request):
     """Get the next undone task and redirect to the annotation interface,
     preferentially selecting from the same batch as the last completed task."""
-    # Get user profile and team
+    # Get user profile and group
     profile = request.user.profile
 
     # Initialize query for tasks that aren't done yet
     tasks_query = Task.objects.filter(is_done=False)
 
-    # If user has a team, include team tasks
-    if profile.team:
-        # Look for tasks from the user's team
-        tasks_query = tasks_query.filter(team=profile.team)
+    # If user has a group, include group tasks
+    if profile.group:
+        # Look for tasks from the user's group
+        tasks_query = tasks_query.filter(group=profile.group)
     else:
-        # Only look at user's own tasks if not in a team
+        # Only look at user's own tasks if not in a group
         tasks_query = tasks_query.filter(created_by=request.user)
 
     # Try to find the most recently completed task to check its batch
     recent_tasks = Task.objects.filter(is_done=True)
 
-    # Filter recent tasks by team or user
-    if profile.team:
-        recent_tasks = recent_tasks.filter(team=profile.team)
+    # Filter recent tasks by group or user
+    if profile.group:
+        recent_tasks = recent_tasks.filter(group=profile.group)
     else:
         recent_tasks = recent_tasks.filter(created_by=request.user)
 
@@ -106,18 +106,18 @@ def get_next_task_view(request):
 @login_required
 def get_last_task_view(request):
     """Get the last task the user worked on (most recently updated) and redirect to it"""
-    # Get user profile and team
+    # Get user profile and group
     profile = request.user.profile
 
     # Initialize query for tasks
     tasks_query = Task.objects.all()
 
-    # If user has a team, include team tasks
-    if profile.team:
-        # Look for tasks from the user's team
-        tasks_query = tasks_query.filter(team=profile.team)
+    # If user has a group, include group tasks
+    if profile.group:
+        # Look for tasks from the user's group
+        tasks_query = tasks_query.filter(group=profile.group)
     else:
-        # Only look at user's own tasks if not in a team
+        # Only look at user's own tasks if not in a group
         tasks_query = tasks_query.filter(created_by=request.user)
 
     # Get the most recently updated task

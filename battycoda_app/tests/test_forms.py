@@ -7,12 +7,12 @@ from battycoda_app.forms import (
     SpeciesForm,
     TaskForm,
     TaskUpdateForm,
-    TeamForm,
+    GroupForm,
     UserLoginForm,
     UserProfileForm,
     UserRegisterForm,
 )
-from battycoda_app.models import Project, Species, Team, UserProfile
+from battycoda_app.models import Project, Species, Group, UserProfile
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 
@@ -62,8 +62,8 @@ class UserFormsTest(BattycodaTestCase):
         # Regular user shouldn't see is_admin field
         self.assertNotIn("is_admin", form.fields)
 
-        # Team field should be disabled
-        self.assertTrue(form.fields["team"].disabled)
+        # Group field should be disabled
+        self.assertTrue(form.fields["group"].disabled)
 
     def test_user_profile_form_admin_user(self):
         # Create a mock user that is an admin
@@ -82,24 +82,24 @@ class TaskFormsTest(BattycodaTestCase):
 
         self.profile = UserProfile.objects.get(user=self.user)
 
-        self.team = Team.objects.create(name="Test Team", description="A test team")
+        self.group = Group.objects.create(name="Test Group", description="A test group")
 
-        # Set as active team for user
-        self.profile.team = self.team
+        # Set as active group for user
+        self.profile.group = self.group
         self.profile.save()
 
         self.species = Species.objects.create(
-            name="Test Species", description="A test species", created_by=self.user, team=self.team
+            name="Test Species", description="A test species", created_by=self.user, group=self.group
         )
 
         self.project = Project.objects.create(
-            name="Test Project", description="A test project", created_by=self.user, team=self.team
+            name="Test Project", description="A test project", created_by=self.user, group=self.group
         )
 
     def test_task_form_init(self):
         form = TaskForm(user=self.user)
 
-        # Form should have species and project fields filtered by team
+        # Form should have species and project fields filtered by group
         self.assertEqual(list(form.fields["species"].queryset), [self.species])
         self.assertEqual(list(form.fields["project"].queryset), [self.project])
 
@@ -135,12 +135,12 @@ class ProjectFormsTest(BattycodaTestCase):
         self.assertIn("name", form.errors)
 
 
-class TeamFormsTest(BattycodaTestCase):
-    def test_team_form_valid(self):
-        form = TeamForm(data={"name": "Test Team", "description": "A test team description"})
+class GroupFormsTest(BattycodaTestCase):
+    def test_group_form_valid(self):
+        form = GroupForm(data={"name": "Test Group", "description": "A test group description"})
         self.assertTrue(form.is_valid())
 
-    def test_team_form_invalid_missing_name(self):
-        form = TeamForm(data={"description": "A test team description"})
+    def test_group_form_invalid_missing_name(self):
+        form = GroupForm(data={"description": "A test group description"})
         self.assertFalse(form.is_valid())
         self.assertIn("name", form.errors)

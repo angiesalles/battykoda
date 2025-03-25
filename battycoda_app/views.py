@@ -6,8 +6,8 @@ from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import TeamForm
-from .models import Task, TaskBatch, TeamMembership
+from .forms import GroupForm
+from .models import Task, TaskBatch, GroupMembership
 
 # Set up logging
 logger = logging.getLogger("battycoda.views")
@@ -30,7 +30,7 @@ def index(request):
 
 # Project Management Views are now in views_project.py
 
-# Team Management Views are now in views_team.py
+# Group Management Views are now in views_group.py
 
 # Import audio views
 from .views_audio import audio_snippet_view, spectrogram_view
@@ -59,7 +59,7 @@ from .views_directory import (
 )
 
 # Import the invitation views
-from .views_invitations import accept_invitation_view, invite_user_view, team_users_view
+from .views_invitations import accept_invitation_view, invite_user_view, group_users_view
 
 # Import project views
 from .views_project import create_project_view, edit_project_view, project_detail_view, project_list_view
@@ -89,13 +89,13 @@ from .views_task import (
     wav_file_view,
 )
 
-# Import team views
-from .views_team import (
-    create_team_view,
-    debug_teams_view,
-    edit_team_view,
-    manage_team_members_view,
-    switch_team_view,
-    team_detail_view,
-    team_list_view,
+# Import group views
+from .views_group import (
+    create_group_view,
+    debug_groups_view,
+    edit_group_view,
+    manage_group_members_view,
+    switch_group_view,
+    group_detail_view,
+    group_list_view,
 )

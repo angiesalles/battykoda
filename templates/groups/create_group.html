@@ -4,9 +4,9 @@
 {% block content %}
 <div class="container my-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Create Team</h1>
-        <a href="{% url 'battycoda_app:team_list' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Teams
+        <h1>Create Group</h1>
+        <a href="{% url 'battycoda_app:group_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Groups
         </a>
     </div>
 
@@ -16,7 +16,7 @@
                 {% csrf_token %}
                 
                 <div class="mb-3">
-                    <label for="{{ form.name.id_for_label }}" class="form-label">Team Name</label>
+                    <label for="{{ form.name.id_for_label }}" class="form-label">Group Name</label>
                     {{ form.name|add_class:"form-control" }}
                     {% if form.name.errors %}
                         <div class="invalid-feedback d-block">{{ form.name.errors }}</div>
@@ -29,12 +29,12 @@
                     {% if form.description.errors %}
                         <div class="invalid-feedback d-block">{{ form.description.errors }}</div>
                     {% endif %}
-                    <div class="form-text">Provide a brief description of this team's purpose.</div>
+                    <div class="form-text">Provide a brief description of this group's purpose.</div>
                 </div>
                 
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Create Team
+                        <i class="fas fa-save"></i> Create Group
                     </button>
                 </div>
             </form>

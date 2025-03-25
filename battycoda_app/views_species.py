@@ -21,16 +21,16 @@ def species_list_view(request):
     # Get the user's profile
     profile = request.user.profile
 
-    # Filter species by team if the user is in a team
-    if profile.team:
+    # Filter species by group if the user is in a group
+    if profile.group:
         if profile.is_admin:
-            # Admin sees all species in their team
-            species_list = Species.objects.filter(team=profile.team)
+            # Admin sees all species in their group
+            species_list = Species.objects.filter(group=profile.group)
         else:
-            # Regular user only sees species in their team
-            species_list = Species.objects.filter(team=profile.team)
+            # Regular user only sees species in their group
+            species_list = Species.objects.filter(group=profile.group)
     else:
-        # If no team is assigned, show all species (legacy behavior)
+        # If no group is assigned, show all species (legacy behavior)
         species_list = Species.objects.all()
 
     context = {
@@ -76,8 +76,8 @@ def create_species_view(request):
             species = form.save(commit=False)
             species.created_by = request.user
 
-            # Always set team to user's active team
-            species.team = request.user.profile.team
+            # Always set group to user's active group
+            species.group = request.user.profile.group
             species.save()
 
             # Keep track of calls created from file

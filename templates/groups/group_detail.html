@@ -3,18 +3,18 @@
 {% block content %}
 <div class="container my-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Team: {{ team.name }}</h1>
+        <h1>Group: {{ group.name }}</h1>
         <div>
-            {% if request.user.profile.is_admin and request.user.profile.team == team %}
-            <a href="{% url 'battycoda_app:edit_team' team.id %}" class="btn btn-outline-secondary">
-                <i class="fas fa-edit"></i> Edit Team
+            {% if request.user.profile.is_admin and request.user.profile.group == group %}
+            <a href="{% url 'battycoda_app:edit_group' group.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-edit"></i> Edit Group
             </a>
-            <a href="{% url 'battycoda_app:manage_team_members' team.id %}" class="btn btn-outline-primary">
+            <a href="{% url 'battycoda_app:manage_group_members' group.id %}" class="btn btn-outline-primary">
                 <i class="fas fa-users"></i> Manage Members
             </a>
             {% endif %}
-            <a href="{% url 'battycoda_app:team_list' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Teams
+            <a href="{% url 'battycoda_app:group_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Groups
             </a>
         </div>
     </div>
@@ -23,26 +23,26 @@
         <div class="col-md-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light">
-                    <h5 class="mb-0">Team Information</h5>
+                    <h5 class="mb-0">Group Information</h5>
                 </div>
                 <div class="card-body">
-                    <p><strong>Description:</strong> {{ team.description|default:"No description provided" }}</p>
-                    <p><strong>Created At:</strong> {{ team.created_at|date:"F d, Y" }}</p>
-                    <p><strong>Total Members:</strong> {{ team.team_memberships.count }}</p>
+                    <p><strong>Description:</strong> {{ group.description|default:"No description provided" }}</p>
+                    <p><strong>Created At:</strong> {{ group.created_at|date:"F d, Y" }}</p>
+                    <p><strong>Total Members:</strong> {{ group.group_memberships.count }}</p>
                 </div>
             </div>
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Team Members</h5>
-                    {% if request.user.profile.is_admin and request.user.profile.team == team %}
-                    <a href="{% url 'battycoda_app:manage_team_members' team.id %}" class="btn btn-sm btn-primary">
+                    <h5 class="mb-0">Group Members</h5>
+                    {% if request.user.profile.is_admin and request.user.profile.group == group %}
+                    <a href="{% url 'battycoda_app:manage_group_members' group.id %}" class="btn btn-sm btn-primary">
                         <i class="fas fa-user-plus"></i> Manage
                     </a>
                     {% endif %}
                 </div>
                 <div class="card-body">
-                    {% if team.team_memberships.all %}
+                    {% if group.group_memberships.all %}
                         <div class="table-responsive">
                             <table class="table table-sm">
                                 <thead>
@@ -53,7 +53,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for membership in team.team_memberships.all %}
+                                    {% for membership in group.group_memberships.all %}
                                         <tr>
                                             <td>{{ membership.user.username }}</td>
                                             <td>{{ membership.user.email }}</td>
@@ -71,7 +71,7 @@
                         </div>
                     {% else %}
                         <div class="alert alert-info" role="alert">
-                            No members in this team.
+                            No members in this group.
                         </div>
                     {% endif %}
                 </div>
@@ -81,7 +81,7 @@
         <div class="col-md-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Team Projects</h5>
+                    <h5 class="mb-0">Group Projects</h5>
                     <a href="{% url 'battycoda_app:create_project' %}" class="btn btn-sm btn-primary">
                         <i class="fas fa-plus"></i> New Project
                     </a>
@@ -101,7 +101,7 @@
                         </div>
                     {% else %}
                         <div class="alert alert-info" role="alert">
-                            No projects for this team.
+                            No projects for this group.
                         </div>
                     {% endif %}
                 </div>
@@ -109,7 +109,7 @@
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Team Species</h5>
+                    <h5 class="mb-0">Group Species</h5>
                     <a href="{% url 'battycoda_app:create_species' %}" class="btn btn-sm btn-primary">
                         <i class="fas fa-plus"></i> New Species
                     </a>
@@ -129,7 +129,7 @@
                         </div>
                     {% else %}
                         <div class="alert alert-info" role="alert">
-                            No species for this team.
+                            No species for this group.
                         </div>
                     {% endif %}
                 </div>

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 
-from .models import Call, Project, Recording, Segment, Species, Task, TaskBatch, Team, UserProfile
+from .models import Call, Project, Recording, Segment, Species, Task, TaskBatch, Group, UserProfile
 
 
 class UserRegisterForm(UserCreationForm):
@@ -21,7 +21,7 @@ class UserLoginForm(AuthenticationForm):
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ["team", "is_admin"]  # Added team and admin fields
+        fields = ["group", "is_admin"]  # Added group and admin fields
 
     def __init__(self, *args, **kwargs):
         # Get the user making the request
@@ -31,8 +31,8 @@ class UserProfileForm(forms.ModelForm):
         # If user is not provided or not an admin, hide the is_admin field
         if not user or not user.profile.is_admin:
             self.fields.pop("is_admin", None)
-            if "team" in self.fields:
-                self.fields["team"].disabled = True
+            if "group" in self.fields:
+                self.fields["group"].disabled = True
 
 
 class TaskBatchForm(forms.ModelForm):
@@ -58,11 +58,11 @@ class TaskBatchForm(forms.ModelForm):
 
             profile, created = UserProfile.objects.get_or_create(user=user)
 
-            # Filter species and projects by user's team - always using profile object directly
-            if profile.team:
+            # Filter species and projects by user's group - always using profile object directly
+            if profile.group:
                 # Filter querysets
-                self.fields["species"].queryset = self.fields["species"].queryset.filter(team=profile.team)
-                self.fields["project"].queryset = self.fields["project"].queryset.filter(team=profile.team)
+                self.fields["species"].queryset = self.fields["species"].queryset.filter(group=profile.group)
+                self.fields["project"].queryset = self.fields["project"].queryset.filter(group=profile.group)
 
 
 class TaskForm(forms.ModelForm):
@@ -102,11 +102,11 @@ class TaskForm(forms.ModelForm):
 
             profile, created = UserProfile.objects.get_or_create(user=user)
 
-            # Filter species and projects by user's team - always using profile object directly
-            if profile.team:
+            # Filter species and projects by user's group - always using profile object directly
+            if profile.group:
                 # Filter querysets
-                self.fields["species"].queryset = self.fields["species"].queryset.filter(team=profile.team)
-                self.fields["project"].queryset = self.fields["project"].queryset.filter(team=profile.team)
+                self.fields["species"].queryset = self.fields["species"].queryset.filter(group=profile.group)
+                self.fields["project"].queryset = self.fields["project"].queryset.filter(group=profile.group)
 
 
 class TaskUpdateForm(forms.ModelForm):
@@ -168,18 +168,18 @@ class ProjectForm(forms.ModelForm):
         }
 
 
-class TeamForm(forms.ModelForm):
+class GroupForm(forms.ModelForm):
     class Meta:
-        model = Team
+        model = Group
         fields = ["name", "description"]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
         }
 
 
-class TeamInvitationForm(forms.Form):
+class GroupInvitationForm(forms.Form):
     email = forms.EmailField(
-        label="Email Address", help_text="Enter the email address of the person you want to invite to your team"
+        label="Email Address", help_text="Enter the email address of the person you want to invite to your group"
     )
 
 
@@ -215,10 +215,10 @@ class RecordingForm(forms.ModelForm):
             # Get or create user profile
             profile, created = UserProfile.objects.get_or_create(user=user)
             
-            # Filter species and projects by user's team
-            if profile.team:
-                self.fields["species"].queryset = self.fields["species"].queryset.filter(team=profile.team)
-                self.fields["project"].queryset = self.fields["project"].queryset.filter(team=profile.team)
+            # Filter species and projects by user's group
+            if profile.group:
+                self.fields["species"].queryset = self.fields["species"].queryset.filter(group=profile.group)
+                self.fields["project"].queryset = self.fields["project"].queryset.filter(group=profile.group)
 
 
 class SegmentForm(forms.ModelForm):

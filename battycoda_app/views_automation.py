@@ -17,13 +17,13 @@ def automation_home_view(request):
     """Display the main automation dashboard"""
     profile = request.user.profile
     
-    # Get recent detection runs for user's teams
-    if profile.team:
+    # Get recent detection runs for user's groups
+    if profile.group:
         if profile.is_admin:
-            recent_runs = DetectionRun.objects.filter(team=profile.team).order_by("-created_at")[:10]
+            recent_runs = DetectionRun.objects.filter(group=profile.group).order_by("-created_at")[:10]
         else:
             recent_runs = DetectionRun.objects.filter(
-                team=profile.team, created_by=request.user
+                group=profile.group, created_by=request.user
             ).order_by("-created_at")[:10]
     else:
         recent_runs = DetectionRun.objects.filter(created_by=request.user).order_by("-created_at")[:10]
@@ -40,16 +40,16 @@ def detection_run_list_view(request):
     """Display list of all detection runs"""
     profile = request.user.profile
     
-    # Filter detection runs by team if the user is in a team
-    if profile.team:
+    # Filter detection runs by group if the user is in a group
+    if profile.group:
         if profile.is_admin:
-            # Admin sees all runs in their team
-            runs = DetectionRun.objects.filter(team=profile.team).order_by("-created_at")
+            # Admin sees all runs in their group
+            runs = DetectionRun.objects.filter(group=profile.group).order_by("-created_at")
         else:
             # Regular user only sees their own runs
             runs = DetectionRun.objects.filter(created_by=request.user).order_by("-created_at")
     else:
-        # Fallback to showing only user's runs if no team is assigned
+        # Fallback to showing only user's runs if no group is assigned
         runs = DetectionRun.objects.filter(created_by=request.user).order_by("-created_at")
     
     context = {
@@ -67,7 +67,7 @@ def detection_run_detail_view(request, run_id):
     
     # Check if the user has permission to view this run
     profile = request.user.profile
-    if run.created_by != request.user and (not profile.team or run.team != profile.team):
+    if run.created_by != request.user and (not profile.group or run.group != profile.group):
         messages.error(request, "You don't have permission to view this detection run.")
         return redirect("battycoda_app:automation_home")
     
@@ -128,7 +128,7 @@ def create_detection_run_view(request, batch_id=None):
         
         # Check if user has permission
         profile = request.user.profile
-        if batch.created_by != request.user and (not profile.team or batch.team != profile.team):
+        if batch.created_by != request.user and (not profile.group or batch.group != profile.group):
             messages.error(request, "You don't have permission to create a detection run for this batch.")
             return redirect("battycoda_app:task_batch_list")
         
@@ -151,7 +151,7 @@ def create_detection_run_view(request, batch_id=None):
                 name=name or f"Detection for {batch.name}",
                 batch=batch,
                 created_by=request.user,
-                team=profile.team,
+                group=profile.group,
                 algorithm_type=classifier.response_format,  # Use the classifier's response format
                 classifier=classifier,
                 status="pending",
@@ -185,19 +185,19 @@ def create_detection_run_view(request, batch_id=None):
         
         # Check if user has permission
         profile = request.user.profile
-        if batch.created_by != request.user and (not profile.team or batch.team != profile.team):
+        if batch.created_by != request.user and (not profile.group or batch.group != profile.group):
             messages.error(request, "You don't have permission to create a detection run for this batch.")
             return redirect("battycoda_app:task_batch_list")
         
-        # Get available classifiers (team's classifiers and global classifiers)
-        if profile.team:
+        # Get available classifiers (group's classifiers and global classifiers)
+        if profile.group:
             classifiers = Classifier.objects.filter(is_active=True).filter(
-                models.Q(team=profile.team) | models.Q(team__isnull=True)
+                models.Q(group=profile.group) | models.Q(group__isnull=True)
             ).order_by('name')
         else:
-            classifiers = Classifier.objects.filter(is_active=True, team__isnull=True).order_by('name')
+            classifiers = Classifier.objects.filter(is_active=True, group__isnull=True).order_by('name')
             
-        logger.info(f"Found {classifiers.count()} classifiers for user {request.user.username} with team {profile.team}")
+        logger.info(f"Found {classifiers.count()} classifiers for user {request.user.username} with group {profile.group}")
         
         # If no classifiers are available, show a message and redirect
         if not classifiers.exists():
@@ -215,16 +215,16 @@ def create_detection_run_view(request, batch_id=None):
     # If no batch_id provided, show list of available batches
     profile = request.user.profile
     
-    # Filter batches by team if the user is in a team
-    if profile.team:
+    # Filter batches by group if the user is in a group
+    if profile.group:
         if profile.is_admin:
-            # Admin sees all batches in their team
-            batches = TaskBatch.objects.filter(team=profile.team).order_by("-created_at")
+            # Admin sees all batches in their group
+            batches = TaskBatch.objects.filter(group=profile.group).order_by("-created_at")
         else:
             # Regular user only sees their own batches
             batches = TaskBatch.objects.filter(created_by=request.user).order_by("-created_at")
     else:
-        # Fallback to showing only user's batches if no team is assigned
+        # Fallback to showing only user's batches if no group is assigned
         batches = TaskBatch.objects.filter(created_by=request.user).order_by("-created_at")
     
     context = {
@@ -242,7 +242,7 @@ def detection_run_status_view(request, run_id):
     
     # Check if the user has permission to view this run
     profile = request.user.profile
-    if run.created_by != request.user and (not profile.team or run.team != profile.team):
+    if run.created_by != request.user and (not profile.group or run.group != profile.group):
         return JsonResponse({"success": False, "error": "Permission denied"}, status=403)
     
     # Return the status
@@ -262,7 +262,7 @@ def apply_detection_results_view(request, run_id, task_id=None):
     
     # Check if the user has permission
     profile = request.user.profile
-    if run.created_by != request.user and (not profile.team or run.team != profile.team):
+    if run.created_by != request.user and (not profile.group or run.group != profile.group):
         messages.error(request, "You don't have permission to apply detection results.")
         return redirect("battycoda_app:detection_run_list")
     

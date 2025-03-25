@@ -21,20 +21,20 @@ logger = logging.getLogger("battycoda.views_recordings")
 
 @login_required
 def recording_list_view(request):
-    """Display list of all recordings for the user's team"""
+    """Display list of all recordings for the user's group"""
     # Get user profile
     profile = request.user.profile
 
-    # Filter recordings by team if the user is in a team
-    if profile.team:
+    # Filter recordings by group if the user is in a group
+    if profile.group:
         if profile.is_admin:
-            # Admin sees all recordings in their team
-            recordings = Recording.objects.filter(team=profile.team).order_by("-created_at")
+            # Admin sees all recordings in their group
+            recordings = Recording.objects.filter(group=profile.group).order_by("-created_at")
         else:
             # Regular user only sees their own recordings
             recordings = Recording.objects.filter(created_by=request.user).order_by("-created_at")
     else:
-        # Fallback to showing only user's recordings if no team is assigned
+        # Fallback to showing only user's recordings if no group is assigned
         recordings = Recording.objects.filter(created_by=request.user).order_by("-created_at")
 
     context = {
@@ -51,9 +51,9 @@ def recording_detail_view(request, recording_id):
     recording = get_object_or_404(Recording, id=recording_id)
 
     # Check if the user has permission to view this recording
-    # Either they created it or they're in the same team
+    # Either they created it or they're in the same group
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         messages.error(request, "You don't have permission to view this recording.")
         return redirect("battycoda_app:recording_list")
 
@@ -105,12 +105,12 @@ def create_recording_view(request):
             # Get user profile
             profile, created = UserProfile.objects.get_or_create(user=request.user)
 
-            # Set team to user's current active team
-            if profile.team:
-                recording.team = profile.team
+            # Set group to user's current active group
+            if profile.group:
+                recording.group = profile.group
             else:
-                # This is a critical issue - user must have a team
-                messages.error(request, "You must be assigned to a team to create a recording")
+                # This is a critical issue - user must have a group
+                messages.error(request, "You must be assigned to a group to create a recording")
                 return redirect("battycoda_app:create_recording")
 
             # Save the recording
@@ -150,7 +150,7 @@ def edit_recording_view(request, recording_id):
 
     # Check if the user has permission to edit this recording
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team or not profile.is_admin):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group or not profile.is_admin):
         messages.error(request, "You don't have permission to edit this recording.")
         return redirect("battycoda_app:recording_list")
 
@@ -178,7 +178,7 @@ def delete_recording_view(request, recording_id):
 
     # Check if the user has permission to delete this recording
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team or not profile.is_admin):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group or not profile.is_admin):
         messages.error(request, "You don't have permission to delete this recording.")
         return redirect("battycoda_app:recording_list")
 
@@ -204,7 +204,7 @@ def segment_recording_view(request, recording_id):
 
     # Check if the user has permission to edit this recording
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         messages.error(request, "You don't have permission to segment this recording.")
         return redirect("battycoda_app:recording_list")
 
@@ -249,7 +249,7 @@ def add_segment_view(request, recording_id):
 
     # Check if the user has permission
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         return JsonResponse({"success": False, "error": "Permission denied"}, status=403)
 
     if request.method == "POST":
@@ -285,7 +285,7 @@ def edit_segment_view(request, segment_id):
 
     # Check if the user has permission
     profile = request.user.profile
-    if segment.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if segment.created_by != request.user and (not profile.group or recording.group != profile.group):
         return JsonResponse({"success": False, "error": "Permission denied"}, status=403)
 
     if request.method == "POST":
@@ -318,7 +318,7 @@ def delete_segment_view(request, segment_id):
 
     # Check if the user has permission
     profile = request.user.profile
-    if segment.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if segment.created_by != request.user and (not profile.group or recording.group != profile.group):
         return JsonResponse({"success": False, "error": "Permission denied"}, status=403)
 
     if request.method == "POST":
@@ -336,7 +336,7 @@ def create_tasks_from_segments_view(request, recording_id):
 
     # Check if the user has permission
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         messages.error(request, "You don't have permission to create tasks from this recording.")
         return redirect("battycoda_app:recording_detail", recording_id=recording.id)
 
@@ -379,7 +379,7 @@ def recording_spectrogram_status_view(request, recording_id):
     
     # Check permission
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         return JsonResponse({"success": False, "error": "Permission denied"}, status=403)
     
     try:
@@ -447,7 +447,7 @@ def upload_pickle_segments_view(request, recording_id):
     
     # Check permission
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         messages.error(request, "You don't have permission to add segments to this recording.")
         return redirect("battycoda_app:recording_detail", recording_id=recording.id)
     
@@ -517,7 +517,7 @@ def get_audio_waveform_data(request, recording_id):
     
     # Check permission
     profile = request.user.profile
-    if recording.created_by != request.user and (not profile.team or recording.team != profile.team):
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         return JsonResponse({"success": False, "error": "Permission denied"}, status=403)
     
     try:

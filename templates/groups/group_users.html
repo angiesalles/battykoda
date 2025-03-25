@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Team Users - {{ team.name }}{% endblock %}
+{% block title %}Group Users - {{ group.name }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Users in {{ team.name }}</h1>
+        <h1>Users in {{ group.name }}</h1>
         <a href="{% url 'battycoda_app:invite_user' %}" class="btn btn-primary">
             <i class="fas fa-envelope me-1"></i> Invite User
         </a>
@@ -15,7 +15,7 @@
         <div class="col-md-8">
             <div class="card mb-4">
                 <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Team Members</h5>
+                    <h5 class="mb-0">Group Members</h5>
                 </div>
                 <div class="card-body">
                     <table class="table table-hover">
@@ -28,7 +28,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for membership in team_memberships %}
+                            {% for membership in group_memberships %}
                             <tr>
                                 <td>{{ membership.user.username }}</td>
                                 <td>{{ membership.user.email }}</td>
@@ -37,7 +37,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="4" class="text-center">No team members found.</td>
+                                <td colspan="4" class="text-center">No group members found.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

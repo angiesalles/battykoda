@@ -43,12 +43,12 @@ def send_mail(subject, message, recipient_list, html_message=None, from_email=No
         return False
 
 
-def send_invitation_email(team_name, inviter_name, recipient_email, invitation_link, expires_at):
+def send_invitation_email(group_name, inviter_name, recipient_email, invitation_link, expires_at):
     """
-    Send a team invitation email.
+    Send a group invitation email.
 
     Args:
-        team_name (str): Name of the team
+        group_name (str): Name of the group 
         inviter_name (str): Name of the person who sent the invitation
         recipient_email (str): Email address of the recipient
         invitation_link (str): Link to accept the invitation
@@ -57,11 +57,11 @@ def send_invitation_email(team_name, inviter_name, recipient_email, invitation_l
     Returns:
         bool: True if email was sent successfully, False otherwise
     """
-    subject = f"Invitation to join {team_name} on BattyCoda"
+    subject = f"Invitation to join {group_name} on BattyCoda"
 
     # Create plain text message
     message = (
-        f"You have been invited to join {team_name} on BattyCoda by {inviter_name}. "
+        f"You have been invited to join {group_name} on BattyCoda by {inviter_name}. "
         f"Visit {invitation_link} to accept. "
         f"This invitation will expire on {expires_at.strftime('%Y-%m-%d %H:%M')}."
     )
@@ -70,7 +70,7 @@ def send_invitation_email(team_name, inviter_name, recipient_email, invitation_l
     html_message = render_to_string(
         "emails/invitation_email.html",
         {
-            "team_name": team_name,
+            "group_name": group_name,
             "inviter_name": inviter_name,
             "invitation_link": invitation_link,
             "expires_at": expires_at.strftime("%Y-%m-%d %H:%M"),

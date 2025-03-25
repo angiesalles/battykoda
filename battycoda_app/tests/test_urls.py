@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.urls import resolve, reverse
 
-from battycoda_app import views, views_auth, views_task, views_team
+from battycoda_app import views, views_auth, views_task, views_group
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 
@@ -30,30 +30,30 @@ class UrlsTest(BattycodaTestCase):
         url = reverse("battycoda_app:profile")
         self.assertEqual(resolve(url).func, views_auth.profile_view)
 
-    def test_team_urls(self):
-        # Team list
-        url = reverse("battycoda_app:team_list")
-        self.assertEqual(resolve(url).func, views_team.team_list_view)
+    def test_group_urls(self):
+        # Group list
+        url = reverse("battycoda_app:group_list")
+        self.assertEqual(resolve(url).func, views_group.group_list_view)
 
-        # Create team
-        url = reverse("battycoda_app:create_team")
-        self.assertEqual(resolve(url).func, views_team.create_team_view)
+        # Create group
+        url = reverse("battycoda_app:create_group")
+        self.assertEqual(resolve(url).func, views_group.create_group_view)
 
-        # Team detail with ID parameter
-        url = reverse("battycoda_app:team_detail", args=[1])
-        self.assertEqual(resolve(url).func, views_team.team_detail_view)
+        # Group detail with ID parameter
+        url = reverse("battycoda_app:group_detail", args=[1])
+        self.assertEqual(resolve(url).func, views_group.group_detail_view)
 
-        # Edit team with ID parameter
-        url = reverse("battycoda_app:edit_team", args=[1])
-        self.assertEqual(resolve(url).func, views_team.edit_team_view)
+        # Edit group with ID parameter
+        url = reverse("battycoda_app:edit_group", args=[1])
+        self.assertEqual(resolve(url).func, views_group.edit_group_view)
 
-        # Manage team members with ID parameter
-        url = reverse("battycoda_app:manage_team_members", args=[1])
-        self.assertEqual(resolve(url).func, views_team.manage_team_members_view)
+        # Manage group members with ID parameter
+        url = reverse("battycoda_app:manage_group_members", args=[1])
+        self.assertEqual(resolve(url).func, views_group.manage_group_members_view)
 
-        # Switch team with ID parameter
-        url = reverse("battycoda_app:switch_team", args=[1])
-        self.assertEqual(resolve(url).func, views_team.switch_team_view)
+        # Switch group with ID parameter
+        url = reverse("battycoda_app:switch_group", args=[1])
+        self.assertEqual(resolve(url).func, views_group.switch_group_view)
 
     def test_task_urls(self):
         # Task list

@@ -178,8 +178,8 @@
         <a href="{% url 'battycoda_app:species_list' %}">Species</a>
         <a href="{% url 'battycoda_app:project_list' %}">Projects</a>
         <a href="{% url 'battycoda_app:automation_home' %}">Automation</a>
-        {% if user.profile.is_admin and user.profile.team %}
-        <a href="{% url 'battycoda_app:team_users' %}">Users</a>
+        {% if user.profile.is_admin and user.profile.group %}
+        <a href="{% url 'battycoda_app:group_users' %}">Users</a>
         {% endif %}
         {% if user.is_staff %}
         <a href="{% url 'admin:index' %}">Admin</a>
@@ -194,28 +194,28 @@
         <span class="me-3">Logged in as: <strong>{{ user.username }}</strong></span>
         <a href="{% url 'battycoda_app:profile' %}" style="margin-right: 15px;">Profile</a>
         
-        <!-- Team Dropdown -->
+        <!-- Group Dropdown -->
         <div class="dropdown me-3">
-            <button class="btn btn-secondary dropdown-toggle" type="button" id="teamDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                {% if user.profile.team %}Team: {{ user.profile.team.name }}{% else %}No Team{% endif %}
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="groupDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                {% if user.profile.group %}Group: {{ user.profile.group.name }}{% else %}No Group{% endif %}
             </button>
-            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="teamDropdown">
-                <li><h6 class="dropdown-header">Your Teams</h6></li>
-                {% for membership in user.team_memberships.all %}
+            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="groupDropdown">
+                <li><h6 class="dropdown-header">Your Groups</h6></li>
+                {% for membership in user.group_memberships.all %}
                 <li>
-                    <a class="dropdown-item {% if user.profile.team == membership.team %}active{% endif %}" 
-                       href="{% url 'battycoda_app:switch_team' team_id=membership.team.id %}">
-                        {{ membership.team.name }}
+                    <a class="dropdown-item {% if user.profile.group == membership.group %}active{% endif %}" 
+                       href="{% url 'battycoda_app:switch_group' group_id=membership.group.id %}">
+                        {{ membership.group.name }}
                         {% if membership.is_admin %}<i class="fas fa-user-shield ms-1" title="Admin"></i>{% endif %}
-                        {% if user.profile.team == membership.team %}<i class="fas fa-check ms-2"></i>{% endif %}
+                        {% if user.profile.group == membership.group %}<i class="fas fa-check ms-2"></i>{% endif %}
                     </a>
                 </li>
                 {% empty %}
-                <li><span class="dropdown-item">No teams available</span></li>
+                <li><span class="dropdown-item">No groups available</span></li>
                 {% endfor %}
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="{% url 'battycoda_app:create_team' %}">
-                    <i class="fas fa-plus-circle me-1"></i> Create New Team
+                <li><a class="dropdown-item" href="{% url 'battycoda_app:create_group' %}">
+                    <i class="fas fa-plus-circle me-1"></i> Create New Group
                 </a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="{% url 'battycoda_app:logout' %}">

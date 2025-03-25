@@ -12,7 +12,7 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Classifier)
 class ClassifierAdmin(admin.ModelAdmin):
-    list_display = ("name", "response_format", "service_url", "is_active", "team")
-    list_filter = ("response_format", "is_active", "team")
+    list_display = ("name", "response_format", "service_url", "is_active", "group")
+    list_filter = ("response_format", "is_active", "group")
     search_fields = ("name", "description", "service_url")
     list_editable = ("is_active",)

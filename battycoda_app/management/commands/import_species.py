@@ -51,9 +51,9 @@ class Command(BaseCommand):
         for user in users:
             self.stdout.write(f"Processing user: {user.username}")
             
-            # Skip if user has no team
-            if not hasattr(user, 'profile') or not user.profile.team:
-                self.stdout.write(self.style.WARNING(f"User {user.username} has no profile or team, skipping"))
+            # Skip if user has no group
+            if not hasattr(user, 'profile') or not user.profile.group:
+                self.stdout.write(self.style.WARNING(f"User {user.username} has no profile or group, skipping"))
                 continue
                 
             # Import default species

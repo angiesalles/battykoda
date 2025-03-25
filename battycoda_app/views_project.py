@@ -17,16 +17,16 @@ def project_list_view(request):
     # Get the user's profile
     profile = request.user.profile
 
-    # Filter projects by team if the user is in a team
-    if profile.team:
+    # Filter projects by group if the user is in a group
+    if profile.group:
         if profile.is_admin:
-            # Admin sees all projects in their team
-            project_list = Project.objects.filter(team=profile.team)
+            # Admin sees all projects in their group
+            project_list = Project.objects.filter(group=profile.group)
         else:
-            # Regular user only sees projects in their team
-            project_list = Project.objects.filter(team=profile.team)
+            # Regular user only sees projects in their group
+            project_list = Project.objects.filter(group=profile.group)
     else:
-        # If no team is assigned, show all projects (legacy behavior)
+        # If no group is assigned, show all projects (legacy behavior)
         project_list = Project.objects.all()
 
     context = {
@@ -65,8 +65,8 @@ def create_project_view(request):
             project = form.save(commit=False)
             project.created_by = request.user
 
-            # Always set team to user's active team
-            project.team = request.user.profile.team
+            # Always set group to user's active group
+            project.group = request.user.profile.group
             project.save()
 
             messages.success(request, "Project created successfully.")
@@ -86,8 +86,8 @@ def edit_project_view(request, project_id):
     """Handle editing of a project"""
     project = get_object_or_404(Project, id=project_id)
 
-    # Only allow editing if the user is admin or in the same team
-    if request.user.profile.is_admin or (request.user.profile.team and request.user.profile.team == project.team):
+    # Only allow editing if the user is admin or in the same group
+    if request.user.profile.is_admin or (request.user.profile.group and request.user.profile.group == project.group):
         if request.method == "POST":
             form = ProjectForm(request.POST, instance=project, user=request.user)
             if form.is_valid():

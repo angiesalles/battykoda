@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Invite User to {{ team.name }}{% endblock %}
+{% block title %}Invite User to {{ group.name }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -8,12 +8,12 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header bg-dark text-white">
-                    <h2 class="mb-0 h5">Invite a User to {{ team.name }}</h2>
+                    <h2 class="mb-0 h5">Invite a User to {{ group.name }}</h2>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Send an invitation email to add someone to your team. They'll receive a link to join BattyCoda 
-                        and will be automatically added to your team when they register or log in.
+                        Send an invitation email to add someone to your group. They'll receive a link to join BattyCoda 
+                        and will be automatically added to your group when they register or log in.
                     </p>
                     
                     <form method="post">
@@ -39,7 +39,7 @@
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-paper-plane me-1"></i> Send Invitation
                             </button>
-                            <a href="{% url 'battycoda_app:team_users' %}" class="btn btn-outline-secondary">
+                            <a href="{% url 'battycoda_app:group_users' %}" class="btn btn-outline-secondary">
                                 <i class="fas fa-times me-1"></i> Cancel
                             </a>
                         </div>

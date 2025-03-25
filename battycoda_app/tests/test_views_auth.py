@@ -5,7 +5,7 @@ from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
-from battycoda_app.models import Team, TeamInvitation, TeamMembership, UserProfile
+from battycoda_app.models import Group, GroupInvitation, GroupMembership, UserProfile
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 
@@ -16,15 +16,15 @@ class AuthViewsTest(BattycodaTestCase):
         # Create a test user
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
 
-        # Create a second user for testing team functionality
+        # Create a second user for testing group functionality
         self.user2 = User.objects.create_user(username="testuser2", email="test2@example.com", password="password123")
 
-        # Create a team for testing invitations
-        self.team = Team.objects.create(name="Test Team", description="A test team for invitations")
+        # Create a group for testing invitations
+        self.group = Group.objects.create(name="Test Group", description="A test group for invitations")
 
-        # Create a team invitation
-        self.invitation = TeamInvitation.objects.create(
-            team=self.team,
+        # Create a group invitation
+        self.invitation = GroupInvitation.objects.create(
+            group=self.group,
             email="new@example.com",
             invited_by=self.user,
             token="testtoken123",
@@ -78,14 +78,14 @@ class AuthViewsTest(BattycodaTestCase):
         # Check that the user was created
         self.assertTrue(User.objects.filter(username="newuser").exists())
 
-        # Check that profile and personal team were created
+        # Check that profile and personal group were created
         user = User.objects.get(username="newuser")
         profile = UserProfile.objects.get(user=user)
         self.assertIsNotNone(profile)
-        self.assertIsNotNone(profile.team)
+        self.assertIsNotNone(profile.group)
 
-        # Test that a team membership was created
-        self.assertTrue(TeamMembership.objects.filter(user=user, team=profile.team).exists())
+        # Test that a group membership was created
+        self.assertTrue(GroupMembership.objects.filter(user=user, group=profile.group).exists())
 
     def test_register_with_invitation(self):
         # Set up session
@@ -108,11 +108,11 @@ class AuthViewsTest(BattycodaTestCase):
         # Check that the user was created
         user = User.objects.get(username="inviteduser")
 
-        # Check that the user was added to the invited team
-        self.assertTrue(TeamMembership.objects.filter(user=user, team=self.team).exists())
+        # Check that the user was added to the invited group
+        self.assertTrue(GroupMembership.objects.filter(user=user, group=self.group).exists())
 
         # Check that the invitation was marked as accepted
-        invitation = TeamInvitation.objects.get(token="testtoken123")
+        invitation = GroupInvitation.objects.get(token="testtoken123")
         self.assertTrue(invitation.accepted)
 
     def test_logout_view(self):

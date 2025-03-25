@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .forms import UserLoginForm, UserProfileForm, UserRegisterForm
-from .models import TeamInvitation, TeamMembership, UserProfile
+from .models import GroupInvitation, GroupMembership, UserProfile
 from .utils import ensure_user_directory_exists
 
 # Set up logging
@@ -42,17 +42,17 @@ def login_view(request):
                 # Process invitation if there is one
                 if invitation_token:
                     try:
-                        invitation = TeamInvitation.objects.get(token=invitation_token)
+                        invitation = GroupInvitation.objects.get(token=invitation_token)
                         if not invitation.is_expired and not invitation.accepted:
-                            # Add user to team using TeamMembership model
-                            membership, created = TeamMembership.objects.get_or_create(
+                            # Add user to group using GroupMembership model
+                            membership, created = GroupMembership.objects.get_or_create(
                                 user=user,
-                                team=invitation.team,
+                                group=invitation.group,
                                 defaults={"is_admin": False},  # New members aren't admins by default
                             )
 
-                            # Set the team from the invitation as active
-                            user.profile.team = invitation.team
+                            # Set the group from the invitation as active
+                            user.profile.group = invitation.group
                             user.profile.save()
 
                             # Mark invitation as accepted
@@ -62,8 +62,8 @@ def login_view(request):
                             # Clear the invitation token from session
                             del request.session["invitation_token"]
 
-                            messages.success(request, f'You have been added to the team "{invitation.team.name}".')
-                    except TeamInvitation.DoesNotExist:
+                            messages.success(request, f'You have been added to the group "{invitation.group.name}".')
+                    except GroupInvitation.DoesNotExist:
                         # If invitation doesn't exist, just continue with login
                         pass
 
@@ -91,10 +91,10 @@ def register_view(request):
     invitation = None
     if invitation_token:
         try:
-            invitation = TeamInvitation.objects.get(token=invitation_token)
+            invitation = GroupInvitation.objects.get(token=invitation_token)
             # Pre-fill email if it matches the invitation
             initial_email = invitation.email
-        except TeamInvitation.DoesNotExist:
+        except GroupInvitation.DoesNotExist:
             invitation = None
             initial_email = ""
     else:
@@ -114,15 +114,15 @@ def register_view(request):
                 # Get the user's profile
                 profile = user.profile
 
-                # Create team membership
-                membership, created = TeamMembership.objects.get_or_create(
+                # Create group membership
+                membership, created = GroupMembership.objects.get_or_create(
                     user=user,
-                    team=invitation.team,
+                    group=invitation.group,
                     defaults={"is_admin": False},  # New members aren't admins by default
                 )
 
-                # Set the team from the invitation as active
-                profile.team = invitation.team
+                # Set the group from the invitation as active
+                profile.group = invitation.group
                 profile.save()
 
                 # Mark invitation as accepted
@@ -135,7 +135,7 @@ def register_view(request):
 
                 messages.success(
                     request,
-                    f'Registration successful! You have been added to the team "{invitation.team.name}". Please log in.',
+                    f'Registration successful! You have been added to the group "{invitation.group.name}". Please log in.',
                 )
             else:
                 messages.success(request, "Registration successful! Please log in.")
@@ -163,14 +163,14 @@ def profile_view(request):
     """Display user profile"""
     profile, created = UserProfile.objects.get_or_create(user=request.user)
 
-    # Get all teams the user is a member of through TeamMembership
-    team_memberships = TeamMembership.objects.filter(user=request.user).select_related("team")
+    # Get all groups the user is a member of through GroupMembership
+    group_memberships = GroupMembership.objects.filter(user=request.user).select_related("group")
 
     context = {
         "user": request.user,
         "profile": profile,
-        "team_memberships": team_memberships,
-        "active_team": profile.team,  # The currently active team
+        "group_memberships": group_memberships,
+        "active_group": profile.group,  # The currently active group
     }
 
     return render(request, "auth/profile.html", context)

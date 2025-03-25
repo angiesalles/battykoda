@@ -30,8 +30,8 @@ if env_file.exists():
 SECRET_KEY = 'django-insecure-r)5pg=&w_$mad+)iuy(o8zv9!f4saom0@#=tw$(@_b&xa51oga'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Get debug setting from environment, default to False for security
-DEBUG = os.environ.get('DJANGO_DEBUG', '0').lower() in ['true', 't', '1', 'yes', 'y']
+# Temporarily enabling DEBUG to troubleshoot
+DEBUG = True
 
 # Get domain name from environment
 DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from battycoda_app.models import Species, Team
+from battycoda_app.models import Species, Group
 from battycoda_app.utils import import_default_species
 
 
@@ -15,11 +15,11 @@ class UtilsTest(TestCase):
         # Create a user
         user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
 
-        # Create a team
-        team = Team.objects.create(name="Test Team", description="Test team")
+        # Create a group
+        group = Group.objects.create(name="Test Group", description="Test group")
 
         # Setup user profile
-        user.profile.team = team
+        user.profile.group = group
         user.profile.save()
 
         # Mock the open file
