@@ -16,7 +16,8 @@ import numpy as np
 from celery.result import AsyncResult
 
 from ..utils import convert_path_to_os_specific
-from .tasks import generate_spectrogram_task, prefetch_spectrograms
+
+# Removed unused imports
 from .utils import appropriate_file, get_audio_bit, normal_hwin, overview_hwin
 
 # Configure logging
@@ -84,7 +85,10 @@ def handle_spectrogram(request):
 
         # Image doesn't exist, need to generate it
         logger.info(f"Cache miss. Generating image: {file_path}")
-
+        
+        # Add a flag to indicate this is dynamically generated
+        args_dict["generated_on_fly"] = "1"
+        
         # Launch Celery task to generate the image
         from celery import current_app
 

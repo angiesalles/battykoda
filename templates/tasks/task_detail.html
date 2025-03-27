@@ -66,11 +66,23 @@
         </div>
         <div class="card-body">
             <div class="row mb-4">
-                <div class="col-md-6">
-                    <a href="#" class="btn btn-primary">View Spectrogram</a>
+                <div class="col-md-8">
+                    <div class="btn-group" role="group" aria-label="Task Actions">
+                        <a href="{% url 'battycoda_app:annotate_task' task.id %}" class="btn btn-primary btn-lg" 
+                           data-bs-toggle="tooltip" data-bs-placement="top" title="Go to the annotation interface for this task">
+                            <i class="fas fa-tag me-1"></i> Annotate Task
+                        </a>
+                        {% if task.batch %}
+                        <a href="{% url 'battycoda_app:task_batch_detail' task.batch.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-layer-group me-1"></i> View Batch
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="col-md-6 text-md-end">
-                    <a href="{% url 'battycoda_app:task_list' %}" class="btn btn-secondary">Back to Tasks</a>
+                <div class="col-md-4 text-md-end">
+                    <a href="{% url 'battycoda_app:task_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Tasks
+                    </a>
                 </div>
             </div>
             
@@ -143,4 +155,16 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialize Bootstrap tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
 {% endblock %}

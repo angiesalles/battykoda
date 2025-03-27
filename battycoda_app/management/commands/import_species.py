@@ -1,8 +1,10 @@
+import logging
+
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
 from battycoda_app.utils import import_default_species
-import logging
+
 
 class Command(BaseCommand):
     help = "Import default species for all users or a specific user"

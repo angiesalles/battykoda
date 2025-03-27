@@ -1,42 +1,47 @@
-{% extends 'base.html' %}
+{% extends 'list_view_base.html' %}
+{% load static %}
 
-{% block title %}Projects List - BattyCoda{% endblock %}
+{% block page_title %}Projects{% endblock %}
+{% block list_title %}Projects{% endblock %}
+{% block card_title %}All Projects{% endblock %}
+{% block item_count %}{{ project_list|length }}{% endblock %}
 
-{% block content %}
-<div class="section">
-    <h2>Projects List</h2>
-    
-    <div style="margin-bottom: 20px;">
-        <a href="{% url 'battycoda_app:create_project' %}" class="button">Add New Project</a>
-    </div>
-    
-    {% if project_list %}
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Name</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created By</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for project in project_list %}
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">
-                    <a href="{% url 'battycoda_app:project_detail' project.id %}">{{ project.name }}</a>
-                </td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ project.created_at|date:"M d, Y" }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ project.created_by.username }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">
-                    <a href="{% url 'battycoda_app:edit_project' project.id %}" class="button">Edit</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No projects have been added yet.</p>
-    {% endif %}
-</div>
+{% block action_buttons %}
+<a href="{% url 'battycoda_app:create_project' %}" class="btn btn-primary" 
+   data-bs-toggle="tooltip" data-bs-placement="bottom" title="Add a new project">
+    <i class="fas fa-plus"></i> New Project
+</a>
 {% endblock %}
+
+{% block table_header %}
+<th>Name</th>
+<th>Tasks</th>
+<th>Batches</th>
+<th>Created</th>
+<th>Created By</th>
+<th>Actions</th>
+{% endblock %}
+
+{% block data_table %}
+{% with items=project_list %}
+    {{ block.super }}
+{% endwith %}
+{% endblock %}
+
+{% block detail_url %}{% url 'battycoda_app:project_detail' item.id %}{% endblock %}
+{% block view_url %}{% url 'battycoda_app:project_detail' item.id %}{% endblock %}
+{% block edit_url %}{% url 'battycoda_app:edit_project' item.id %}{% endblock %}
+{% block delete_url %}{% url 'battycoda_app:delete_project' item.id %}{% endblock %}
+
+{% block item_fields %}
+<td>{{ item.tasks.count }}</td>
+<td>{{ item.task_batches.count }}</td>
+<td>{{ item.created_at|date:"M d, Y" }}</td>
+<td>{{ item.created_by.username }}</td>
+{% endblock %}
+
+{% block empty_icon %}fas fa-folder-open{% endblock %}
+{% block empty_title %}No Projects Found{% endblock %}
+{% block empty_text %}Create your first project to get started.{% endblock %}
+{% block create_url %}{% url 'battycoda_app:create_project' %}{% endblock %}
+{% block create_text %}Add New Project{% endblock %}

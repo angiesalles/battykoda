@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from battycoda_app.models import Species, Group
+from battycoda_app.models import Group, Species
 from battycoda_app.utils import import_default_species
 
 

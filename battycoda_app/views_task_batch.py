@@ -1,18 +1,21 @@
+import csv
 import logging
 import pickle
 import traceback
+from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 import numpy as np
 
+from .audio.utils import process_pickle_file
 from .forms import TaskBatchForm
-from .models import Task, TaskBatch, UserProfile
+from .models import Recording, Segment, Task, TaskBatch, UserProfile
 
 # Set up logging
 logger = logging.getLogger("battycoda.views_task_batch")
@@ -68,8 +71,75 @@ def task_batch_detail_view(request, batch_id):
 
 
 @login_required
+def export_task_batch_view(request, batch_id):
+    """Export task batch results to CSV"""
+    # Get the batch by ID
+    batch = get_object_or_404(TaskBatch, id=batch_id)
+
+    # Check if the user has permission to export this batch
+    # Either they created it or they're in the same group
+    profile = request.user.profile
+    if batch.created_by != request.user and (not profile.group or batch.group != profile.group):
+        messages.error(request, "You don't have permission to export this batch.")
+        return redirect("battycoda_app:task_batch_list")
+
+    # Get tasks with ascending ID order
+    tasks = Task.objects.filter(batch=batch).order_by("id")
+
+    # Create HTTP response with CSV content type
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"taskbatch_{batch.id}_{batch.name.replace(' ', '_')}_{timestamp}.csv"
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    
+    # Create CSV writer
+    writer = csv.writer(response)
+    
+    # Write header row
+    writer.writerow([
+        "Task ID", 
+        "Onset (s)", 
+        "Offset (s)", 
+        "Duration (s)",
+        "Status", 
+        "Label", 
+        "Classification Result", 
+        "Confidence", 
+        "Notes",
+        "WAV File", 
+        "Species", 
+        "Project", 
+        "Created By", 
+        "Created At", 
+        "Updated At"
+    ])
+    
+    # Write data rows
+    for task in tasks:
+        writer.writerow([
+            task.id,
+            task.onset,
+            task.offset,
+            task.offset - task.onset,
+            task.status,
+            task.label if task.label else "",
+            task.classification_result if task.classification_result else "",
+            task.confidence if task.confidence is not None else "",
+            task.notes.replace('\n', ' ').replace('\r', '') if task.notes else "",
+            task.wav_file_name,
+            task.species.name,
+            task.project.name,
+            task.created_by.username,
+            task.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            task.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
+        ])
+    
+    return response
+
+
+@login_required
 def create_task_batch_view(request):
-    """Handle creation of a new task batch with pickle file and wav file upload"""
+    """Handle creation of a new task batch with WAV file upload, creating a recording and segments from pickle"""
     if request.method == "POST":
         form = TaskBatchForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
@@ -91,7 +161,6 @@ def create_task_batch_view(request):
             # Get the WAV file from the form and set the wav_file_name from it
             if "wav_file" in request.FILES:
                 # The wav_file field will be saved automatically when the form is saved
-                # Always set wav_file_name from the uploaded file's name
                 wav_file = request.FILES["wav_file"]
                 batch.wav_file_name = wav_file.name
             else:
@@ -100,111 +169,48 @@ def create_task_batch_view(request):
 
             # Save the batch with files
             batch.save()
-
-            # Process the pickle file
-            pickle_file = request.FILES["pickle_file"]
-
+            
+            # Create a Recording object from the WAV file
+            recording = None
+            segments_created = 0
+            
             try:
-                # Load the pickle file
-                pickle_data = pickle.load(pickle_file)
-
-                # Extract onsets and offsets
-                # Check if the data is a dictionary or a list
-                if isinstance(pickle_data, dict):
-                    onsets = pickle_data.get("onsets", [])
-                    offsets = pickle_data.get("offsets", [])
-                elif isinstance(pickle_data, list) and len(pickle_data) >= 2:
-                    # Assume first item is onsets, second is offsets
-                    onsets = pickle_data[0]
-                    offsets = pickle_data[1]
-                elif isinstance(pickle_data, tuple) and len(pickle_data) >= 2:
-                    # Assume first item is onsets, second is offsets
-                    onsets = pickle_data[0]
-                    offsets = pickle_data[1]
-                else:
-                    # Unrecognized format
-                    onsets = []
-                    offsets = []
-                    logger.error(f"Pickle file format not recognized: {type(pickle_data)}")
-
-                # Convert to lists if they're NumPy arrays or other iterables
-                if isinstance(onsets, np.ndarray):
-                    onsets = onsets.tolist()
-                elif not isinstance(onsets, list):
-                    onsets = list(onsets)
-
-                if isinstance(offsets, np.ndarray):
-                    offsets = offsets.tolist()
-                elif not isinstance(offsets, list):
-                    offsets = list(offsets)
-
-                # Validate data
-                if len(onsets) == 0 or len(offsets) == 0:
-                    messages.error(request, "Pickle file does not contain required onset and offset lists.")
-                    return redirect("battycoda_app:create_task_batch")
-
-                # Check if lists are the same length
-                if len(onsets) != len(offsets):
-                    messages.error(request, "Onsets and offsets lists must have the same length.")
-                    return redirect("battycoda_app:create_task_batch")
-
-                # Create tasks for each onset-offset pair inside a transaction
-                tasks_created = 0
-                with transaction.atomic():
-                    for i in range(len(onsets)):
-                        try:
-                            # Convert numpy types to Python native types if needed
-                            onset_value = float(onsets[i])
-                            offset_value = float(offsets[i])
-
-                            # Create and save the task
-                            task = Task(
-                                wav_file_name=batch.wav_file_name,
-                                onset=onset_value,
-                                offset=offset_value,
-                                species=batch.species,
-                                project=batch.project,
-                                batch=batch,
-                                created_by=request.user,
-                                group=profile.group,
-                                status="pending",
-                            )
-                            task.save()
-                            tasks_created += 1
-                        except Exception as e:
-                            logger.error(f"Error creating task {i}: {str(e)}")
-                            logger.error(traceback.format_exc())
-                            raise  # Re-raise to trigger transaction rollback
-
-                # Check if AJAX request
-                if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                    return JsonResponse(
-                        {
-                            "success": True,
-                            "message": f"Successfully created batch with {tasks_created} tasks.",
-                            "redirect_url": reverse("battycoda_app:task_batch_detail", kwargs={"batch_id": batch.id}),
-                        }
-                    )
-
-                messages.success(request, f"Successfully created batch with {tasks_created} tasks.")
-                return redirect("battycoda_app:task_batch_detail", batch_id=batch.id)
-
+                # Check if we have a pickle file
+                pickle_file = request.FILES.get("pickle_file")
+                
+                # Use the utility function to create the recording and segments
+                from .utils import create_recording_from_batch
+                recording, segments_created = create_recording_from_batch(batch, pickle_file=pickle_file)
+                
+                if not recording:
+                    messages.warning(request, "Task batch was created, but there was an error creating the recording")
+                elif pickle_file and segments_created == 0:
+                    messages.warning(request, f"Task batch and recording were created, but there was an error processing the pickle file")
             except Exception as e:
-                logger.error(f"Error processing pickle file: {str(e)}")
+                logger.error(f"Error creating recording from task batch: {str(e)}")
                 logger.error(traceback.format_exc())
+                messages.warning(request, f"Task batch was created, but there was an error creating the recording: {str(e)}")
 
-                # Delete the batch if pickle processing failed
-                if batch.id:
-                    batch.delete()
+            # Check if AJAX request
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "success": True,
+                        "message": "Successfully created task batch" + 
+                                  (f" and recording with {segments_created} segments" if recording else ""),
+                        "redirect_url": reverse("battycoda_app:task_batch_detail", kwargs={"batch_id": batch.id}),
+                    }
+                )
 
-                # Return JSON response for AJAX requests
-                if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                    return JsonResponse({"success": False, "error": f"Error processing file: {str(e)}"})
-
-                messages.error(request, f"Error processing pickle file: {str(e)}")
-                batch.delete()
-
-                return redirect("battycoda_app:create_task_batch")
+            # Prepare success message
+            success_msg = "Successfully created task batch"
+            if recording:
+                success_msg += f" and recording"
+                if segments_created > 0:
+                    success_msg += f" with {segments_created} segments"
+            
+            messages.success(request, success_msg)
+            return redirect("battycoda_app:task_batch_detail", batch_id=batch.id)
     else:
         form = TaskBatchForm(user=request.user)
 

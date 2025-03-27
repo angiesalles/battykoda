@@ -5,14 +5,15 @@ services:
       context: .
       dockerfile: Dockerfile.web
     network_mode: host
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
       - ./:/app:rw
-      - data-volume:/app/media:rw
-      - /home/ubuntu/template:/template:ro
     env_file:
       - .env
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
@@ -25,10 +26,9 @@ services:
       context: .
       dockerfile: Dockerfile.celery
     network_mode: host
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
       - ./:/app:rw
-      - data-volume:/app/media:rw
-      - /home/ubuntu/template:/template:ro
     env_file:
       - .env
     environment:
@@ -45,6 +45,7 @@ services:
       context: .
       dockerfile: Dockerfile.flower
     network_mode: host
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
       - ./:/app:rw
     env_file:
@@ -69,11 +70,11 @@ services:
   r-server:
     image: r_ubuntu:with_mychanges  # Use our committed image with changes
     network_mode: host  # Use host network mode for direct port access
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
       - ./:/app:rw  # Mount project directory to access R scripts
     command: ["Rscript", "/app/r_server_direct.R"]
     restart: unless-stopped
 
 volumes:
-  data-volume:
   redis-data:

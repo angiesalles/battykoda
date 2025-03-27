@@ -51,6 +51,9 @@
                                 <a href="{% url 'battycoda_app:create_detection_run_for_batch' batch_id=batch.id %}" class="btn btn-info">
                                     <i class="fas fa-robot"></i> Run Automated Detection
                                 </a>
+                                <a href="{% url 'battycoda_app:export_task_batch' batch.id %}" class="btn btn-success">
+                                    <i class="fas fa-file-export"></i> Export Results
+                                </a>
                             </div>
                         </div>
                         

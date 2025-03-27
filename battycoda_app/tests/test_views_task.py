@@ -3,7 +3,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
 
-from battycoda_app.models import Project, Species, Task, TaskBatch, Group, UserProfile
+from battycoda_app.models import Group, Project, Species, Task, TaskBatch, UserProfile
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 
-from .models import Call, Project, Recording, Segment, Species, Task, TaskBatch, Group, UserProfile
+from .models import Call, Group, Project, Recording, Segment, Species, Task, TaskBatch, UserProfile
 
 
 class UserRegisterForm(UserCreationForm):
@@ -36,33 +36,70 @@ class UserProfileForm(forms.ModelForm):
 
 
 class TaskBatchForm(forms.ModelForm):
-    pickle_file = forms.FileField(help_text="Upload a pickle file containing onsets and offsets lists.")
-    wav_file = forms.FileField(help_text="Upload the WAV file for this task batch.", required=True)
+    wav_file = forms.FileField(
+        help_text="Upload the WAV file for this task batch.", 
+        required=True,
+        widget=forms.FileInput(attrs={"class": "form-control bg-dark text-light"})
+    )
+    pickle_file = forms.FileField(
+        help_text="Upload a pickle file containing onsets and offsets.", 
+        required=False,
+        widget=forms.FileInput(attrs={"class": "form-control bg-dark text-light"})
+    )
 
     class Meta:
         model = TaskBatch
         fields = ["name", "species", "project", "wav_file"]
         # hidden wav_file_name field that will be auto-populated from the wav_file
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control bg-dark text-light"}),
+            "species": forms.Select(attrs={"class": "form-control bg-dark text-light"}),
+            "project": forms.Select(attrs={"class": "form-control bg-dark text-light"}),
+        }
 
     def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)
+        self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
         # Set empty label for dropdowns
         self.fields["species"].empty_label = "Select a species"
         self.fields["project"].empty_label = "Select a project"
 
-        if user:
+        if self.user:
             # Get or create user profile
             from .models import UserProfile
 
-            profile, created = UserProfile.objects.get_or_create(user=user)
+            self.profile, created = UserProfile.objects.get_or_create(user=self.user)
 
             # Filter species and projects by user's group - always using profile object directly
-            if profile.group:
+            if self.profile.group:
                 # Filter querysets
-                self.fields["species"].queryset = self.fields["species"].queryset.filter(group=profile.group)
-                self.fields["project"].queryset = self.fields["project"].queryset.filter(group=profile.group)
+                self.fields["species"].queryset = self.fields["species"].queryset.filter(group=self.profile.group)
+                self.fields["project"].queryset = self.fields["project"].queryset.filter(group=self.profile.group)
+    
+    def clean_name(self):
+        """
+        Validate that the name is unique within the user's group.
+        This is needed to properly handle the unique_together constraint.
+        """
+        name = self.cleaned_data.get('name')
+        
+        if not name:
+            return name
+            
+        if not hasattr(self, 'profile') or not self.profile.group:
+            return name
+            
+        # Check if a task batch with this name already exists in the user's group
+        # Exclude the current instance if we're editing
+        qs = TaskBatch.objects.filter(name=name, group=self.profile.group)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+            
+        if qs.exists():
+            raise forms.ValidationError(f"A task batch with the name '{name}' already exists in your group. Please use a different name.")
+            
+        return name
 
 
 class TaskForm(forms.ModelForm):
@@ -121,15 +158,13 @@ class TaskUpdateForm(forms.ModelForm):
 
 
 class SpeciesForm(forms.ModelForm):
-    calls_file = forms.FileField(
-        required=False, help_text="Upload a text file with call types (one per line, format: short_name,long_name)"
-    )
-
     class Meta:
         model = Species
         fields = ["name", "description", "image"]
         widgets = {
-            "description": forms.Textarea(attrs={"rows": 3}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "image": forms.FileInput(attrs={"class": "form-control"}),
         }
 
 
@@ -140,7 +175,9 @@ class SpeciesEditForm(forms.ModelForm):
         model = Species
         fields = ["name", "description", "image"]
         widgets = {
-            "description": forms.Textarea(attrs={"rows": 3}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "image": forms.FileInput(attrs={"class": "form-control"}),
         }
 
 
@@ -148,15 +185,29 @@ class CallForm(forms.ModelForm):
     class Meta:
         model = Call
         fields = ["short_name", "long_name"]
+        widgets = {
+            "short_name": forms.TextInput(attrs={"class": "form-control"}),
+            "long_name": forms.TextInput(attrs={"class": "form-control"}),
+            "DELETE": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
 
 
 class CallFormSet(forms.BaseModelFormSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.queryset = Call.objects.none()
+        # Only set empty queryset for new instances, not when editing
+        if not self.queryset:
+            self.queryset = Call.objects.none()
 
 
-CallFormSetFactory = forms.modelformset_factory(Call, form=CallForm, formset=CallFormSet, extra=1, can_delete=True)
+# Use extra=1 to add a single empty form by default
+CallFormSetFactory = forms.modelformset_factory(
+    Call, 
+    form=CallForm, 
+    formset=CallFormSet, 
+    extra=1,  # Add one empty form 
+    can_delete=True
+)
 
 
 class ProjectForm(forms.ModelForm):
@@ -189,6 +240,12 @@ class RecordingForm(forms.ModelForm):
         widget=forms.DateInput(attrs={'type': 'date'}),
         required=False,
         help_text="Date when the recording was made"
+    )
+    
+    # Override wav_file field to hide "Currently" text
+    wav_file = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={"class": "form-control"})
     )
     
     class Meta:

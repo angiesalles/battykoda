@@ -1,122 +1,263 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}{{ species.name }} - BattyCoda{% endblock %}
+{% block title %}BattyCoda - {{ species.name }}{% endblock %}
 
 {% block content %}
-<div class="section">
-    <h2>{{ species.name }}</h2>
-    
-    <div style="margin-bottom: 20px;">
-        <a href="{% url 'battycoda_app:edit_species' species.id %}" class="button">Edit Species</a>
-        <a href="{% url 'battycoda_app:species_list' %}" class="button" style="margin-left: 10px;">Back to Species List</a>
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2">{{ species.name }}</h1>
+        </div>
+        <div class="btn-group">
+            <a href="{% url 'battycoda_app:edit_species' species.id %}" class="btn btn-primary"
+               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Edit this species">
+                <i class="fas fa-edit"></i> Edit Species
+            </a>
+            <a href="{% url 'battycoda_app:delete_species' species.id %}" class="btn btn-danger"
+               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Delete this species">
+                <i class="fas fa-trash"></i> Delete
+            </a>
+            <a href="{% url 'battycoda_app:species_list' %}" class="btn btn-outline-secondary"
+               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Return to species list">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </a>
+        </div>
     </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
     
-    <div style="display: flex; margin-bottom: 20px;">
-        <div style="flex: 2; margin-right: 20px;">
-            {% if species.scientific_name %}
-            <p><strong>Scientific Name:</strong> {{ species.scientific_name }}</p>
-            {% endif %}
-            
-            <p><strong>Created:</strong> {{ species.created_at|date:"F d, Y H:i" }}</p>
-            <p><strong>Created By:</strong> {{ species.created_by.username }}</p>
-            
-            {% if species.description %}
-            <h3>Description</h3>
-            <div style="margin-bottom: 20px;">
-                {{ species.description|linebreaks }}
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card bg-dark h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Species Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6>Description</h6>
+                        {% if species.description %}
+                            <p>{{ species.description|linebreaks }}</p>
+                        {% else %}
+                            <p class="text-muted"><em>No description provided</em></p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <h6>Created By</h6>
+                                <p>{{ species.created_by.username }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <h6>Created On</h6>
+                                <p>{{ species.created_at|date:"F d, Y" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            {% endif %}
         </div>
         
-        <div style="flex: 1;">
-            {% if species.image %}
-            <div style="text-align: center; margin-bottom: 20px;">
-                <img src="{{ species.image.url }}" alt="{{ species.name }}" style="max-width: 100%; max-height: 300px;">
+        <div class="col-md-4">
+            <div class="card bg-dark h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Species Image</h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if species.image %}
+                        <img src="{{ species.image.url }}" alt="{{ species.name }}" class="img-fluid mb-2" style="max-height: 250px;">
+                        <div class="mt-2">
+                            <a href="{{ species.image.url }}" target="_blank" class="btn btn-sm btn-outline-light">
+                                <i class="fas fa-external-link-alt"></i> View Full Size
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center p-4">
+                            <i class="fas fa-spider fa-4x mb-3 text-muted"></i>
+                            <p class="text-muted">No image available</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
+        </div>
+    </div>
+    
+    <div class="card bg-dark mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Call Types</h5>
+            <span class="badge bg-info">{{ calls|length }} Total</span>
+        </div>
+        <div class="card-body p-0">
+            {% if calls %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Short Name</th>
+                                <th>Long Name</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for call in calls %}
+                            <tr>
+                                <td>{{ call.short_name }}</td>
+                                <td>{{ call.long_name|default:"—" }}</td>
+                                <td>{{ call.created_at|date:"M d, Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
-            <div style="text-align: center; background-color: #2a2a2a; padding: 20px; margin-bottom: 20px;">
-                <p style="font-style: italic;">No image available</p>
-            </div>
+                <div class="text-center p-4">
+                    <i class="fas fa-volume-up fa-4x mb-3 text-muted"></i>
+                    <p class="text-muted">No call types defined for this species</p>
+                </div>
             {% endif %}
         </div>
     </div>
     
-    <h3>Call Types</h3>
-    {% if calls %}
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-        <thead>
-            <tr>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Short Name</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Long Name</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for call in calls %}
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ call.short_name }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ call.long_name|default:"" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No call types defined for this species.</p>
-    {% endif %}
+    <div class="card bg-dark mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Task Batches</h5>
+            <span class="badge bg-info">{{ batches|length }} Total</span>
+        </div>
+        <div class="card-body p-0">
+            {% if batches %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Project</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for batch in batches %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'battycoda_app:task_batch_detail' batch.id %}">{{ batch.name }}</a>
+                                </td>
+                                <td>
+                                    <a href="{% url 'battycoda_app:project_detail' batch.project.id %}">{{ batch.project.name }}</a>
+                                </td>
+                                <td>{{ batch.created_at|date:"M d, Y" }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'battycoda_app:task_batch_detail' batch.id %}" 
+                                           class="btn btn-outline-info"
+                                           data-bs-toggle="tooltip" data-bs-placement="top" 
+                                           title="View batch details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-tasks fa-4x mb-3 text-muted"></i>
+                    <p class="text-muted">No task batches associated with this species</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
     
-    <h3>Associated Task Batches</h3>
-    {% if batches %}
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Name</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Project</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for batch in batches %}
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">
-                    <a href="{% url 'battycoda_app:task_batch_detail' batch.id %}">{{ batch.name }}</a>
-                </td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">
-                    <a href="{% url 'battycoda_app:project_detail' batch.project.id %}">{{ batch.project.name }}</a>
-                </td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ batch.created_at|date:"M d, Y" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No task batches associated with this species.</p>
-    {% endif %}
-    
-    <h3>Associated Tasks</h3>
-    {% if tasks %}
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">WAV File</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Segment</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Status</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Project</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for task in tasks %}
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ task.wav_file_name }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ task.status }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">
-                    <a href="{% url 'battycoda_app:project_detail' task.project.id %}">{{ task.project.name }}</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No tasks associated with this species.</p>
-    {% endif %}
+    <div class="card bg-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Tasks</h5>
+            <span class="badge bg-info">{{ tasks|length }} Total</span>
+        </div>
+        <div class="card-body p-0">
+            {% if tasks %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>WAV File</th>
+                                <th>Segment</th>
+                                <th>Status</th>
+                                <th>Project</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in tasks %}
+                            <tr>
+                                <td>{{ task.wav_file_name }}</td>
+                                <td>{{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</td>
+                                <td>
+                                    {% if task.status == 'done' %}
+                                        <span class="badge bg-success">Done</span>
+                                    {% elif task.status == 'completed' %}
+                                        <span class="badge bg-primary">Completed</span>
+                                    {% elif task.status == 'in_progress' %}
+                                        <span class="badge bg-warning">In Progress</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'battycoda_app:project_detail' task.project.id %}">{{ task.project.name }}</a>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'battycoda_app:task_detail' task.id %}" 
+                                           class="btn btn-outline-info"
+                                           data-bs-toggle="tooltip" data-bs-placement="top" 
+                                           title="View task details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'battycoda_app:annotate_task' task.id %}" 
+                                           class="btn btn-outline-primary"
+                                           data-bs-toggle="tooltip" data-bs-placement="top" 
+                                           title="Annotate this task">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-clipboard-check fa-4x mb-3 text-muted"></i>
+                    <p class="text-muted">No tasks associated with this species</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
 {% endblock %}

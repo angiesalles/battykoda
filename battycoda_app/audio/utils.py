@@ -4,7 +4,6 @@ Utility functions for audio processing in BattyCoda.
 import logging
 import os
 import pickle
-import shutil
 import tempfile
 import traceback
 
@@ -138,10 +137,11 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
                     f"Using task onset/offset: {onset_time:.5f}s-{offset_time:.5f}s ({int(onset_time*fs)}-{int(offset_time*fs)} samples)"
                 )
 
-                # Add window padding (in seconds)
-                window_padding = window_size / 1000  # convert ms to seconds
-                start_time = max(0, onset_time - window_padding)
-                end_time = min(info.duration, offset_time + window_padding)
+                # Handle window padding (in seconds)
+                pre_padding = window_size[0] / 1000  # convert ms to seconds
+                post_padding = window_size[1] / 1000
+                start_time = max(0, onset_time - pre_padding)
+                end_time = min(info.duration, offset_time + post_padding)
 
                 # Calculate frames to read
                 start_frame = int(start_time * fs)
@@ -240,8 +240,10 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
             offset = max(onset + 1, min(offset, len(audiodata)))
 
             # Extract audio segment with window padding
-            start_idx = max(0, onset - (fs * window_size // 1000))
-            end_idx = min(offset + (fs * window_size // 1000), len(audiodata))
+            pre_padding = window_size[0] / 1000
+            post_padding = window_size[1] / 1000
+            start_idx = max(0, onset - int(fs * pre_padding))
+            end_idx = min(offset + int(fs * post_padding), len(audiodata))
 
             logger.debug(f"Extracting segment: start_idx={start_idx}, end_idx={end_idx}")
             audio_segment = audiodata[start_idx:end_idx, :]
@@ -259,13 +261,13 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
 
 
 def overview_hwin():
-    """Returns the half-window size for overview in milliseconds."""
-    return 0
+    """Returns the window padding as (pre_window, post_window) in milliseconds."""
+    return (150, 350)
 
 
 def normal_hwin():
-    """Returns the half-window size for detailed view in milliseconds."""
-    return 8
+    """Returns the window padding as (pre_window, post_window) in milliseconds."""
+    return (8, 8)
 
 
 def process_pickle_file(pickle_file):
@@ -329,5 +331,108 @@ def process_pickle_file(pickle_file):
 
     except Exception as e:
         logger.error(f"Error processing pickle file: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
+
+
+def auto_segment_audio(audio_path, min_duration_ms=10, smooth_window=3, threshold_factor=0.5):
+    """
+    Automatically segment audio using the following steps:
+    1. Take absolute value of the signal
+    2. Smooth the signal using a moving average filter
+    3. Apply a threshold to detect segments
+    4. Reject markings shorter than the minimum duration
+    
+    Args:
+        audio_path: Path to the audio file
+        min_duration_ms: Minimum segment duration in milliseconds
+        smooth_window: Window size for smoothing filter
+        threshold_factor: Threshold factor (between 0-1) to apply
+        
+    Returns:
+        tuple: (onsets, offsets) as lists of floats in seconds
+    """
+    try:
+        import soundfile as sf
+
+        # Load the audio file
+        audio_data, sample_rate = sf.read(audio_path)
+        logger.info(f"Loaded audio file for automated segmentation: {audio_path}")
+        logger.info(f"Audio shape: {audio_data.shape}, sample rate: {sample_rate}")
+        
+        # For stereo files, use the first channel for detection
+        if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+            audio_data = audio_data[:, 0]
+            logger.info(f"Using first channel from stereo recording for detection")
+        
+        # Step 1: Take absolute value of the signal
+        abs_signal = np.abs(audio_data)
+        
+        # Step 2: Smooth the signal with a moving average filter
+        if smooth_window > 1:
+            kernel = np.ones(smooth_window) / smooth_window
+            smoothed_signal = np.convolve(abs_signal, kernel, mode='same')
+        else:
+            smoothed_signal = abs_signal
+        
+        # Step 3: Apply threshold
+        # Calculate adaptive threshold based on the signal statistics
+        signal_mean = np.mean(smoothed_signal)
+        signal_std = np.std(smoothed_signal)
+        threshold = signal_mean + (threshold_factor * signal_std)
+        
+        logger.info(f"Auto-segmentation thresholds - Mean: {signal_mean:.6f}, Std: {signal_std:.6f}, Threshold: {threshold:.6f}")
+        
+        # Create binary mask where signal exceeds threshold
+        binary_mask = smoothed_signal > threshold
+        
+        # Find transitions in the binary mask (0->1 and 1->0)
+        # Transitions from 0->1 indicate segment onsets
+        # Transitions from 1->0 indicate segment offsets
+        transitions = np.diff(binary_mask.astype(int))
+        onset_samples = np.where(transitions == 1)[0] + 1  # +1 because diff reduces length by 1
+        offset_samples = np.where(transitions == -1)[0] + 1
+        
+        # Handle edge cases
+        if binary_mask[0]:
+            # Signal starts above threshold, insert onset at sample 0
+            onset_samples = np.insert(onset_samples, 0, 0)
+            
+        if binary_mask[-1]:
+            # Signal ends above threshold, append offset at the last sample
+            offset_samples = np.append(offset_samples, len(binary_mask) - 1)
+        
+        # Ensure we have the same number of onsets and offsets
+        if len(onset_samples) > len(offset_samples):
+            # More onsets than offsets - trim extra onsets
+            onset_samples = onset_samples[:len(offset_samples)]
+        elif len(offset_samples) > len(onset_samples):
+            # More offsets than onsets - trim extra offsets
+            offset_samples = offset_samples[:len(onset_samples)]
+            
+        # Convert sample indices to time in seconds
+        onsets = onset_samples / sample_rate
+        offsets = offset_samples / sample_rate
+        
+        # Step 4: Reject segments shorter than the minimum duration
+        min_samples = int((min_duration_ms / 1000) * sample_rate)
+        valid_segments = []
+        
+        for i in range(len(onsets)):
+            duration_samples = offset_samples[i] - onset_samples[i]
+            if duration_samples >= min_samples:
+                valid_segments.append(i)
+        
+        # Filter onsets and offsets to only include valid segments
+        filtered_onsets = [onsets[i] for i in valid_segments]
+        filtered_offsets = [offsets[i] for i in valid_segments]
+        
+        logger.info(f"Automated segmentation found {len(onsets)} potential segments")
+        logger.info(f"After minimum duration filtering: {len(filtered_onsets)} segments")
+        
+        return filtered_onsets, filtered_offsets
+        
+    except Exception as e:
+        logger.error(f"Error in auto_segment_audio: {str(e)}")
         logger.error(traceback.format_exc())
         raise

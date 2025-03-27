@@ -10,7 +10,6 @@ from django.utils import timezone
 
 from .forms import UserLoginForm, UserProfileForm, UserRegisterForm
 from .models import GroupInvitation, GroupMembership, UserProfile
-from .utils import ensure_user_directory_exists
 
 # Set up logging
 logger = logging.getLogger("battycoda.views_auth")
@@ -104,10 +103,7 @@ def register_view(request):
         form = UserRegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
-
-            # Create user's home directory from template
-            ensure_user_directory_exists(user.username)
-            logger.info(f"Created home directory for new user {user.username}")
+            logger.info(f"Registered new user {user.username}")
 
             # If there's a valid invitation, process it
             if invitation and not invitation.is_expired and not invitation.accepted:

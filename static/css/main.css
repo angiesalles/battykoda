@@ -67,8 +67,7 @@ p {
 .nav-container {
     display: flex;
     justify-content: space-between;
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
     padding: 10px 20px;
     background-color: #1e1e1e;
     border-bottom: 1px solid #333;
@@ -77,6 +76,7 @@ p {
 .nav-links {
     display: flex;
     align-items: center;
+    width: 100%;
 }
 
 .nav-links a {

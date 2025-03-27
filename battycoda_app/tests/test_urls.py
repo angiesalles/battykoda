@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.urls import resolve, reverse
 
-from battycoda_app import views, views_auth, views_task, views_group
+from battycoda_app import views, views_auth, views_group, views_task
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 

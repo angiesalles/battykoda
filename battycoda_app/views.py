@@ -1,4 +1,5 @@
 import logging
+import os
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -7,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import GroupForm
-from .models import Task, TaskBatch, GroupMembership
+from .models import GroupMembership, Task, TaskBatch
 
 # Set up logging
 logger = logging.getLogger("battycoda.views")
@@ -47,19 +48,18 @@ from .views_auth import (
     request_login_code,
 )
 
-# Import directory views
-from .views_directory import (
-    create_directory_view,
-    home_view,
-    species_directory_view,
-    species_info_view,
-    subdirectory_view,
-    upload_file_view,
-    user_directory_view,
+# Import group views
+from .views_group import (
+    create_group_view,
+    edit_group_view,
+    group_detail_view,
+    group_list_view,
+    manage_group_members_view,
+    switch_group_view,
 )
 
 # Import the invitation views
-from .views_invitations import accept_invitation_view, invite_user_view, group_users_view
+from .views_invitations import accept_invitation_view, group_users_view, invite_user_view
 
 # Import project views
 from .views_project import create_project_view, edit_project_view, project_detail_view, project_list_view
@@ -89,13 +89,4 @@ from .views_task import (
     wav_file_view,
 )
 
-# Import group views
-from .views_group import (
-    create_group_view,
-    debug_groups_view,
-    edit_group_view,
-    manage_group_members_view,
-    switch_group_view,
-    group_detail_view,
-    group_list_view,
-)
+# Directory views have been removed

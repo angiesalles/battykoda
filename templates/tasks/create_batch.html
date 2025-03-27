@@ -14,89 +14,183 @@
     </nav>
     
     <div class="card bg-dark">
-        <div class="card-header">
-            <h2>Create Task Batch</h2>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Create Task Batch</h2>
+            <span class="badge bg-info p-2">
+                <i class="fas fa-info-circle me-1"></i> Group: {{ request.user.profile.group.name }}
+            </span>
         </div>
         <div class="card-body">
-            <p class="text-muted mb-4">
-                Create a batch of tasks by uploading a pickle file containing onsets and offsets. 
-                The pickle file should contain two lists: 'onsets' and 'offsets', with matching indices.
-            </p>
+            <div class="alert alert-info">
+                <h5><i class="fas fa-lightbulb me-2"></i>How it works</h5>
+                <p class="mb-0">
+                    Create a batch of tasks by uploading a <strong>pickle file</strong> containing onsets and offsets, 
+                    and a <strong>WAV file</strong> with the audio recordings. The pickle file should contain two lists: 
+                    'onsets' and 'offsets', which mark the time points of bat calls in the audio.
+                </p>
+            </div>
             
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
-                <div class="row">
-                    <div class="col-md-12 mb-3">
-                        <label for="{{ form.name.id_for_label }}" class="form-label">Batch Name</label>
-                        {{ form.name|add_class:"form-control bg-dark text-light" }}
-                        <div class="form-text">Give your batch a descriptive name</div>
-                        {% if form.name.errors %}
-                            <div class="text-danger">{{ form.name.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.species.id_for_label }}" class="form-label">Species</label>
-                        {{ form.species|add_class:"form-control bg-dark text-light" }}
-                        {% if form.species.errors %}
-                            <div class="text-danger">{{ form.species.errors }}</div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.project.id_for_label }}" class="form-label">Project</label>
-                        {{ form.project|add_class:"form-control bg-dark text-light" }}
-                        {% if form.project.errors %}
-                            <div class="text-danger">{{ form.project.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <!-- Group field removed - group is now automatically assigned -->
-                
-                
-                <div class="mb-4">
-                    <label for="{{ form.pickle_file.id_for_label }}" class="form-label">Pickle File</label>
-                    {{ form.pickle_file|add_class:"form-control bg-dark text-light" }}
-                    <div class="form-text">{{ form.pickle_file.help_text }}</div>
-                    {% if form.pickle_file.errors %}
-                        <div class="text-danger">{{ form.pickle_file.errors }}</div>
-                    {% endif %}
-                </div>
-                
-                <div class="mb-4">
-                    <label for="{{ form.wav_file.id_for_label }}" class="form-label">WAV File</label>
-                    {{ form.wav_file|add_class:"form-control bg-dark text-light" }}
-                    <div class="form-text">{{ form.wav_file.help_text }}</div>
-                    {% if form.wav_file.errors %}
-                        <div class="text-danger">{{ form.wav_file.errors }}</div>
-                    {% endif %}
-                </div>
-                
-                <div id="upload-progress-container" class="mt-3 mb-4 d-none">
-                    <label class="form-label">Upload Progress</label>
-                    <div class="progress">
-                        <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                             role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
-                            0%
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Batch Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="{{ form.name.id_for_label }}" class="form-label">Batch Name</label>
+                                    {{ form.name }}
+                                    <div class="form-text">Give your batch a descriptive name</div>
+                                    {% if form.name.errors %}
+                                        <div class="text-danger">{{ form.name.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.species.id_for_label }}" class="form-label">Species</label>
+                                        {{ form.species }}
+                                        {% if form.species.errors %}
+                                            <div class="text-danger">{{ form.species.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.project.id_for_label }}" class="form-label">Project</label>
+                                        {{ form.project }}
+                                        {% if form.project.errors %}
+                                            <div class="text-danger">{{ form.project.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <small id="upload-status" class="form-text"></small>
-                    <button id="cancel-upload" type="button" class="btn btn-sm btn-outline-danger mt-2">Cancel Upload</button>
                 </div>
                 
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                    <a href="{% url 'battycoda_app:task_batch_list' %}" class="btn btn-outline-secondary me-md-2">Cancel</a>
-                    <button type="submit" class="btn btn-primary">Create Batch</button>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-secondary h-100">
+                            <div class="card-header bg-dark">
+                                <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Pickle File</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-0">
+                                    <label for="{{ form.pickle_file.id_for_label }}" class="form-label visually-hidden">Pickle File</label>
+                                    {{ form.pickle_file }}
+                                    <div class="form-text mb-2">Upload a pickle file containing onsets and offsets</div>
+                                    {% if form.pickle_file.errors %}
+                                        <div class="text-danger">{{ form.pickle_file.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-secondary h-100">
+                            <div class="card-header bg-dark">
+                                <h5 class="mb-0"><i class="fas fa-file-audio me-2"></i>WAV File</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-0">
+                                    <label for="{{ form.wav_file.id_for_label }}" class="form-label visually-hidden">WAV File</label>
+                                    {{ form.wav_file }}
+                                    <div class="form-text mb-2">Upload the corresponding WAV audio file</div>
+                                    {% if form.wav_file.errors %}
+                                        <div class="text-danger">{{ form.wav_file.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="upload-progress-container" class="mt-4 mb-4 d-none">
+                    <div class="card bg-dark border-info">
+                        <div class="card-header bg-info bg-opacity-25 text-white">
+                            <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Progress</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="progress mb-3" style="height: 25px;">
+                                <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
+                                    0%
+                                </div>
+                            </div>
+                            <div id="upload-status" class="form-text mb-3">Waiting for files to be selected...</div>
+                            <button id="cancel-upload" type="button" class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-ban me-1"></i> Cancel Upload
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                    <a href="{% url 'battycoda_app:task_batch_list' %}" class="btn btn-outline-secondary me-md-2">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-lg btn-primary">
+                        <i class="fas fa-upload me-1"></i> Create Batch
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<style>
+    /* File Dropzone Styling */
+    .file-dropzone {
+        background-color: #1e1e1e;
+        transition: all 0.3s ease;
+        padding: 2rem 1rem !important;
+        cursor: pointer;
+    }
+    
+    .file-dropzone:hover {
+        background-color: #2c2c2c;
+        border-color: #0d6efd !important;
+    }
+    
+    /* Progress bar and animation styling */
+    .progress {
+        background-color: #2c2c2c;
+        height: 25px;
+    }
+    
+    /* Custom alert styling for dark theme */
+    .alert {
+        background-color: rgba(25, 25, 25, 0.5);
+        border-left: 4px solid;
+    }
+    
+    .alert-info {
+        border-color: #0dcaf0;
+    }
+    
+    .alert-success {
+        border-color: #198754;
+    }
+    
+    .alert-danger {
+        border-color: #dc3545;
+    }
+    
+    /* Card styling */
+    .card {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Badge styling */
+    .badge {
+        font-size: 0.85rem;
+        font-weight: normal;
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}

@@ -3,53 +3,14 @@ Utility functions for the battycoda application.
 """
 import logging
 import os
-import platform
-import shutil
-import subprocess
 
 from django.conf import settings
 
+# Removed unused import: subprocess
+
+
 # Set up logging
 logger = logging.getLogger("battycoda.utils")
-
-
-def get_home_directory():
-    """
-    Get the system home directory based on platform
-
-    Returns:
-        str: Path to the home directory
-    """
-    if platform.system() == "Windows":
-        return "Users"
-    else:
-        return "home"
-
-
-def get_template_directory():
-    """
-    Find the template directory for user directory creation and species templates
-
-    Returns:
-        str: Path to the template directory, or None if not found
-    """
-    # List of possible template directory locations
-    template_dirs = [
-        "/template",  # Docker mount (primary)
-        "/app/template",  # Project directory in Docker
-        os.path.join(settings.BASE_DIR, "template"),  # Django project base
-        "/home/ubuntu/template",  # Host system location
-    ]
-
-    # Try each location
-    for template_dir in template_dirs:
-        if os.path.exists(template_dir):
-            logger.info(f"Found template directory at: {template_dir}")
-            return template_dir
-
-    # No template directory found
-    logger.warning("No template directory found in any location")
-    return None
 
 
 def convert_path_to_os_specific(path):
@@ -57,7 +18,7 @@ def convert_path_to_os_specific(path):
     Convert a web path to an OS-specific path
 
     Args:
-        path (str): Web path (like "home/username/folder")
+        path (str): Web path (like "recordings/audio.wav")
 
     Returns:
         str: OS-specific path to the location in media directory
@@ -69,81 +30,28 @@ def convert_path_to_os_specific(path):
     if path.startswith("/"):
         path = path[1:]
 
-    # All user paths now go to media folder
+    # All paths now go to media folder
     return os.path.join(settings.MEDIA_ROOT, path)
-
-
-def ensure_user_directory_exists(username):
-    """
-    Ensure that a user's home directory exists, create it if it doesn't
-
-    Args:
-        username (str): Username to check/create directory for
-
-    Returns:
-        bool: True if directory exists or was created
-    """
-    # Get template directory
-    template_dir = "/template"
-
-    # Store user directories in media folder (shared between containers)
-    user_home_path = os.path.join(settings.MEDIA_ROOT, "home", username)
-
-    # Return if directory already exists
-    if os.path.exists(user_home_path):
-        return True
-
-    # Create the directory
-    logger.info(f"Creating user home directory: {user_home_path}")
-    os.makedirs(user_home_path, exist_ok=True)
-
-    # Copy template content
-    for item in os.listdir(template_dir):
-        source = os.path.join(template_dir, item)
-        destination = os.path.join(user_home_path, item)
-
-        if os.path.isdir(source):
-            shutil.copytree(source, destination)
-        else:
-            shutil.copy2(source, destination)
-
-    # Set permissions to make directories writable by everyone
-    subprocess.run(["chmod", "-R", "777", user_home_path])
-    logger.info(f"Set permissions for {user_home_path}")
-
-    return True
 
 
 def available_species():
     """
-    Get a list of available species templates
+    Get a list of available default species
 
     Returns:
-        list: List of species template names
+        list: List of default species names
     """
     try:
-        # Get template directory
-        template_dir = get_template_directory()
-        if not template_dir:
-            logger.warning("Cannot list available species: No template directory found")
-            return []
-
-        # Get list of directories in template
-        species_list = [
-            item
-            for item in os.listdir(template_dir)
-            if os.path.isdir(os.path.join(template_dir, item)) and not item.startswith(".")
-        ]
-
-        return sorted(species_list)
-
+        # Import directly from the default_species module
+        from .default_species import DEFAULT_SPECIES
+        return [species["name"] for species in DEFAULT_SPECIES]
     except Exception as e:
         logger.error(f"Error getting available species: {str(e)}")
         return []
 
 
 def import_default_species(user):
-    """Import default species (Carollia and Efuscus) for a new user's group
+    """Import default species for a new user's group
 
     Args:
         user: The User object to import species for
@@ -156,6 +64,7 @@ def import_default_species(user):
 
     from django.core.files import File
 
+    from .default_species import DEFAULT_SPECIES
     from .models import Call, Species
 
     # Add a delay to ensure user creation transaction is complete
@@ -171,36 +80,23 @@ def import_default_species(user):
 
     created_species = []
 
-    # Define the default species to import
-    default_species = [
-        {
-            "name": "Carollia",
-            "image_file": "Carollia.png",
-            "call_file": "Carollia.txt",
-            "description": "Carollia is a genus of short-tailed leaf-nosed bats. Their calls include various types such as aggressive warbles, distress calls, and echolocation.",
-        },
-        {
-            "name": "Efuscus",
-            "image_file": "Efuscus.jpg",
-            "call_file": "Efuscus.txt",
-            "description": "Eptesicus fuscus (big brown bat) is a species found across North America. Their calls range from frequency-modulated sweeps to quasi-constant frequency calls.",
-        },
-    ]
+    # Use the default species defined in the separate module
+    default_species = DEFAULT_SPECIES
 
     # Import each species
     for species_data in default_species:
-        # Create a unique name for this group
-        unique_name = f"{species_data['name']} - {group.name}"
+        # Use the actual species name (no group suffix)
+        species_name = species_data['name']
 
         # Skip if species already exists for this group
-        if Species.objects.filter(name=unique_name).exists():
-            logger.info(f"Species {unique_name} already exists")
+        if Species.objects.filter(name=species_name, group=group).exists():
+            logger.info(f"Species {species_name} already exists for group {group.name}")
             continue
 
         try:
-            # Create the species with a unique name
+            # Create the species with its normal name
             species = Species.objects.create(
-                name=unique_name, description=species_data["description"], created_by=user, group=group
+                name=species_name, description=species_data["description"], created_by=user, group=group
             )
             logger.info(f"Created species {species.name} for group {group.name}")
 
@@ -282,8 +178,106 @@ def import_default_species(user):
     return created_species
 
 
+def create_recording_from_batch(batch, onsets=None, offsets=None, pickle_file=None):
+    """Create a recording and segments from a task batch
+    
+    Args:
+        batch: The TaskBatch object to create a recording from
+        onsets: Optional list of onset times in seconds
+        offsets: Optional list of offset times in seconds
+        pickle_file: Optional pickle file object containing onset/offset data
+        
+    Returns:
+        tuple: (recording, segments_created) - The Recording object and count of segments created,
+               or (None, 0) if creation failed
+    """
+    import traceback
+
+    from django.db import transaction
+
+    from .audio.utils import process_pickle_file
+    from .models import Recording, Segment, Segmentation
+    
+    logger.info(f"Creating recording from task batch {batch.name}")
+    
+    # Ensure we have a valid batch with a WAV file
+    if not batch.wav_file:
+        logger.error(f"Task batch {batch.name} has no WAV file")
+        return None, 0
+    
+    try:
+        # Create a new recording using the same WAV file
+        recording = Recording(
+            name=f"Recording from {batch.name}",
+            description=f"Created automatically from task batch {batch.name}",
+            wav_file=batch.wav_file,  # Use the same WAV file
+            species=batch.species,
+            project=batch.project,
+            group=batch.group,
+            created_by=batch.created_by
+        )
+        recording.save()
+        
+        segments_created = 0
+        
+        # Process the pickle file if provided
+        if pickle_file:
+            try:
+                # Process the pickle file to get onsets and offsets
+                onsets, offsets = process_pickle_file(pickle_file)
+            except Exception as e:
+                logger.error(f"Error processing pickle file: {str(e)}")
+                logger.error(traceback.format_exc())
+                return recording, segments_created
+        
+        # Create segments if we have onset/offset data
+        if onsets and offsets and len(onsets) == len(offsets):
+            try:
+                with transaction.atomic():
+                    # First, create the segmentation object
+                    segmentation = Segmentation(
+                        recording=recording,
+                        status='completed',  # Already completed since we have the data
+                        progress=100,
+                        created_by=batch.created_by
+                    )
+                    segmentation.save()
+                    
+                    # Now create the segments
+                    for i in range(len(onsets)):
+                        # Create segment name
+                        segment_name = f"Segment {i+1}"
+                        
+                        # Convert numpy types to Python native types if needed
+                        onset_value = float(onsets[i])
+                        offset_value = float(offsets[i])
+                        
+                        # Create and save the segment
+                        segment = Segment(
+                            recording=recording,
+                            name=segment_name,
+                            onset=onset_value,
+                            offset=offset_value,
+                            created_by=batch.created_by
+                        )
+                        segment.save()
+                        segments_created += 1
+                
+                logger.info(f"Created segmentation with {segments_created} segments for recording from task batch {batch.name}")
+            except Exception as e:
+                logger.error(f"Error creating segments: {str(e)}")
+                logger.error(traceback.format_exc())
+        
+        return recording, segments_created
+        
+    except Exception as e:
+        logger.error(f"Error creating recording from task batch: {str(e)}")
+        logger.error(traceback.format_exc())
+        return None, 0
+
+
 def create_demo_task_batch(user):
-    """Create a demo task batch for a new user using sample files
+    """Create a demo task batch for a new user using sample files.
 
     Args:
         user: The User object to create the task batch for
@@ -297,9 +291,8 @@ def create_demo_task_batch(user):
     from django.core.files import File
     from django.db import transaction
 
-    import numpy as np
-
     from .models import Project, Species, Task, TaskBatch
+    from .audio.utils import process_pickle_file
 
     logger.info(f"Creating demo task batch for user {user.username}")
 
@@ -319,7 +312,7 @@ def create_demo_task_batch(user):
             return None
 
         # Find the Carollia species
-        species = Species.objects.filter(group=group, name__contains="Carollia").first()
+        species = Species.objects.filter(group=group, name="Carollia").first()
 
         if not species:
             logger.warning(f"No Carollia species found for {user.username}, skipping task batch creation")
@@ -356,7 +349,7 @@ def create_demo_task_batch(user):
             return None
 
         # Create the task batch
-        batch_name = f"Demo Bat Calls - {user.username}"
+        batch_name = "Demo Bat Calls"
 
         # Create and save the TaskBatch
         batch = TaskBatch(
@@ -378,28 +371,12 @@ def create_demo_task_batch(user):
 
         logger.info(f"Created task batch {batch.name} for user {user.username}")
 
-        # Load the pickle file
+        # Load the pickle file and process it once to get onsets and offsets
         try:
             with open(pickle_path, "rb") as f:
-                pickle_data = pickle.load(f)
-
-            # Extract onsets and offsets
-            if isinstance(pickle_data, dict):
-                onsets = pickle_data.get("onsets", [])
-                offsets = pickle_data.get("offsets", [])
-            elif isinstance(pickle_data, (list, tuple)) and len(pickle_data) >= 2:
-                onsets = pickle_data[0]
-                offsets = pickle_data[1]
-            else:
-                logger.error(f"Pickle file format not recognized")
-                return batch
-
-            # Convert to lists if they're NumPy arrays
-            if isinstance(onsets, np.ndarray):
-                onsets = onsets.tolist()
-            if isinstance(offsets, np.ndarray):
-                offsets = offsets.tolist()
-
+                # Process the pickle file using our standard utility
+                onsets, offsets = process_pickle_file(f)
+            
             # Create tasks for each onset-offset pair inside a transaction
             tasks_created = 0
             with transaction.atomic():
@@ -432,6 +409,21 @@ def create_demo_task_batch(user):
                         raise  # Re-raise to trigger transaction rollback
 
             logger.info(f"Created {tasks_created} tasks for batch {batch.name}")
+            
+            # Create recording and segments using the same onsets/offsets
+            try:
+                # Use our utility function to create the recording and segments
+                recording, segments_created = create_recording_from_batch(batch, onsets=onsets, offsets=offsets)
+                
+                if recording:
+                    logger.info(f"Created recording with {segments_created} segments for demo batch {batch.name}")
+                else:
+                    logger.warning(f"Failed to create recording for demo batch {batch.name}")
+            except Exception as e:
+                logger.error(f"Error creating recording from demo batch: {str(e)}")
+                logger.error(traceback.format_exc())
+                # Don't fail task batch creation if recording creation fails
+            
             return batch
 
         except Exception as e:

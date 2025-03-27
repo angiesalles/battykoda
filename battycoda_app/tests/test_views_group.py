@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 
-from battycoda_app.models import Project, Species, Group, GroupMembership, UserProfile
+from battycoda_app.models import Group, GroupMembership, Project, Species, UserProfile
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 

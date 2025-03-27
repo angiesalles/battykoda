@@ -6,7 +6,7 @@ from django.db import models
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import DetectionRun, DetectionResult, TaskBatch, Call, CallProbability, Task, Classifier
+from .models import Call, CallProbability, Classifier, DetectionResult, DetectionRun, Task, TaskBatch
 
 # Set up logging
 logger = logging.getLogger("battycoda.views_automation")

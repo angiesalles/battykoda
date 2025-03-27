@@ -3,7 +3,6 @@ Celery tasks for BattyCoda audio and spectrogram processing.
 """
 import logging
 import os
-import shutil
 import tempfile
 import time
 import traceback
@@ -129,15 +128,16 @@ def generate_recording_spectrogram(self, recording_id):
     import hashlib
     import os
     import tempfile
-    
+
     from django.conf import settings
+
     import matplotlib
     matplotlib.use('Agg')  # Use non-interactive backend
     import matplotlib.pyplot as plt
     import numpy as np
     import soundfile as sf
     from PIL import Image
-    
+
     from ..models import Recording
     
     logger.info(f"Generating full spectrogram for recording {recording_id}")
@@ -236,15 +236,18 @@ def run_call_detection(self, detection_run_id):
     Returns:
         dict: Result of the detection process
     """
-    from django.db import transaction
-    from django.conf import settings
-    from ..models import DetectionRun, DetectionResult, CallProbability, Task, Call, Classifier
-    import os
-    import requests
     import json
-    import time
+    import os
     import tempfile
+    import time
+
+    from django.conf import settings
+    from django.db import transaction
+
     import numpy as np
+    import requests
+
+    from ..models import Call, CallProbability, Classifier, DetectionResult, DetectionRun, Task
     
     logger.info(f"Starting call detection for run {detection_run_id}")
     
@@ -564,6 +567,100 @@ def extract_audio_segment(wav_path, onset, offset, padding=0.01):
         raise
 
 
+@shared_task(bind=True, name="battycoda_app.audio.tasks.auto_segment_recording")
+def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_window=3, threshold_factor=0.5):
+    """
+    Automatically segment a recording using the steps:
+    1. Take absolute value of the signal
+    2. Smooth the signal using a moving average filter
+    3. Apply a threshold to detect segments
+    4. Reject markings shorter than the minimum duration
+    
+    Args:
+        recording_id: ID of the Recording model to segment
+        min_duration_ms: Minimum segment duration in milliseconds
+        smooth_window: Window size for smoothing filter (number of samples)
+        threshold_factor: Threshold factor (between 0-1) relative to signal statistics
+        
+    Returns:
+        dict: Result information including number of segments created
+    """
+    from django.db import transaction
+
+    from ..models import Recording, Segment
+    from .utils import auto_segment_audio
+    
+    logger.info(f"Starting automated segmentation for recording {recording_id}")
+    
+    try:
+        # Get the recording
+        recording = Recording.objects.get(id=recording_id)
+        
+        # Check if recording file exists
+        if not recording.wav_file or not os.path.exists(recording.wav_file.path):
+            error_msg = f"WAV file not found for recording {recording_id}"
+            logger.error(error_msg)
+            return {"status": "error", "message": error_msg}
+        
+        # Run the automated segmentation
+        try:
+            onsets, offsets = auto_segment_audio(
+                recording.wav_file.path, 
+                min_duration_ms=min_duration_ms,
+                smooth_window=smooth_window, 
+                threshold_factor=threshold_factor
+            )
+        except Exception as e:
+            error_msg = f"Error during auto-segmentation: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            return {"status": "error", "message": error_msg}
+        
+        # Create database segments from the detected onsets/offsets
+        segments_created = 0
+        
+        with transaction.atomic():
+            # Create segments for each onset/offset pair
+            for i in range(len(onsets)):
+                try:
+                    # Generate segment name
+                    segment_name = f"Auto Segment {i+1}"
+                    
+                    # Create segment
+                    segment = Segment(
+                        recording=recording,
+                        name=segment_name,
+                        onset=onsets[i],
+                        offset=offsets[i],
+                        created_by=recording.created_by,  # Use recording's creator
+                        notes="Created by automated segmentation"
+                    )
+                    segment.save()
+                    segments_created += 1
+                except Exception as e:
+                    logger.error(f"Error creating segment {i}: {str(e)}")
+                    # Continue with other segments
+        
+        # Return success result
+        logger.info(f"Successfully created {segments_created} segments from automated detection")
+        return {
+            "status": "success",
+            "recording_id": recording_id,
+            "segments_created": segments_created,
+            "total_segments_found": len(onsets),
+            "parameters": {
+                "min_duration_ms": min_duration_ms,
+                "smooth_window": smooth_window,
+                "threshold_factor": threshold_factor
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in auto_segment_recording_task: {str(e)}")
+        logger.error(traceback.format_exc())
+        return {"status": "error", "message": str(e)}
+
+
 def generate_spectrogram(path, args, output_path=None):
     """
     Pure function to generate a spectrogram.
@@ -660,13 +757,24 @@ def generate_spectrogram(path, args, output_path=None):
         height, width = img_data.shape
         rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
 
-        # Simple colormap: convert grayscale to indigo-purple
-        # R channel - more for brighter areas
-        rgb_data[:, :, 0] = np.clip(img_data * 0.7, 0, 255).astype(np.uint8)
-        # G channel - less overall
-        rgb_data[:, :, 1] = np.clip(img_data * 0.2, 0, 255).astype(np.uint8)
-        # B channel - more in all areas for blue/indigo base
-        rgb_data[:, :, 2] = np.clip(img_data * 0.9, 0, 255).astype(np.uint8)
+        # Check if this spectrogram is generated on-the-fly - if so, use inverted colors
+        if args.get("generated_on_fly") == "1":
+            logger.info("Generating on-the-fly spectrogram with inverted colors")
+            # Inverted colormap (yellow-green instead of purple-blue)
+            # R channel - more for brighter areas
+            rgb_data[:, :, 0] = np.clip(img_data * 0.9, 0, 255).astype(np.uint8)
+            # G channel - more overall
+            rgb_data[:, :, 1] = np.clip(img_data * 0.8, 0, 255).astype(np.uint8)
+            # B channel - less in all areas
+            rgb_data[:, :, 2] = np.clip(img_data * 0.3, 0, 255).astype(np.uint8)
+        else:
+            # Standard colormap: convert grayscale to indigo-purple
+            # R channel - more for brighter areas
+            rgb_data[:, :, 0] = np.clip(img_data * 0.7, 0, 255).astype(np.uint8)
+            # G channel - less overall
+            rgb_data[:, :, 1] = np.clip(img_data * 0.2, 0, 255).astype(np.uint8)
+            # B channel - more in all areas for blue/indigo base
+            rgb_data[:, :, 2] = np.clip(img_data * 0.9, 0, 255).astype(np.uint8)
 
         log_performance(process_start, f"{task_id}: Process spectrogram data")
 

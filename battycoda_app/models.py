@@ -103,8 +103,8 @@ def create_user_profile(sender, instance, created, **kwargs):
         profile = UserProfile.objects.create(user=instance)
 
         # Create a new group for this user
-        group_name = f"{instance.username}'s Group"
-        group = Group.objects.create(name=group_name, description=f"Personal group for {instance.username}")
+        group_name = "My Group"
+        group = Group.objects.create(name=group_name, description="Your personal workspace for projects and recordings")
 
         # Assign the user to their own group and make them an admin
         profile.group = group
@@ -119,12 +119,12 @@ def create_user_profile(sender, instance, created, **kwargs):
             # Import here to avoid circular imports
             Project = sender.objects.model._meta.apps.get_model("battycoda_app", "Project")
 
-            # Generate a unique project name
-            project_name = f"Demo Project - {instance.username}"
+            # Create a standard demo project
+            project_name = "Demo Project"
 
             Project.objects.create(
                 name=project_name,
-                description=f"Demo project created automatically for {instance.username}",
+                description="Sample project for demonstration and practice",
                 created_by=instance,
                 group=group,
             )
@@ -159,12 +159,42 @@ def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
 
 
+def get_species_image_path(instance, filename):
+    """
+    Generate a unique path for species images.
+    Format: species_images/user_<user_id>/species_<species_id>/<timestamp>_<filename>
+    This ensures:
+    1. Separation by user
+    2. Separation by species
+    3. Timestamp to avoid name collisions
+    4. Original filename preserved for reference
+    """
+    import os
+    from datetime import datetime
+
+    # Extract file extension
+    ext = os.path.splitext(filename)[1].lower()
+    
+    # Generate a timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    # Use the user ID and create a timestamp-based filename
+    user_id = instance.created_by.id if instance.created_by else 'unknown'
+    species_id = instance.id if instance.id else 'new'
+    
+    # Create a clean filename (remove special characters)
+    clean_filename = ''.join(c for c in os.path.splitext(filename)[0] if c.isalnum() or c in '_- ')
+    clean_filename = clean_filename.replace(' ', '_')
+    
+    # Format: user_<id>/species_<id>/<timestamp>_<clean_filename><ext>
+    return f"species_images/user_{user_id}/species_{species_id}/{timestamp}_{clean_filename}{ext}"
+
 # Species model for bat species
 class Species(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     # scientific_name field removed
     description = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to="species_images/", blank=True, null=True)
+    image = models.ImageField(upload_to=get_species_image_path, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="species")
     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="species", null=True)
@@ -172,6 +202,7 @@ class Species(models.Model):
     class Meta:
         verbose_name_plural = "Species"
         ordering = ["name"]
+        unique_together = [("name", "group")]
 
     def __str__(self):
         return self.name
@@ -195,12 +226,16 @@ class Call(models.Model):
 
 # Project model for research projects
 class Project(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="projects", null=True)
-
+    
+    class Meta:
+        ordering = ["name"]
+        unique_together = [("name", "group")]
+    
     def __str__(self):
         return self.name
 
@@ -216,6 +251,10 @@ class TaskBatch(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="task_batches")
     wav_file = models.FileField(upload_to="task_batches/", null=True, blank=True)
     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="task_batches", null=True)
+
+    class Meta:
+        ordering = ["name"]
+        unique_together = [("name", "group")]
 
     def __str__(self):
         return self.name
@@ -440,7 +479,7 @@ class Segment(models.Model):
             return self.task
         
         # Create a new batch if needed or use the existing one
-        from django.utils.text import slugify
+        # Removed unused import: slugify
         batch_name = f"Batch from {self.recording.name} - {timezone.now().strftime('%Y%m%d-%H%M%S')}"
         
         batch = TaskBatch.objects.create(
@@ -456,7 +495,7 @@ class Segment(models.Model):
         
         # Import the Task model here to avoid circular imports
         from battycoda_app.models import Task
-        
+
         # Create task
         task = Task.objects.create(
             wav_file_name=self.recording.wav_file.name,
@@ -562,9 +601,9 @@ class Task(models.Model):
                 # Get the path from the uploaded file in the batch
                 wav_path = self.batch.wav_file.path
             else:
-                # Assume the path is based on the project structure
+                # Assume the path is based on the recordings structure
                 wav_path = os.path.join(
-                    "home", self.created_by.username, self.species.name, self.project.name, self.wav_file_name
+                    "recordings", self.wav_file_name
                 )
                 wav_path = convert_path_to_os_specific(wav_path)
 
@@ -603,3 +642,141 @@ class Task(models.Model):
             import traceback
 
             logger.error(traceback.format_exc())
+
+
+# Segmentation algorithm model
+class SegmentationAlgorithm(models.Model):
+    """Model for storing different segmentation algorithms."""
+    
+    name = models.CharField(max_length=255, help_text="Name of the segmentation algorithm")
+    description = models.TextField(blank=True, null=True, help_text="Description of how the algorithm works")
+    
+    # Algorithm type choices
+    ALGORITHM_TYPE_CHOICES = (
+        ("threshold", "Threshold-based Detection"),
+        ("energy", "Energy-based Detection"),
+        ("ml", "Machine Learning Detection"),
+        ("external", "External Service"),
+    )
+    algorithm_type = models.CharField(
+        max_length=20,
+        choices=ALGORITHM_TYPE_CHOICES,
+        default="threshold",
+        help_text="Type of segmentation algorithm"
+    )
+    
+    # Celery task to call
+    celery_task = models.CharField(
+        max_length=255, 
+        help_text="Fully qualified Celery task name to execute this algorithm",
+        default="battycoda_app.audio.tasks.auto_segment_recording"
+    )
+    
+    # External service parameters (for external algorithms)
+    service_url = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        help_text="URL of the external service, if applicable"
+    )
+    endpoint = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        help_text="Endpoint path for the service"
+    )
+    
+    # Default parameters
+    default_min_duration_ms = models.IntegerField(
+        default=10, 
+        help_text="Default minimum duration in milliseconds"
+    )
+    default_smooth_window = models.IntegerField(
+        default=3, 
+        help_text="Default smoothing window size"
+    )
+    default_threshold_factor = models.FloatField(
+        default=0.5, 
+        help_text="Default threshold factor (0-10)"
+    )
+    
+    # Admin only flag
+    is_active = models.BooleanField(default=True, help_text="Whether this algorithm is currently active")
+    created_at = models.DateTimeField(auto_now_add=True)
+    group = models.ForeignKey(
+        Group, 
+        on_delete=models.SET_NULL, 
+        related_name="segmentation_algorithms", 
+        null=True,
+        blank=True,
+        help_text="Group that owns this algorithm. If null, it's available to all groups"
+    )
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        ordering = ["name"]
+
+
+# Segmentation model for a recording
+class Segmentation(models.Model):
+    """Track segmentation for a recording. Each recording can have only one segmentation."""
+
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    )
+
+    recording = models.OneToOneField(
+        Recording, 
+        on_delete=models.CASCADE, 
+        related_name="segmentation",
+        help_text="The recording this segmentation belongs to"
+    )
+    algorithm = models.ForeignKey(
+        SegmentationAlgorithm, 
+        on_delete=models.SET_NULL, 
+        related_name="segmentations",
+        null=True,
+        blank=True,
+        help_text="The algorithm used for this segmentation, if any"
+    )
+    task_id = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True,
+        help_text="Celery task ID for automated segmentation"
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+    progress = models.FloatField(default=100, help_text="Progress percentage (0-100)")
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    @property
+    def is_processing(self):
+        """Return True if the segmentation is currently being processed."""
+        return self.status in ('pending', 'in_progress')
+        
+    def __str__(self):
+        """String representation of segmentation, using recording name."""
+        return f"Segmentation for {self.recording.name}"
+    updated_at = models.DateTimeField(auto_now=True)
+    error_message = models.TextField(blank=True, null=True)
+    
+    # Store segmentation parameters
+    min_duration_ms = models.IntegerField(default=10)
+    smooth_window = models.IntegerField(default=3)
+    threshold_factor = models.FloatField(default=0.5)
+    
+    # Store results
+    segments_created = models.IntegerField(default=0)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        """Return string representation."""
+        return f"Segmentation job {self.id} - {self.recording.name} ({self.status})"

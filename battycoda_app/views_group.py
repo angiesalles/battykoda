@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .forms import GroupForm
-from .models import Project, Species, TaskBatch, Group, GroupMembership, UserProfile
+from .models import Group, GroupMembership, Project, Species, TaskBatch, UserProfile
 
 # Set up logging
 logger = logging.getLogger("battycoda.views_group")
@@ -281,59 +281,3 @@ def switch_group_view(request, group_id):
     # Redirect back to referring page or index
     next_page = request.META.get("HTTP_REFERER", reverse("battycoda_app:index"))
     return redirect(next_page)
-
-
-@login_required
-def debug_groups_view(request):
-    """Debug view to inspect group membership and available groups"""
-    # Get all groups in the database with their memberships
-    all_groups = Group.objects.all().prefetch_related("group_memberships", "group_memberships__user")
-
-    # Get user's memberships
-    user_memberships = GroupMembership.objects.filter(user=request.user).select_related("group")
-
-    # Group consistency check - verify that we have correct group memberships
-    # Get all user profiles and count their groups
-    total_profiles = UserProfile.objects.filter(group__isnull=False).count()
-    total_memberships = GroupMembership.objects.count()
-
-    # Find profiles without matching memberships
-    profiles_without_membership = UserProfile.objects.filter(group__isnull=False).exclude(
-        user__in=GroupMembership.objects.filter(group=models.F("user__profile__group")).values_list("user", flat=True)
-    )
-
-    # Find users with memberships but no active group
-    users_with_memberships_no_group = UserProfile.objects.filter(
-        user__in=GroupMembership.objects.values_list("user", flat=True), group__isnull=True
-    )
-
-    context = {
-        "all_groups": all_groups,
-        "user_memberships": user_memberships,
-        "total_profiles_with_groups": total_profiles,
-        "total_memberships": total_memberships,
-        "profiles_without_membership": profiles_without_membership,
-        "users_with_memberships_no_group": users_with_memberships_no_group,
-    }
-
-    # If the sync parameter is provided, fix any inconsistencies
-    if request.GET.get("sync") == "true" and request.user.is_superuser:
-        # For each profile without a membership, create one
-        for profile in profiles_without_membership:
-            GroupMembership.objects.get_or_create(
-                user=profile.user, group=profile.group, defaults={"is_admin": profile.is_admin}
-            )
-
-        # For each user with memberships but no active group, set their active group
-        for profile in users_with_memberships_no_group:
-            # Get first membership
-            membership = GroupMembership.objects.filter(user=profile.user).first()
-            if membership:
-                profile.group = membership.group
-                profile.is_admin = membership.is_admin
-                profile.save()
-
-        messages.success(request, "Group memberships synchronized successfully.")
-        return redirect("battycoda_app:debug_groups")
-
-    return render(request, "groups/debug_groups.html", context)

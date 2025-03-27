@@ -160,10 +160,11 @@ def task_annotation_view(request, task_id):
     # Calculate midpoint time for axis
     midpoint_time = (task.onset + task.offset) / 2
 
-    # Get window size for the spectrogram
-    from .audio.utils import normal_hwin
+    # Get window sizes for the spectrogram
+    from .audio.utils import normal_hwin, overview_hwin
 
     normal_window_size = normal_hwin()
+    overview_window_size = overview_hwin()
 
     # Create context for the template
     context = {
@@ -183,6 +184,7 @@ def task_annotation_view(request, task_id):
         "midpoint_time": midpoint_time,  # Add midpoint time for x-axis
         "spectrogram_urls": spectrogram_urls,  # Add pre-generated spectrogram URLs
         "normal_hwin": normal_window_size,  # Add window size for time axis in milliseconds
+        "overview_hwin": overview_window_size,  # Add overview window size
     }
 
     # Return the annotation interface

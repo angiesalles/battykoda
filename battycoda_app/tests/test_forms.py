@@ -3,16 +3,16 @@ from unittest.mock import MagicMock
 from django.contrib.auth.models import User
 
 from battycoda_app.forms import (
+    GroupForm,
     ProjectForm,
     SpeciesForm,
     TaskForm,
     TaskUpdateForm,
-    GroupForm,
     UserLoginForm,
     UserProfileForm,
     UserRegisterForm,
 )
-from battycoda_app.models import Project, Species, Group, UserProfile
+from battycoda_app.models import Group, Project, Species, UserProfile
 from battycoda_app.tests.test_base import BattycodaTestCase
 
 

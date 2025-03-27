@@ -11,14 +11,15 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 import os
-import dotenv
 from pathlib import Path
+
+import dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env.local if it exists
-env_file = BASE_DIR / '.env.local'
+# Load environment variables from .env
+env_file = BASE_DIR / '.env'
 if env_file.exists():
     dotenv.load_dotenv(env_file)
 
@@ -32,7 +33,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Debug mode should be False in production
-DEBUG = False
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 # Get domain name from environment
 DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')
@@ -40,14 +41,21 @@ DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')
 # Allow the domain name, www subdomain, localhost, and internal docker IPs
 ALLOWED_HOSTS = [DOMAIN_NAME, f'www.{DOMAIN_NAME}', 'localhost', '127.0.0.1', '[::1]']
 
-# CSRF trusted origins
-CSRF_TRUSTED_ORIGINS = ['http://*', 'https://*', 'https://battycoda.com', 'https://*.batlab.org', 'https://*.boergens.net', 'https://boergens.net', 'http://localhost', 'http://127.0.0.1']
+# CSRF trusted origins - generated dynamically based on DOMAIN_NAME
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{DOMAIN_NAME}',
+    f'https://*.{DOMAIN_NAME}',
+    f'http://{DOMAIN_NAME}',
+    f'http://*.{DOMAIN_NAME}',
+    'http://localhost',
+    'http://127.0.0.1'
+]
 
 # Security settings for HTTPS - temporarily disabled until HTTPS is fully set up
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = True  # Temporarily disable until HTTPS is set up
-SESSION_COOKIE_SECURE = True  # Temporarily disable until HTTPS is set up
-CSRF_COOKIE_SECURE = True  # Temporarily disable until HTTPS is set up
+SECURE_SSL_REDIRECT = False  # Disabled until HTTPS is fully set up
+SESSION_COOKIE_SECURE = False  # Disabled until HTTPS is fully set up
+CSRF_COOKIE_SECURE = False  # Disabled until HTTPS is fully set up
 SECURE_HSTS_SECONDS = 31536000  # Commented out until HTTPS is fully configured
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
@@ -67,6 +75,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add whitenoise for static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -144,11 +153,25 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+# Whitenoise configuration for serving static files
+# Check if static file caching should be disabled using environment variable
+DISABLE_STATIC_CACHING = os.environ.get('DISABLE_STATIC_CACHING', 'False').lower() == 'true'
+
+# Choose appropriate storage backend based on caching settings
+if DISABLE_STATIC_CACHING:
+    # Use basic storage with no caching for development
+    STATICFILES_STORAGE = 'whitenoise.storage.StaticFilesStorage'
+    WHITENOISE_MAX_AGE = 0  # No caching
+else:
+    # Use compressed storage with long caching for production
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+    WHITENOISE_MAX_AGE = 31536000  # 1 year in seconds
 
 # Media files
 MEDIA_URL = '/media/'
@@ -214,6 +237,16 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'battycoda.views_species': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
     },
 }
 
@@ -223,4 +256,4 @@ AWS_SES_REGION_NAME = os.environ.get('AWS_SES_REGION_NAME', 'us-east-1')
 AWS_SES_ACCESS_KEY_ID = os.environ.get('AWS_SES_ACCESS_KEY_ID')
 AWS_SES_SECRET_ACCESS_KEY = os.environ.get('AWS_SES_SECRET_ACCESS_KEY')
 AWS_SES_CONFIGURATION_SET = os.environ.get('AWS_SES_CONFIGURATION_SET', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@battycoda.com')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', f'noreply@{DOMAIN_NAME}')

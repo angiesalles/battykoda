@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BattyCoda - Delete Project{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'battycoda_app:project_list' %}">Projects</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'battycoda_app:project_detail' project.id %}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Delete</li>
+            </ol>
+        </nav>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card bg-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Delete Project: {{ project.name }}</h5>
+        </div>
+        <div class="card-body">
+            {% if has_dependencies %}
+            <div class="alert alert-danger">
+                <h5><i class="fas fa-exclamation-triangle"></i> Cannot Delete Project</h5>
+                <p>This project has associated items that must be removed first:</p>
+                <ul>
+                    {% if task_count > 0 %}
+                    <li>{{ task_count }} associated task{% if task_count != 1 %}s{% endif %}</li>
+                    {% endif %}
+                    {% if batch_count > 0 %}
+                    <li>{{ batch_count }} task batch{% if batch_count != 1 %}es{% endif %}</li>
+                    {% endif %}
+                </ul>
+                <p>Please remove these dependencies before deleting this project.</p>
+            </div>
+            <div class="mt-4">
+                <a href="{% url 'battycoda_app:project_detail' project.id %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Return to Project
+                </a>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <h5><i class="fas fa-exclamation-triangle"></i> Warning</h5>
+                <p>You are about to delete the project <strong>{{ project.name }}</strong>. This action cannot be undone.</p>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'battycoda_app:project_detail' project.id %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete Project
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
