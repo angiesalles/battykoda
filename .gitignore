@@ -1,5 +1,7 @@
-.env.local
+.env
 *.pid
 .venv
 *__pycache__*
 *.sqlite3
+staticfiles/*
+media/*

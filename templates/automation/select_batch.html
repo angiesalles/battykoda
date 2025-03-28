@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Select Batch for Classification | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-4">Select Task Batch</h1>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Classification</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Select Batch</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Available Task Batches</h4>
+                    
+                    <div class="input-group" style="max-width: 300px;">
+                        <span class="input-group-text bg-dark text-white border-secondary">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" id="batchSearch" class="form-control bg-dark text-white border-secondary" 
+                               placeholder="Search batches...">
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if batches %}
+                    <div class="alert alert-info">
+                        <p class="mb-0">Select a task batch to run automated call classification on.</p>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover" id="batchesTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Species</th>
+                                    <th>Task Count</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for batch in batches %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'battycoda_app:task_batch_detail' batch_id=batch.id %}">
+                                            {{ batch.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ batch.species.name }}</td>
+                                    <td>{{ batch.tasks.count }}</td>
+                                    <td>{{ batch.created_at|date:"M d, Y" }}</td>
+                                    <td>
+                                        <a href="{% url 'battycoda_app:create_detection_run' %}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fas fa-play me-1"></i> Run Classification
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <p class="mb-0">
+                            No task batches available. 
+                            <a href="{% url 'battycoda_app:create_task_batch' %}" class="alert-link">Create a task batch</a> 
+                            first to use the automated classification.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality for batches table
+    const searchInput = document.getElementById('batchSearch');
+    const batchesTable = document.getElementById('batchesTable');
+    
+    if (searchInput && batchesTable) {
+        searchInput.addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = batchesTable.querySelectorAll('tbody tr');
+            
+            rows.forEach(function(row) {
+                const text = row.textContent.toLowerCase();
+                const display = text.includes(searchTerm) ? '' : 'none';
+                row.style.display = display;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

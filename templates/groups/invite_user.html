@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Invite User to {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h2 class="mb-0 h5">Invite a User to {{ group.name }}</h2>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Send an invitation email to add someone to your group. They'll receive a link to join BattyCoda 
+                        and will be automatically added to your group when they register or log in.
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">{{ form.email.label }}</label>
+                            <input type="email" 
+                                   name="{{ form.email.name }}" 
+                                   id="{{ form.email.id_for_label }}" 
+                                   class="form-control {% if form.email.errors %}is-invalid{% endif %}"
+                                   placeholder="example@email.com"
+                                   required>
+                            {% if form.email.errors %}
+                            <div class="invalid-feedback">
+                                {{ form.email.errors }}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">{{ form.email.help_text }}</div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-1"></i> Send Invitation
+                            </button>
+                            <a href="{% url 'battycoda_app:group_users' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

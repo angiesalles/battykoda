@@ -1,0 +1,36 @@
+# Dockerfile for BattyCoda Web Service
+FROM python:3.12-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libsndfile1 \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better layer caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Create necessary directories
+RUN mkdir -p media/home logs static/tempdata
+
+# The application code will be mounted at runtime via volume
+# This allows for faster development cycles without rebuilding the image
+
+# Expose the port Django runs on
+EXPOSE 8060
+
+# Default command - gunicorn for production
+CMD ["gunicorn", "--workers=3", "--bind=0.0.0.0:8060", "--timeout=120", "--log-level=debug", "config.wsgi:application"]

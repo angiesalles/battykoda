@@ -13,23 +13,52 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os
 from pathlib import Path
 
+import dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env
+env_file = BASE_DIR / '.env'
+if env_file.exists():
+    dotenv.load_dotenv(env_file)
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-r)5pg=&w_$mad+)iuy(o8zv9!f4saom0@#=tw$(@_b&xa51oga'
+# The SECRET_KEY must be provided via environment variable
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Debug mode should be False in production
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']  # For testing. Replace with specific hostname/IP in production
+# Get domain name from environment
+DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')
 
-# Allow forms from Cloudflare, even if the origin appears different
-CSRF_TRUSTED_ORIGINS = ['https://battycoda.com', 'https://*.cloudflareaccess.com', 'https://*.batlab.org']
+# Allow the domain name, www subdomain, localhost, and internal docker IPs
+ALLOWED_HOSTS = [DOMAIN_NAME, f'www.{DOMAIN_NAME}', 'localhost', '127.0.0.1', '[::1]']
+
+# CSRF trusted origins - generated dynamically based on DOMAIN_NAME
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{DOMAIN_NAME}',
+    f'https://*.{DOMAIN_NAME}',
+    f'http://{DOMAIN_NAME}',
+    f'http://*.{DOMAIN_NAME}',
+    'http://localhost',
+    'http://127.0.0.1'
+]
+
+# Security settings for HTTPS - temporarily disabled until HTTPS is fully set up
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = False  # Disabled until HTTPS is fully set up
+SESSION_COOKIE_SECURE = False  # Disabled until HTTPS is fully set up
+CSRF_COOKIE_SECURE = False  # Disabled until HTTPS is fully set up
+SECURE_HSTS_SECONDS = 31536000  # Commented out until HTTPS is fully configured
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
 
 
 # Application definition
@@ -46,21 +75,17 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add whitenoise for static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # Add Cloudflare verification middleware
-    'battycoda_app.middleware.cloudflare_middleware.CloudflareAccessMiddleware',
+    # Add standard authentication middleware
+    'battycoda_app.middleware.authentication_middleware.AuthenticationMiddleware',
 ]
 
-# Cloudflare Access settings
-CLOUDFLARE_ACCESS_ENABLED = True
-CLOUDFLARE_AUDIENCE = os.environ.get('CLOUDFLARE_AUDIENCE', '92f9c8b2586479249c3bea574d492514af0593259e62280662f6a3876f00cc1b')
-CLOUDFLARE_DOMAIN = os.environ.get('CLOUDFLARE_DOMAIN', 'batlab.cloudflareaccess.com')
-ENFORCE_CLOUDFLARE_IN_DEV = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -128,11 +153,25 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+# Whitenoise configuration for serving static files
+# Check if static file caching should be disabled using environment variable
+DISABLE_STATIC_CACHING = os.environ.get('DISABLE_STATIC_CACHING', 'False').lower() == 'true'
+
+# Choose appropriate storage backend based on caching settings
+if DISABLE_STATIC_CACHING:
+    # Use basic storage with no caching for development
+    STATICFILES_STORAGE = 'whitenoise.storage.StaticFilesStorage'
+    WHITENOISE_MAX_AGE = 0  # No caching
+else:
+    # Use compressed storage with long caching for production
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+    WHITENOISE_MAX_AGE = 31536000  # 1 year in seconds
 
 # Media files
 MEDIA_URL = '/media/'
@@ -141,6 +180,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Make sure the media directory exists
 os.makedirs(MEDIA_ROOT / 'audio_cache', exist_ok=True)
 os.makedirs(MEDIA_ROOT / 'home', exist_ok=True)
+
+# File upload settings - read from same environment variable as Nginx
+MAX_UPLOAD_SIZE_MB = int(os.environ.get('MAX_UPLOAD_SIZE_MB', 100))
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024  # Convert MB to bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
 
 # Celery configuration
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://redis:6379/0')
@@ -173,7 +217,7 @@ LOGGING = {
         },
     },
     'loggers': {
-        'battycoda.cloudflare': {
+        'battycoda.auth': {
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': True,
@@ -188,5 +232,28 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'battycoda.email': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'battycoda.views_species': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
     },
 }
+
+# AWS SES Email Configuration
+EMAIL_BACKEND = 'django_ses.SESBackend'
+AWS_SES_REGION_NAME = os.environ.get('AWS_SES_REGION_NAME', 'us-east-1')
+AWS_SES_ACCESS_KEY_ID = os.environ.get('AWS_SES_ACCESS_KEY_ID')
+AWS_SES_SECRET_ACCESS_KEY = os.environ.get('AWS_SES_SECRET_ACCESS_KEY')
+AWS_SES_CONFIGURATION_SET = os.environ.get('AWS_SES_CONFIGURATION_SET', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', f'noreply@{DOMAIN_NAME}')

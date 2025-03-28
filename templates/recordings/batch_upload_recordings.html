@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block title %}BattyCoda - Batch Upload Recordings{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'battycoda_app:recording_list' %}">Recordings</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Batch Upload Recordings</li>
+            </ol>
+        </nav>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card bg-dark">
+        <div class="card-header">
+            <h5 class="mb-0">Simple Batch Upload</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i> Upload WAV files as a ZIP archive. If you have pickle files, include them in a separate ZIP archive.
+            </div>
+            
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <!-- File Upload Section -->
+                <h6 class="text-muted mb-3">File Upload</h6>
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <label for="wav_zip" class="form-label">WAV Files ZIP*</label>
+                        <input type="file" name="wav_zip" id="wav_zip" class="form-control bg-dark text-light border-secondary" accept=".zip">
+                        <small class="form-text text-muted">Upload a ZIP file containing WAV audio files</small>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="pickle_zip" class="form-label">Pickle Files ZIP <small class="text-muted">(Optional)</small></label>
+                        <input type="file" name="pickle_zip" id="pickle_zip" class="form-control bg-dark text-light border-secondary" accept=".zip">
+                        <small class="form-text text-muted">Upload a ZIP file containing matching pickle files</small>
+                    </div>
+                </div>
+                
+                <!-- Shared Metadata Section -->
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> The following metadata will be applied to all uploaded recordings.
+                </div>
+                
+                <div class="alert alert-primary mb-4">
+                    <h6 class="mb-2"><i class="fas fa-lightbulb"></i> Tips for batch uploads:</h6>
+                    <ul class="mb-0">
+                        <li>Each pickle file should match a WAV file name (e.g., recording.wav.pickle)</li>
+                        <li>For best results, keep file names unique and descriptive</li>
+                        <li>Files will be processed after upload completes</li>
+                    </ul>
+                </div>
+                
+                <!-- Description Section -->
+                <h6 class="text-muted mb-3">Description</h6>
+                <div class="row mb-4">
+                    <div class="col-12 mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">Description (Optional)</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.description.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Classification Section -->
+                <h6 class="text-muted mb-3">Classification</h6>
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.species.id_for_label }}" class="form-label">Species*</label>
+                        {{ form.species }}
+                        {% if form.species.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.species.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.project.id_for_label }}" class="form-label">Project*</label>
+                        {{ form.project }}
+                        {% if form.project.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.project.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Metadata Section -->
+                <h6 class="text-muted mb-3">Recording Metadata (Optional)</h6>
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.recorded_date.id_for_label }}" class="form-label">Recording Date</label>
+                        {{ form.recorded_date }}
+                        {% if form.recorded_date.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.recorded_date.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.location.id_for_label }}" class="form-label">Location</label>
+                        {{ form.location }}
+                        {% if form.location.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.location.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.equipment.id_for_label }}" class="form-label">Equipment</label>
+                        {{ form.equipment }}
+                        {% if form.equipment.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.equipment.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.environmental_conditions.id_for_label }}" class="form-label">Environmental Conditions</label>
+                        {{ form.environmental_conditions }}
+                        {% if form.environmental_conditions.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.environmental_conditions.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="{% url 'battycoda_app:recording_list' %}" class="btn btn-outline-secondary me-md-2">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Recordings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+/* 
+ * BattyKoda Theme CSS
+ * Theme styles for the BattyCoda application 
+ */
+
+/* Default theme (red) is in main.css */
+
+/* Blue/Green Theme */
+body.theme-blue {
+    background-color: #0f172a;
+    color: white;
+}
+
+body.theme-blue h1, 
+body.theme-blue h2, 
+body.theme-blue h3, 
+body.theme-blue h4, 
+body.theme-blue h5, 
+body.theme-blue h6 {
+    color: #38bdf8;
+}
+
+body.theme-blue a {
+    color: #38bdf8;
+}
+
+body.theme-blue a:hover {
+    text-decoration: underline;
+    color: #0ea5e9;
+}
+
+body.theme-blue .header {
+    background-color: #38bdf8;
+    color: black;
+}
+
+/* Fix for header h1 color - overriding the default h1 color */
+body.theme-blue .header h1 {
+    color: black;
+}
+
+body.theme-blue .container,
+body.theme-blue .content-container, 
+body.theme-blue .section, 
+body.theme-blue .nav-container {
+    background-color: #1e293b;
+}
+
+body.theme-blue .nav-links a {
+    color: #38bdf8;
+}
+
+body.theme-blue .btn,
+body.theme-blue button.btn-primary,
+body.theme-blue input[type="submit"] {
+    background-color: #38bdf8;
+    color: black;
+}
+
+body.theme-blue .btn:hover,
+body.theme-blue button.btn-primary:hover,
+body.theme-blue input[type="submit"]:hover {
+    background-color: #0ea5e9;
+}
+
+body.theme-blue .flash-message {
+    background-color: #38bdf8;
+}
+
+/* For theme preview in profile editor */
+.theme-preview {
+    padding: 20px;
+    border-radius: 5px;
+    margin-top: 15px;
+    transition: all 0.3s ease;
+}
+
+.theme-preview h3 {
+    margin-top: 0;
+}
+
+.theme-default {
+    background-color: #1e1e1e;
+}
+
+.theme-default h3 {
+    color: #e57373;
+}
+
+.theme-default .preview-button {
+    background-color: #e57373;
+    color: black;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.theme-blue {
+    background-color: #1e293b;
+}
+
+.theme-blue h3 {
+    color: #38bdf8;
+}
+
+.theme-blue .preview-button {
+    background-color: #38bdf8;
+    color: black;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}

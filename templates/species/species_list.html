@@ -1,42 +1,45 @@
-{% extends 'base.html' %}
+{% extends 'list_view_base.html' %}
+{% load static %}
 
-{% block title %}Species List - BattyCoda{% endblock %}
+{% block page_title %}Species{% endblock %}
+{% block list_title %}Species{% endblock %}
+{% block card_title %}All Species{% endblock %}
+{% block item_count %}{{ species_list|length }}{% endblock %}
 
-{% block content %}
-<div class="section">
-    <h2>Species List</h2>
-    
-    <div style="margin-bottom: 20px;">
-        <a href="{% url 'battycoda_app:create_species' %}" class="button">Add New Species</a>
-    </div>
-    
-    {% if species_list %}
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Name</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Scientific Name</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Created</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for species in species_list %}
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">
-                    <a href="{% url 'battycoda_app:species_detail' species.id %}">{{ species.name }}</a>
-                </td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ species.scientific_name|default:"" }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">{{ species.created_at|date:"M d, Y" }}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #333;">
-                    <a href="{% url 'battycoda_app:edit_species' species.id %}" class="button">Edit</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No species have been added yet.</p>
-    {% endif %}
-</div>
+{% block action_buttons %}
+<a href="{% url 'battycoda_app:create_species' %}" class="btn btn-primary" 
+   data-bs-toggle="tooltip" data-bs-placement="bottom" title="Add a new species">
+    <i class="fas fa-plus"></i> New Species
+</a>
 {% endblock %}
+
+{% block table_header %}
+<th>Name</th>
+<th>Call Types</th>
+<th>Tasks</th>
+<th>Created</th>
+<th>Actions</th>
+{% endblock %}
+
+{% block data_table %}
+{% with items=species_list %}
+    {{ block.super }}
+{% endwith %}
+{% endblock %}
+
+{% block detail_url %}{% url 'battycoda_app:species_detail' item.id %}{% endblock %}
+{% block view_url %}{% url 'battycoda_app:species_detail' item.id %}{% endblock %}
+{% block edit_url %}{% url 'battycoda_app:edit_species' item.id %}{% endblock %}
+{% block delete_url %}{% url 'battycoda_app:delete_species' item.id %}{% endblock %}
+
+{% block item_fields %}
+<td>{{ item.calls.count }}</td>
+<td>{{ item.tasks.count }}</td>
+<td>{{ item.created_at|date:"M d, Y" }}</td>
+{% endblock %}
+
+{% block empty_icon %}fas fa-spider{% endblock %}
+{% block empty_title %}No Species Found{% endblock %}
+{% block empty_text %}Create your first species to get started.{% endblock %}
+{% block create_url %}{% url 'battycoda_app:create_species' %}{% endblock %}
+{% block create_text %}Add New Species{% endblock %}

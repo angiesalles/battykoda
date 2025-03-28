@@ -1,0 +1,64 @@
+{% extends 'list_view_base.html' %}
+{% load static %}
+
+{% block page_title %}Recordings{% endblock %}
+{% block list_title %}Recordings{% endblock %}
+{% block card_title %}All Recordings{% endblock %}
+{% block item_count %}{{ recordings|length }}{% endblock %}
+
+{% block action_buttons %}
+<a href="{% url 'battycoda_app:create_recording' %}" class="btn btn-primary" 
+   data-bs-toggle="tooltip" data-bs-placement="bottom" title="Upload a single audio recording">
+    <i class="fas fa-plus"></i> New Recording
+</a>
+<a href="{% url 'battycoda_app:batch_upload_recordings' %}" class="btn btn-success"
+   data-bs-toggle="tooltip" data-bs-placement="bottom" title="Upload multiple recordings at once">
+    <i class="fas fa-cloud-upload-alt"></i> Batch Upload
+</a>
+{% endblock %}
+
+{% block table_header %}
+<th>Name</th>
+<th>Species</th>
+<th>Duration</th>
+<th>Sample Rate</th>
+<th>Segments</th>
+<th>Created</th>
+<th>Actions</th>
+{% endblock %}
+
+{% block data_table %}
+{% with items=recordings %}
+    {{ block.super }}
+{% endwith %}
+{% endblock %}
+
+{% block detail_url %}{% url 'battycoda_app:recording_detail' recording_id=item.id %}{% endblock %}
+{% block view_url %}{% url 'battycoda_app:recording_detail' recording_id=item.id %}{% endblock %}
+{% block edit_url %}{% url 'battycoda_app:edit_recording' recording_id=item.id %}{% endblock %}
+{% block delete_url %}{% url 'battycoda_app:delete_recording' recording_id=item.id %}{% endblock %}
+
+{% block item_fields %}
+<td>{{ item.species.name }}</td>
+<td>{{ item.duration|default:"Unknown"|floatformat:2 }} sec</td>
+<td>{{ item.sample_rate|default:"Unknown" }} Hz</td>
+<td>{{ item.segments.count }}</td>
+<td>{{ item.created_at|date:"M d, Y" }}</td>
+{% endblock %}
+
+{% block item_actions %}
+{{ block.super }}
+<!-- Additional segment button -->
+<a href="{% url 'battycoda_app:segment_recording' recording_id=item.id %}" 
+   class="btn btn-outline-success" 
+   data-bs-toggle="tooltip" data-bs-placement="top" 
+   title="Create segments to identify bat calls">
+    <i class="fas fa-cut"></i>
+</a>
+{% endblock %}
+
+{% block empty_icon %}fas fa-file-audio{% endblock %}
+{% block empty_title %}No Recordings Found{% endblock %}
+{% block empty_text %}Upload your first recording to get started.{% endblock %}
+{% block create_url %}{% url 'battycoda_app:create_recording' %}{% endblock %}
+{% block create_text %}Add New Recording{% endblock %}

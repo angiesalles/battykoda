@@ -1,0 +1,66 @@
+# Minimal R environment built from Ubuntu 24.04
+FROM ubuntu:24.04
+
+# Avoid prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install R base
+RUN apt-get update && apt-get install -y \
+    r-base \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install required dependencies for R packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake \
+    pkg-config \
+    libfftw3-dev \
+    libfftw3-double3 \
+    libfftw3-bin \
+    libcurl4-openssl-dev \
+    libcurl4 \
+    libsodium-dev \
+    libsodium23 \
+    zlib1g-dev \
+    zlib1g \
+    libxml2-dev \
+    libxml2 \
+    libssl-dev \
+    libssl3 \
+    libudunits2-dev \
+    libudunits2-0 \
+    libfontconfig1-dev \
+    libfontconfig1 \
+    libgdal-dev \
+    libpng-dev \
+    libpng16-16 \
+    libharfbuzz-dev \
+    libharfbuzz0b \
+    libfribidi-dev \
+    libfribidi0 \
+    libsndfile1-dev \
+    libsox-dev \
+    ffmpeg \
+    libasound2-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Define a volume for the app directory
+VOLUME ["/app"]
+
+# Install R packages
+RUN R -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); \
+    # Detect number of available CPUs \
+    num_cpus <- parallel::detectCores(); \
+    # Install all packages with their dependencies \
+    install.packages(c("class", "plumber", "warbleR"), dependencies = TRUE, quiet = FALSE, Ncpus = num_cpus)'
+
+# Expose port for the R plumber API
+EXPOSE 8100
+
+# Default command to run the R server
+CMD ["Rscript", "/app/r_server_direct.R"]
+

@@ -1,0 +1,163 @@
+{% extends "list_view_base.html" %}
+{% load static %}
+
+{% block page_title %}Auto Segment{% endblock %}
+{% block list_title %}Automated Segmentation{% endblock %}
+{% block card_title %}{{ recording.name }}{% endblock %}
+
+{% block action_buttons %}
+<a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-secondary">
+    <i class="fas fa-cut"></i> Manual Segmentation
+</a>
+<a href="{% url 'battycoda_app:recording_detail' recording_id=recording.id %}" class="btn btn-outline-secondary">
+    <i class="fas fa-arrow-left"></i> Back to Recording
+</a>
+{% endblock %}
+
+{% block data_table %}
+<div class="mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:recording_list' %}">Recordings</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:recording_detail' recording_id=recording.id %}">{{ recording.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}">Segment</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Auto Segment</li>
+        </ol>
+    </nav>
+</div>
+
+{% if existing_segmentation %}
+<div class="alert alert-info mb-4">
+    <i class="fas fa-info-circle"></i> 
+    <strong>Note:</strong> This recording already has one or more segmentations. Running a new segmentation will create an additional segmentation that you can switch between.
+</div>
+{% endif %}
+
+<div class="alert alert-info mb-4">
+    <i class="fas fa-info-circle"></i> 
+    {% if selected_algorithm %}
+        <strong>{{ selected_algorithm.name }}</strong>: {{ selected_algorithm.description }}
+    {% else %}
+        This tool automatically segments recordings by taking the absolute value of the audio signal,
+        smoothing it using a moving average filter, applying a threshold to detect segments, and 
+        rejecting segments shorter than the minimum duration.
+    {% endif %}
+</div>
+
+{% if algorithms %}
+<form method="post" action="{% url 'battycoda_app:auto_segment_recording' recording_id=recording.id %}" id="autoSegmentForm">
+    {% csrf_token %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5>Choose Algorithm</h5>
+                </div>
+                <div class="card-body">
+                    {% for algo in algorithms %}
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="algorithm" id="algorithm-{{ algo.id }}" 
+                            value="{{ algo.id }}" {% if algo.id == selected_algorithm.id or forloop.first and not selected_algorithm %}checked{% endif %}>
+                        <label class="form-check-label" for="algorithm-{{ algo.id }}">
+                            <strong>{{ algo.name }}</strong>
+                            <span class="badge bg-secondary ms-2">{{ algo.get_algorithm_type_display }}</span>
+                        </label>
+                        <small class="d-block text-muted mt-1">{{ algo.description }}</small>
+                    </div>
+                    {% if not forloop.last %}<hr class="my-3">{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5>Configure Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="min_duration_ms" class="form-label">Minimum Duration (ms):</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                            id="min_duration_ms" name="min_duration_ms" value="{{ min_duration_ms }}" 
+                            min="1" max="1000" required>
+                        <small class="form-text text-muted">Minimum segment duration in milliseconds. Shorter segments will be filtered out.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="smooth_window" class="form-label">Smoothing Window:</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                            id="smooth_window" name="smooth_window" value="{{ smooth_window }}" 
+                            min="1" max="100" required>
+                        <small class="form-text text-muted">Window size for the smoothing filter. Higher values create smoother detection but may miss short sounds.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="threshold_factor" class="form-label">Threshold Factor:</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                            id="threshold_factor" name="threshold_factor" value="{{ threshold_factor }}" 
+                            min="0.1" max="10" step="0.1" required>
+                        <small class="form-text text-muted">Factor used to calculate the threshold (mean + factor * std). Higher values = fewer segments detected.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+    <!-- No hidden fields needed since we're using the inputs directly -->
+    
+    <!-- Additional options and submit button -->
+    <div class="card bg-dark mt-4">
+        <div class="card-header">
+            <h5>Additional Options</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-4">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="debug_visualization" name="debug_visualization">
+                    <label class="form-check-label" for="debug_visualization">
+                        Generate visualization of segmentation steps
+                    </label>
+                </div>
+                <small class="form-text text-muted">Creates a detailed visualization showing signal processing steps and threshold application. Useful for debugging segmentation issues.</small>
+            </div>
+            
+            <div class="text-end">
+                <button type="submit" class="btn btn-primary" id="startSegmentationBtn">
+                    <i class="fas fa-play"></i> Start Automated Segmentation
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Status display area - hidden initially -->
+<div class="card bg-dark mt-4" id="statusCard" style="display: none;">
+    <div class="card-header">
+        <h5>Segmentation Status</h5>
+    </div>
+    <div class="card-body">
+        <div id="statusMessage" class="alert alert-info">
+            <i class="fas fa-spinner fa-spin"></i> Processing...
+        </div>
+        <div id="resultDetails" style="display: none;">
+            <p><strong>Segments Created:</strong> <span id="segmentsCount">0</span></p>
+            <p><strong>Processing Time:</strong> <span id="processingTime">-</span></p>
+        </div>
+        <div class="d-flex justify-content-between mt-3">
+            <a href="{% url 'battycoda_app:batch_segmentation' %}" class="btn btn-secondary" id="viewAllJobsBtn">
+                <i class="fas fa-tasks"></i> View All Segmentation Jobs
+            </a>
+            <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-primary" id="viewSegmentsBtn" style="display: none;">
+                <i class="fas fa-list"></i> View Segments
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- No JavaScript needed - all handled server-side -->
+{% endblock %}

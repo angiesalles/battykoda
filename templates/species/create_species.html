@@ -2,6 +2,15 @@
 
 {% block title %}Add New Species - BattyCoda{% endblock %}
 
+{% block extra_css %}
+<style>
+    button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="section">
     <h2>Add New Species</h2>
@@ -10,8 +19,10 @@
         {% csrf_token %}
         
         <div style="margin-bottom: 15px;">
-            <label for="id_name" style="display: block; margin-bottom: 5px;">Name:</label>
+            <label for="id_name" style="display: block; margin-bottom: 5px;">Name: <span style="color: #e57373;">*</span></label>
             {{ form.name }}
+            <p style="font-size: 0.8em; margin-top: 3px; color: #999;">Species name must be unique within your group</p>
+            <div id="name-error-field" style="color: #e57373; margin-top: 5px; display: none;"></div>
             {% if form.name.errors %}
             <div style="color: #e57373; margin-top: 5px;">
                 {% for error in form.name.errors %}
@@ -21,17 +32,7 @@
             {% endif %}
         </div>
         
-        <div style="margin-bottom: 15px;">
-            <label for="id_scientific_name" style="display: block; margin-bottom: 5px;">Scientific Name:</label>
-            {{ form.scientific_name }}
-            {% if form.scientific_name.errors %}
-            <div style="color: #e57373; margin-top: 5px;">
-                {% for error in form.scientific_name.errors %}
-                {{ error }}
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+        <!-- Scientific Name field removed -->
         
         <div style="margin-bottom: 15px;">
             <label for="id_description" style="display: block; margin-bottom: 5px;">Description:</label>
@@ -59,137 +60,375 @@
         
         <h3>Call Types</h3>
         
-        <div style="margin-bottom: 15px;">
-            <label for="id_calls_file" style="display: block; margin-bottom: 5px;">Import Calls from File:</label>
-            {{ form.calls_file }}
-            <p style="font-size: 0.8em; margin-top: 5px;">Upload a text file with call types (one per line, format: short_name,long_name)</p>
-            {% if form.calls_file.errors %}
-            <div style="color: #e57373; margin-top: 5px;">
-                {% for error in form.calls_file.errors %}
-                {{ error }}
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+        <!-- Hidden field to store call types as JSON -->
+        <input type="hidden" id="call_types_json" name="call_types_json" value="[]">
         
         <div style="margin-bottom: 20px; padding: 15px; background-color: #2a2a2a; border-radius: 5px;">
-            <h4 style="margin-top: 0;">Add Call Types</h4>
-            {{ call_formset.management_form }}
+            <!-- Import from file section -->
+            <div style="margin-bottom: 15px;">
+                <h4 style="margin-top: 0; margin-bottom: 10px;">Import Calls from File</h4>
+                <p style="margin-bottom: 8px; font-style: italic; color: #999;">Uploading a file will replace any calls you've already added.</p>
+                <div style="display: flex; gap: 10px; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <input type="file" id="calls_file_input" style="padding: 6px; background-color: #444; border: 1px solid #555; color: white; width: 100%;">
+                    </div>
+                    <button type="button" id="parse_file_btn" class="button">Parse File</button>
+                </div>
+                <p style="font-size: 0.8em; margin-top: 5px;">Upload a text file with call types (one per line, format: short_name,long_name)</p>
+                <div id="file-load-status" style="margin-top: 5px;"></div>
+            </div>
             
-            <table id="call-formset-table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Short Name</th>
-                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Long Name</th>
-                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Description</th>
-                        <th style="text-align: center; padding: 8px; border-bottom: 1px solid #333;">Delete</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for call_form in call_formset %}
-                    <tr class="call-form">
-                        <td style="padding: 8px; border-bottom: 1px solid #333;">
-                            {{ call_form.short_name }}
-                            {% if call_form.short_name.errors %}
-                            <div style="color: #e57373; margin-top: 5px;">
-                                {% for error in call_form.short_name.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td style="padding: 8px; border-bottom: 1px solid #333;">
-                            {{ call_form.long_name }}
-                            {% if call_form.long_name.errors %}
-                            <div style="color: #e57373; margin-top: 5px;">
-                                {% for error in call_form.long_name.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td style="padding: 8px; border-bottom: 1px solid #333;">
-                            {{ call_form.description }}
-                            {% if call_form.description.errors %}
-                            <div style="color: #e57373; margin-top: 5px;">
-                                {% for error in call_form.description.errors %}
-                                {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td style="padding: 8px; border-bottom: 1px solid #333; text-align: center;">
-                            {{ call_form.DELETE }} 
-                            {{ call_form.id }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <h4 style="margin-top: 15px; margin-bottom: 10px;">Call Types List</h4>
             
-            <button type="button" id="add-call" class="button" style="margin-top: 10px;">Add Another Call</button>
+            <!-- List of calls -->
+            <div id="calls-container" style="margin-bottom: 15px;">
+                <div id="calls-table-container">
+                    <p style="font-style: italic; color: #999; text-align: center;">No call types added yet.</p>
+                </div>
+            </div>
+            
+            <!-- Add new call form -->
+            <div style="background-color: #333; padding: 12px; border-radius: 4px;">
+                <h5 style="margin-top: 0; margin-bottom: 10px;">Add a New Call Type</h5>
+                <p style="font-size: 0.8em; margin-bottom: 8px; font-style: italic; color: #999;">Press Enter in either field to quickly add a call</p>
+                <div id="add-call-messages"></div>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <div style="flex: 1;">
+                        <label for="new-call-short-name" style="display: block; margin-bottom: 5px;">Short Name:</label>
+                        <input type="text" id="new-call-short-name" class="form-control" style="width: 100%; padding: 6px; background-color: #444; border: 1px solid #555; color: white;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="new-call-long-name" style="display: block; margin-bottom: 5px;">Long Name:</label>
+                        <input type="text" id="new-call-long-name" class="form-control" style="width: 100%; padding: 6px; background-color: #444; border: 1px solid #555; color: white;">
+                    </div>
+                </div>
+                <button type="button" id="add-call-btn" class="button">Add Call</button>
+            </div>
         </div>
         
         <div style="margin-top: 20px;">
-            <button type="submit" class="button">Save Species</button>
+            <button type="submit" id="submit-button" class="button" style="opacity: 1; transition: opacity 0.3s;">Save Species</button>
             <a href="{% url 'battycoda_app:species_list' %}" style="margin-left: 10px;">Cancel</a>
         </div>
     </form>
 </div>
+{% endblock content %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const addCallButton = document.getElementById('add-call');
-    const callFormsetTable = document.getElementById('call-formset-table').querySelector('tbody');
+    // Identify our elements
+    const addCallButton = document.getElementById('add-call-btn');
+    const parseFileButton = document.getElementById('parse_file_btn');
+    const newCallShortName = document.getElementById('new-call-short-name');
+    const newCallLongName = document.getElementById('new-call-long-name');
+    const callsTableContainer = document.getElementById('calls-table-container');
+    const fileLoadStatus = document.getElementById('file-load-status');
+    const callTypesJsonInput = document.getElementById('call_types_json');
+    const addCallMessages = document.getElementById('add-call-messages');
     
-    // Initial form count
-    let formCount = {{ call_formset.total_form_count }};
+    // Initialize call types array
+    let callTypes = [];
     
-    // Get the form prefix
-    const prefix = 'calls';
-    
-    // Function to update the form count
-    function updateFormCount() {
-        document.getElementById('id_' + prefix + '-TOTAL_FORMS').value = formCount;
+    // Function to update the hidden JSON field
+    function updateCallTypesJson() {
+        const jsonString = JSON.stringify(callTypes);
+        callTypesJsonInput.value = jsonString;
+        return jsonString; // Return for chaining
     }
     
-    // Add new call form
-    addCallButton.addEventListener('click', function() {
-        // Clone the first form
-        const callForms = document.querySelectorAll('.call-form');
-        const newForm = callForms[0].cloneNode(true);
+    // Function to show a message
+    function showMessage(element, message, type = 'success') {
+        element.innerHTML = `
+            <div style="margin-top: 8px; margin-bottom: 8px; padding: 8px 12px; border-radius: 4px; background-color: ${type === 'success' ? '#2e7d32' : '#c62828'}; color: white;">
+                ${message}
+            </div>
+        `;
         
-        // Update form IDs and names
-        const inputs = newForm.querySelectorAll('input, select, textarea');
-        inputs.forEach(function(input) {
-            const name = input.getAttribute('name');
-            if (name) {
-                const newName = name.replace('-0-', '-' + formCount + '-');
-                input.setAttribute('name', newName);
-                input.setAttribute('id', 'id_' + newName);
-                
-                // Clear value except for hidden fields
-                if (input.type !== 'hidden') {
-                    input.value = '';
-                }
-                
-                // Uncheck checkboxes
-                if (input.type === 'checkbox') {
-                    input.checked = false;
-                }
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (element && element.firstChild) {
+                element.innerHTML = '';
             }
+        }, 5000);
+    }
+    
+    // Function to render the calls table
+    function renderCallsTable() {
+        if (callTypes.length === 0) {
+            callsTableContainer.innerHTML = '<p style="font-style: italic; color: #999; text-align: center;">No call types added yet.</p>';
+            return;
+        }
+        
+        // Create table HTML
+        let tableHtml = `
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Short Name</th>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #333;">Long Name</th>
+                        <th style="text-align: center; padding: 8px; border-bottom: 1px solid #333;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        // Add rows for each call type
+        callTypes.forEach((call, index) => {
+            tableHtml += `
+                <tr data-index="${index}">
+                    <td style="padding: 8px; border-bottom: 1px solid #333;">${call.short_name}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #333;">${call.long_name || ''}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #333; text-align: center;">
+                        <button type="button" class="button button-small button-danger delete-call-btn" data-index="${index}">Delete</button>
+                    </td>
+                </tr>
+            `;
         });
         
-        // Add the new form to the table
-        callFormsetTable.appendChild(newForm);
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
         
-        // Increment form count
-        formCount++;
-        updateFormCount();
+        callsTableContainer.innerHTML = tableHtml;
+        
+        // Add event listeners to delete buttons
+        document.querySelectorAll('.delete-call-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
+                deleteCall(index);
+            });
+        });
+    }
+    
+    // Function to add a new call
+    function addCall(shortName, longName) {
+        // Check if a call with this short name already exists
+        const existing = callTypes.find(call => call.short_name.toLowerCase() === shortName.toLowerCase());
+        if (existing) {
+            showMessage(addCallMessages, `A call with short name '${shortName}' already exists.`, 'error');
+            return false;
+        }
+        
+        // Add to the call types array
+        callTypes.push({
+            short_name: shortName,
+            long_name: longName
+        });
+        
+        // Update the JSON field and re-render the table
+        updateCallTypesJson();
+        renderCallsTable();
+        
+        return true;
+    }
+    
+    // Function to delete a call
+    function deleteCall(index) {
+        // Remove from the array
+        callTypes.splice(index, 1);
+        
+        // Update the JSON field and re-render the table
+        updateCallTypesJson();
+        renderCallsTable();
+    }
+    
+    // Function to handle adding a new call
+    function handleAddCall() {
+        // Get the values
+        const shortName = newCallShortName.value.trim();
+        const longName = newCallLongName.value.trim();
+        
+        // Validate
+        if (!shortName) {
+            showMessage(addCallMessages, 'Short name is required', 'error');
+            newCallShortName.focus();
+            return false;
+        }
+        
+        // Add the call
+        const added = addCall(shortName, longName);
+        
+        if (added) {
+            // Show success message
+            showMessage(addCallMessages, `Call '${shortName}' added successfully.`);
+            
+            // Clear the inputs
+            newCallShortName.value = '';
+            newCallLongName.value = '';
+            newCallShortName.focus();
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Add new call when button is clicked
+    addCallButton.addEventListener('click', function(event) {
+        event.preventDefault();
+        handleAddCall();
+    });
+    
+    // Handle Enter key in call input fields
+    newCallShortName.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Prevent form submission
+            handleAddCall();
+        }
+    });
+    
+    newCallLongName.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Prevent form submission
+            handleAddCall();
+        }
+    });
+    
+    // Parse calls file
+    parseFileButton.addEventListener('click', function() {
+        const fileInput = document.getElementById('calls_file_input');
+        const files = fileInput.files;
+        
+        if (!files || files.length === 0) {
+            showMessage(fileLoadStatus, 'Please select a file first', 'error');
+            return;
+        }
+        
+        const file = files[0];
+        if (file.type !== 'text/plain' && !file.name.endsWith('.txt')) {
+            showMessage(fileLoadStatus, 'Please select a text file (.txt)', 'error');
+            return;
+        }
+        
+        // Show loading message
+        showMessage(fileLoadStatus, 'Reading file...', 'success');
+        
+        // Read the file
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            const lines = content.split(/\r?\n/);
+            const calls = [];
+            
+            // Process each line
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line) return; // Skip empty lines
+                
+                let shortName, longName = '';
+                
+                if (line.includes(',')) {
+                    [shortName, longName] = line.split(',', 2);
+                } else if (line.includes('|')) {
+                    [shortName, longName] = line.split('|', 2);
+                } else if (line.includes('\t')) {
+                    [shortName, longName] = line.split('\t', 2);
+                } else {
+                    shortName = line;
+                }
+                
+                shortName = shortName.trim();
+                longName = longName ? longName.trim() : '';
+                
+                if (shortName) {
+                    calls.push({
+                        short_name: shortName,
+                        long_name: longName
+                    });
+                }
+            });
+            
+            if (calls.length === 0) {
+                showMessage(fileLoadStatus, 'No valid call types found in the file', 'error');
+                return;
+            }
+            
+            // Replace all existing calls with the ones from the file
+            callTypes = calls;
+            updateCallTypesJson();
+            renderCallsTable();
+            
+            showMessage(fileLoadStatus, `Successfully loaded ${calls.length} call types from file`, 'success');
+        };
+        
+        reader.onerror = function() {
+            showMessage(fileLoadStatus, 'Error reading file', 'error');
+        };
+        
+        reader.readAsText(file);
+    });
+    
+    // Initialize the table
+    renderCallsTable();
+    
+    // Create a list of existing species names for validation
+    const existingSpeciesNames = {{ existing_species_names|safe|default:"[]" }};
+    const speciesNameInput = document.getElementById('id_name');
+    const submitButton = document.getElementById('submit-button');
+    const nameErrorDiv = document.getElementById('name-error-field');
+    
+    // Function to validate species name
+    function validateSpeciesName() {
+        const speciesName = speciesNameInput.value.trim();
+        
+        // Check if empty
+        if (!speciesName) {
+            nameErrorDiv.textContent = 'Please enter a species name.';
+            nameErrorDiv.style.display = 'block';
+            submitButton.disabled = true;
+            return false;
+        }
+        
+        // Check for duplicates
+        if (existingSpeciesNames.includes(speciesName)) {
+            nameErrorDiv.textContent = `A species with the name "${speciesName}" already exists in your group.`;
+            nameErrorDiv.style.display = 'block';
+            submitButton.disabled = true;
+            return false;
+        }
+        
+        // If we get here, name is valid
+        nameErrorDiv.style.display = 'none';
+        submitButton.disabled = false;
+        return true;
+    }
+    
+    // Check name as soon as the page loads (in case there's a default value)
+    validateSpeciesName();
+    
+    // Check name as user types
+    speciesNameInput.addEventListener('input', validateSpeciesName);
+    
+    // Prevent form submission on Enter key press in text fields
+    document.querySelector('form').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && event.target.tagName === 'INPUT' && event.target.type === 'text') {
+            // Let the call inputs handle their own Enter key
+            if (event.target === newCallShortName || event.target === newCallLongName) {
+                return;
+            }
+            
+            // For other text inputs, prevent form submission
+            event.preventDefault();
+        }
+    });
+    
+    // Handle form submission
+    document.querySelector('form').addEventListener('submit', function(event) {
+        // Stop the form submission temporarily
+        event.preventDefault();
+        
+        // Validate name one more time
+        if (!validateSpeciesName()) {
+            return;
+        }
+        
+        // Make sure the JSON field is up to date - this must happen BEFORE form submission
+        updateCallTypesJson();
+        
+        // Continue with form submission after ensuring data is set
+        this.submit();
     });
 });
 </script>
-{% endblock %}
-
-{% endblock %}
+{% endblock extra_js %}

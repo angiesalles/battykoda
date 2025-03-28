@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BattyCoda - {% block page_title %}List View{% endblock %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Add contrast to page title */
+    title {
+        color: black !important; /* Force black text in title */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">{% block list_title %}Items{% endblock %}</h1>
+        <div class="btn-group">
+            {% block action_buttons %}
+            <!-- Action buttons go here -->
+            {% endblock %}
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card bg-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{% block card_title %}All Items{% endblock %}</h5>
+            <span class="badge bg-info">{% block item_count %}0{% endblock %} Total</span>
+        </div>
+        <div class="card-body p-0">
+            {% block data_table %}
+            {% if items %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover table-striped mb-0">
+                    <thead>
+                        <tr>
+                            {% block table_header %}
+                            <th>Name</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                            {% endblock %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% block table_body %}
+                        {% for item in items %}
+                        <tr>
+                            <td>
+                                <a href="{% block detail_url %}#{% endblock %}" class="text-decoration-none">
+                                    {{ item.name }}
+                                </a>
+                            </td>
+                            
+                            {% block item_fields %}
+                            <!-- Additional fields go here -->
+                            <td>{{ item.created_at|date:"M d, Y" }}</td>
+                            {% endblock %}
+                            
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    {% block item_actions %}
+                                    <!-- View button -->
+                                    <a href="{% block view_url %}#{% endblock %}" 
+                                       class="btn btn-outline-info" 
+                                       data-bs-toggle="tooltip" data-bs-placement="top" 
+                                       title="View details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    
+                                    <!-- Edit button -->
+                                    <a href="{% block edit_url %}#{% endblock %}" 
+                                       class="btn btn-outline-primary" 
+                                       data-bs-toggle="tooltip" data-bs-placement="top" 
+                                       title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    
+                                    <!-- Delete button -->
+                                    <a href="{% block delete_url %}#{% endblock %}" 
+                                       class="btn btn-outline-danger" 
+                                       data-bs-toggle="tooltip" data-bs-placement="top" 
+                                       title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    
+                                    <!-- Additional actions can be added in child templates -->
+                                    {% endblock %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% endblock %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            {% block empty_state %}
+            <div class="text-center p-5">
+                <i class="{% block empty_icon %}fas fa-box-open{% endblock %} fa-4x mb-3 text-muted"></i>
+                <h4>{% block empty_title %}No Items Found{% endblock %}</h4>
+                <p class="text-muted">{% block empty_text %}Create your first item to get started.{% endblock %}</p>
+                <a href="{% block create_url %}#{% endblock %}" class="btn btn-primary mt-2">
+                    <i class="fas fa-plus"></i> {% block create_text %}Add New Item{% endblock %}
+                </a>
+            </div>
+            {% endblock %}
+            {% endif %}
+            {% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Classification Run | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-4">Create Classification Run</h1>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Classification</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Classification Runs</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Create</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h4 class="mb-0">New Classification Run</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'battycoda_app:create_detection_run' %}">
+                        {% csrf_token %}
+                        
+                        <input type="hidden" name="segmentation_id" value="{{ segmentation.id }}">
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Run Name</label>
+                            <input type="text" class="form-control bg-dark text-white border-secondary" 
+                                   id="name" name="name" 
+                                   placeholder="Classification Run for {{ segmentation.recording.name }}" 
+                                   value="Classification Run for {{ segmentation.recording.name }}">
+                            <div class="form-text text-muted">Give your classification run a descriptive name</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="classifier_id" class="form-label">Classifier</label>
+                            <select class="form-select bg-dark text-white border-secondary" 
+                                   id="classifier_id" name="classifier_id" required>
+                                {% for classifier in classifiers %}
+                                    <option value="{{ classifier.id }}" 
+                                    {% if default_classifier and default_classifier.id == classifier.id %}selected{% endif %}>
+                                        {{ classifier.name }} 
+                                        ({{ classifier.get_response_format_display }})
+                                    </option>
+                                {% empty %}
+                                    <option disabled selected>No classifiers found</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text text-muted">
+                                Select the classifier to use for this classification run
+                            </div>
+                        </div>
+                        
+                        
+                        <div class="mb-4">
+                            <h5>Segmentation Information</h5>
+                            <table class="table table-dark">
+                                <tr>
+                                    <th>Recording</th>
+                                    <td>
+                                        <a href="{% url 'battycoda_app:recording_detail' recording_id=segmentation.recording.id %}">
+                                            {{ segmentation.recording.name }}
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Species</th>
+                                    <td>{{ segmentation.recording.species.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>WAV File</th>
+                                    <td>{{ segmentation.recording.wav_file.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Segment Count</th>
+                                    <td>{{ segmentation.recording.segments.count }}</td>
+                                </tr>
+                                {% if segmentation.algorithm %}
+                                <tr>
+                                    <th>Segmentation Algorithm</th>
+                                    <td>{{ segmentation.algorithm.name }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if segmentation.manually_edited %}
+                                <tr>
+                                    <th>Status</th>
+                                    <td><span class="badge bg-info">Manually Edited</span></td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading">Classification Process</h5>
+                            <p>When you start a classification run:</p>
+                            <ol class="mb-0">
+                                <li>Each segment in the recording will be analyzed by the selected classifier</li>
+                                <li>The system will calculate probabilities for each possible call type</li>
+                                <li>Results will be available for review once processing is complete</li>
+                                <li>You can apply classification results to segments automatically or review them manually</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="text-end">
+                            <a href="{% url 'battycoda_app:recording_detail' recording_id=segmentation.recording.id %}" class="btn btn-secondary me-2">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-play me-1"></i> Start Classification Run
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

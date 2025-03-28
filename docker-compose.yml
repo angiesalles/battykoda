@@ -1,67 +1,57 @@
-version: '3.8'
-
+# BattyCoda Docker Compose Configuration
 services:
   web:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.web
     network_mode: host
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
       - ./:/app:rw
-      - data-volume:/app/media:rw
-      - /home/ubuntu/template:/template:ro
-      - ./data:/data:rw
-    working_dir: /app
+    env_file:
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
-      - CLOUDFLARE_ACCESS_ENABLED=True
-      - CLOUDFLARE_AUDIENCE=92f9c8b2586479249c3bea574d492514af0593259e62280662f6a3876f00cc1b
-      - CLOUDFLARE_DOMAIN=batlab.cloudflareaccess.com
-      - ENFORCE_CLOUDFLARE_IN_DEV=True
     depends_on:
       - redis
     restart: unless-stopped
-    command: >
-      bash -c "
-        echo 'Installing dependencies...' &&
-        pip install -r requirements.txt &&
-        echo 'Starting web server...' &&
-        gunicorn --workers=3 --bind=0.0.0.0:8060 --timeout=120 --log-level debug config.wsgi:application
-      "
 
   celery:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
     network_mode: host
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
       - ./:/app:rw
-      - data-volume:/app/media:rw
-      - /home/ubuntu/template:/template:ro
-    working_dir: /app
+    env_file:
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
+      - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
     depends_on:
       - redis
     restart: unless-stopped
-    command: >
-      bash -c "
-        echo 'Installing dependencies...' &&
-        pip install -r requirements.txt &&
-        echo 'Starting Celery worker...' &&
-        celery -A config worker --loglevel=info
-      "
 
   flower:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.flower
     network_mode: host
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
       - ./:/app:rw
-    working_dir: /app
+    env_file:
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
+      - DOMAIN_NAME=${DOMAIN_NAME}
       - REDIS_URL=redis://localhost:6379/0
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - CELERY_RESULT_BACKEND=redis://localhost:6379/0
@@ -69,13 +59,6 @@ services:
       - redis
       - celery
     restart: unless-stopped
-    command: >
-      bash -c "
-        echo 'Installing dependencies...' &&
-        pip install -r requirements.txt &&
-        echo 'Starting Flower...' &&
-        celery -A config flower --port=5555
-      "
 
   redis:
     image: redis:latest
@@ -84,35 +67,14 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
-  r-server-direct:
-    image: rocker/r-base:latest
-    ports:
-      - "8100:8100"
+  r-server:
+    image: r_ubuntu:with_mychanges  # Use our committed image with changes
+    network_mode: host  # Use host network mode for direct port access
+    user: "1000:1000"  # Set to match the host user to fix permission issues
     volumes:
-      - ./:/app:rw
-      - r-libs:/usr/local/lib/R/site-library
-    working_dir: /app
+      - ./:/app:rw  # Mount project directory to access R scripts
+    command: ["Rscript", "/app/r_server_direct.R"]
     restart: unless-stopped
-    command: >
-      bash -c "
-        Rscript r_server_direct.R
-      "
-
-  r-server-original:
-    image: rocker/r-base:latest
-    ports:
-      - "8101:8101"
-    volumes:
-      - ./:/app:rw
-      - r-libs:/usr/local/lib/R/site-library
-    working_dir: /app
-    restart: unless-stopped
-    command: >
-      bash -c "
-        Rscript r_prediction_server.R --port 8101
-      "
 
 volumes:
-  data-volume:
   redis-data:
-  r-libs:

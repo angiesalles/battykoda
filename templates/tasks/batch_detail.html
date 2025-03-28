@@ -43,6 +43,23 @@
                         {% endwith %}
                         {% endwith %}
                         
+                        <div class="mt-3">
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{% url 'battycoda_app:annotate_batch' batch.id %}" class="btn btn-primary">
+                                    <i class="fas fa-tasks"></i> Annotate Tasks
+                                </a>
+                                <!-- "Run Automated Detection" button removed as it's no longer applicable in new workflow -->
+                                {% if batch.detection_run %}
+                                <a href="{% url 'battycoda_app:detection_run_detail' run_id=batch.detection_run.id %}" class="btn btn-info">
+                                    <i class="fas fa-robot"></i> View Source Classification
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'battycoda_app:export_task_batch' batch.id %}" class="btn btn-success">
+                                    <i class="fas fa-file-export"></i> Export Results
+                                </a>
+                            </div>
+                        </div>
+                        
                         <div class="mt-2 small">
                             <span class="badge bg-warning">Pending: {{ tasks|count_by_status:"pending" }}</span>
                             <span class="badge bg-info ms-1">In Progress: {{ tasks|count_by_status:"in_progress" }}</span>

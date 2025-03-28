@@ -1,0 +1,29 @@
+# Dockerfile for BattyCoda Flower (Celery monitoring)
+FROM python:3.12-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings
+
+WORKDIR /app
+
+# Flower needs minimal dependencies
+RUN apt-get update && apt-get install -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better layer caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# The application code will be mounted at runtime via volume
+
+# Expose the port Flower runs on
+EXPOSE 5555
+
+# Default command for Flower
+CMD ["celery", "-A", "config", "flower", "--port=5555"]

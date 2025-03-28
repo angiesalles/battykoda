@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BattyCoda - {{ recording.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'battycoda_app:recording_list' %}">Recordings</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ recording.name }}</li>
+            </ol>
+        </nav>
+        <div class="btn-group" role="group">
+            <a href="{% url 'battycoda_app:edit_recording' recording_id=recording.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-edit"></i> Edit Recording
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Recording information card -->
+        <div class="col-md-4">
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Recording Information</h5>
+                </div>
+                <div class="card-body">
+                    <h2 class="h3 card-title mb-3">{{ recording.name }}</h2>
+                    {% if recording.description %}
+                    <p class="card-text">{{ recording.description }}</p>
+                    <hr class="my-3">
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <div class="fw-bold text-muted small mb-1">File Details</div>
+                        <p class="mb-0"><strong>Duration:</strong> {{ recording.duration|default:"Unknown"|floatformat:2 }} seconds</p>
+                        <p class="mb-0"><strong>Sample Rate:</strong> {{ recording.sample_rate|default:"Unknown" }} Hz</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="fw-bold text-muted small mb-1">Recording Metadata</div>
+                        <p class="mb-0"><strong>Species:</strong> {{ recording.species.name }}</p>
+                        <p class="mb-0"><strong>Project:</strong> {{ recording.project.name }}</p>
+                        {% if recording.recorded_date %}
+                        <p class="mb-0"><strong>Date:</strong> {{ recording.recorded_date|date:"M d, Y" }}</p>
+                        {% endif %}
+                        {% if recording.location %}
+                        <p class="mb-0"><strong>Location:</strong> {{ recording.location }}</p>
+                        {% endif %}
+                        {% if recording.equipment %}
+                        <p class="mb-0"><strong>Equipment:</strong> {{ recording.equipment }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    {% if recording.environmental_conditions %}
+                    <div class="mb-3">
+                        <div class="fw-bold text-muted small mb-1">Environmental Conditions</div>
+                        <p class="mb-0">{{ recording.environmental_conditions }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div>
+                        <div class="fw-bold text-muted small mb-1">Created By</div>
+                        <p class="mb-0">{{ recording.created_by.username }} on {{ recording.created_at|date:"M d, Y" }}</p>
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <a href="{{ recording.wav_file.url }}" class="btn btn-outline-primary" target="_blank">
+                        <i class="fas fa-download"></i> Download Recording
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Integrated audio player note -->
+            <div class="card bg-dark mb-2">
+                <div class="card-body py-2">
+                    <small class="text-muted"><i class="fas fa-info-circle"></i> Note: The audio player is integrated with the waveform visualization above. Click the waveform to seek or use the playback controls below.</small>
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- Spectrogram and segments section -->
+        <div class="col-md-8">
+            <!-- Include the reusable waveform player -->
+            {% include "recordings/includes/waveform_player.html" with recording=recording container_id="detail-waveform" %}
+            
+            <!-- Segmentation links card -->
+            <div class="card bg-dark">
+                <div class="card-header">
+                    <h5 class="mb-0">Segmentation Options</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        To view and manage segments for this recording, use the segmentation tool.
+                    </p>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-primary">
+                            <i class="fas fa-cut"></i> Segment Recording
+                        </a>
+                        <a href="{% url 'battycoda_app:upload_pickle_segments' recording_id=recording.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-file-upload"></i> Upload Pickle File
+                        </a>
+                        <a href="{% url 'battycoda_app:auto_segment_recording' recording_id=recording.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-magic"></i> Auto-Segment
+                        </a>
+                        {% if recording.segmentation %}
+                        <a href="{% url 'battycoda_app:create_detection_run_for_segmentation' segmentation_id=recording.segmentation.id %}" class="btn btn-outline-success">
+                            <i class="fas fa-tag"></i> Run Classification
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<!-- Include the waveform player script -->
+<script src="{% static 'js/waveform_player.js' %}"></script>
+{% endblock %}
+
+{% endblock %}

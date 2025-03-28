@@ -1,0 +1,32 @@
+# Dockerfile for BattyCoda Celery Worker
+FROM python:3.12-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings
+
+WORKDIR /app
+
+# Install system dependencies - Celery might need fewer dependencies
+# than the web service, but we include what's necessary for task processing
+RUN apt-get update && apt-get install -y \
+    libsndfile1 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better layer caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Create necessary directories
+RUN mkdir -p media/home logs 
+
+# The application code will be mounted at runtime via volume
+# This allows for faster development cycles without rebuilding the image
+
+# Default command for Celery worker
+CMD ["celery", "-A", "config", "worker", "--loglevel=info"]

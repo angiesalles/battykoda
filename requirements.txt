@@ -15,3 +15,13 @@ markupsafe>=2.1.1,<3.0.0
 pydevd-pycharm>=233.13135.95  # Required for PyCharm debugging
 gunicorn>=23.0.0,<24.0.0  # Web server for production
 soundfile>=0.12.1,<1.0.0  # For efficient audio processing
+boto3>=1.34.0,<2.0.0  # AWS SDK for Python (used for SES)
+django-ses>=3.5.0,<4.0.0  # Django AWS SES email backend
+whitenoise>=6.6.0,<7.0.0  # Serving static files in production
+
+# Linting and code quality tools
+flake8>=6.1.0,<7.0.0
+flake8-django>=1.4.0,<2.0.0
+flake8-docstrings>=1.7.0,<2.0.0
+black>=23.12.0,<24.0.0
+isort>=5.13.0,<6.0.0

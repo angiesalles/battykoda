@@ -1,0 +1,30 @@
+{% if calls %}
+<div class="table-responsive">
+    <table class="table table-dark table-hover">
+        <thead>
+            <tr>
+                <th>Short Name</th>
+                <th>Long Name</th>
+                <th class="text-center" style="width: 100px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for call in calls %}
+            <tr class="call-item">
+                <td>{{ call.short_name }}</td>
+                <td>{{ call.long_name|default:'' }}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-danger delete-call-btn" data-call-id="{{ call.id }}">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle"></i> No call types added yet.
+</div>
+{% endif %}
