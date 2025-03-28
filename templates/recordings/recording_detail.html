@@ -13,9 +13,6 @@
             </ol>
         </nav>
         <div class="btn-group" role="group">
-            <a href="{% url 'battycoda_app:segment_recording' recording_id=recording.id %}" class="btn btn-primary">
-                <i class="fas fa-cut"></i> Segment Recording
-            </a>
             <a href="{% url 'battycoda_app:edit_recording' recording_id=recording.id %}" class="btn btn-outline-secondary">
                 <i class="fas fa-edit"></i> Edit Recording
             </a>
@@ -50,6 +47,7 @@
                     <div class="mb-3">
                         <div class="fw-bold text-muted small mb-1">File Details</div>
                         <p class="mb-0"><strong>Duration:</strong> {{ recording.duration|default:"Unknown"|floatformat:2 }} seconds</p>
+                        <p class="mb-0"><strong>Sample Rate:</strong> {{ recording.sample_rate|default:"Unknown" }} Hz</p>
                     </div>
                     
                     <div class="mb-3">
@@ -93,64 +91,12 @@
                 </div>
             </div>
             
-            <!-- Hidden audio element (used by JavaScript) -->
-            <audio id="audio-player" preload="auto" style="display: none;">
-                <source src="{% url 'battycoda_app:stream_recording_audio' recording_id=recording.id %}" type="audio/wav">
-                Your browser does not support the audio element.
-            </audio>
         </div>
         
         <!-- Spectrogram and segments section -->
         <div class="col-md-8">
-            <!-- Waveform card with integrated player -->
-            <div class="card bg-dark mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Audio Playback & Waveform</h5>
-                    <span id="waveform-status" class="badge bg-info">Loading...</span>
-                </div>
-                <div class="card-body p-2">
-                    <!-- Waveform visualization -->
-                    <div id="waveform-container" style="height: 200px; background-color: #1a1a1a; position: relative;">
-                        <div id="loading-waveform" class="d-flex justify-content-center align-items-center h-100">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Timeline visualization -->
-                    <div id="timeline-container" class="position-relative mt-2" style="height: 30px; background-color: #1a1a1a;">
-                        <!-- Timeline markers will be added here via JavaScript -->
-                    </div>
-                    
-                    <!-- Audio controls and time display -->
-                    <div class="d-flex align-items-center my-2">
-                        <div class="btn-group me-3">
-                            <button id="play-btn" class="btn btn-primary">
-                                <i class="fas fa-play"></i>
-                            </button>
-                            <button id="pause-btn" class="btn btn-secondary" disabled>
-                                <i class="fas fa-pause"></i>
-                            </button>
-                            <button id="stop-btn" class="btn btn-secondary" disabled>
-                                <i class="fas fa-stop"></i>
-                            </button>
-                        </div>
-                        
-                        <div class="flex-grow-1">
-                            <div id="progress-container" class="progress" style="height: 10px; cursor: pointer;">
-                                <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="ms-3">
-                            <span id="current-time" class="badge bg-dark">0.00s</span>
-                            <span class="text-muted">/</span>
-                            <span id="total-time" class="badge bg-dark">{{ recording.duration|default:"0"|floatformat:2 }}s</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- Include the reusable waveform player -->
+            {% include "recordings/includes/waveform_player.html" with recording=recording container_id="detail-waveform" %}
             
             <!-- Segmentation links card -->
             <div class="card bg-dark">
@@ -171,6 +117,11 @@
                         <a href="{% url 'battycoda_app:auto_segment_recording' recording_id=recording.id %}" class="btn btn-outline-primary">
                             <i class="fas fa-magic"></i> Auto-Segment
                         </a>
+                        {% if recording.segmentation %}
+                        <a href="{% url 'battycoda_app:create_detection_run_for_segmentation' segmentation_id=recording.segmentation.id %}" class="btn btn-outline-success">
+                            <i class="fas fa-tag"></i> Run Classification
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -179,344 +130,8 @@
 </div>
 
 {% block extra_scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // DOM elements
-    const audioPlayer = document.getElementById('audio-player');
-    const progressBar = document.getElementById('progress-bar');
-    const currentTimeEl = document.getElementById('current-time');
-    const totalTimeEl = document.getElementById('total-time');
-    const waveformContainer = document.getElementById('waveform-container');
-    const timelineContainer = document.getElementById('timeline-container');
-    const loadingWaveform = document.getElementById('loading-waveform');
-    const waveformStatus = document.getElementById('waveform-status');
-    
-    // State
-    let currentTime = 0;
-    let duration = {{ recording.duration|default:0 }};
-    let waveformData = null;
-    let segments = [];
-    
-    // Load waveform data
-    async function loadWaveformData() {
-        try {
-            // Update status
-            waveformStatus.textContent = 'Loading...';
-            
-            const response = await fetch("{% url 'battycoda_app:recording_waveform_data' recording_id=recording.id %}");
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            
-            // Always update duration if available, even on error
-            if (data.duration !== undefined && data.duration !== null) {
-                duration = data.duration || 0;
-                totalTimeEl.textContent = duration.toFixed(2) + 's';
-            }
-            
-            if (data.success) {
-                waveformData = data.waveform;
-                
-                // Hide loading indicator
-                loadingWaveform.style.display = 'none';
-                
-                // Update status
-                waveformStatus.textContent = 'Complete';
-                waveformStatus.classList.remove('bg-info');
-                waveformStatus.classList.add('bg-success');
-                
-                // Draw waveform
-                drawWaveform();
-                drawTimeline();
-            } else {
-                throw new Error(data.error || 'Failed to load waveform data');
-            }
-        } catch (error) {
-            console.error('Error loading waveform data:', error);
-            
-            // Hide loading indicator
-            loadingWaveform.style.display = 'none';
-            
-            // Update status
-            waveformStatus.textContent = 'Error';
-            waveformStatus.classList.remove('bg-info');
-            waveformStatus.classList.add('bg-danger');
-            
-            // Show error message
-            waveformContainer.innerHTML = `
-                <div class="alert alert-danger m-3">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    Error loading waveform: ${error.message}
-                </div>
-            `;
-            
-            // Still attempt to draw the timeline with empty data
-            drawTimeline();
-        }
-    }
-    
-    // Draw waveform
-    function drawWaveform() {
-        if (!waveformData) return;
-        
-        // Create canvas
-        waveformContainer.innerHTML = '';
-        const canvas = document.createElement('canvas');
-        canvas.width = waveformContainer.clientWidth;
-        canvas.height = waveformContainer.clientHeight;
-        waveformContainer.appendChild(canvas);
-        
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        
-        // Clear canvas
-        ctx.clearRect(0, 0, width, height);
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(0, 0, width, height);
-        
-        // Draw waveform
-        ctx.beginPath();
-        ctx.strokeStyle = '#4dabf7';
-        ctx.lineWidth = 1;
-        
-        const step = Math.max(1, Math.floor(waveformData.length / width));
-        for (let i = 0; i < width; i++) {
-            const dataIdx = Math.floor(i * waveformData.length / width);
-            if (dataIdx < waveformData.length) {
-                const value = waveformData[dataIdx];
-                const y = (0.5 - value / 2) * height;
-                if (i === 0) {
-                    ctx.moveTo(i, y);
-                } else {
-                    ctx.lineTo(i, y);
-                }
-            }
-        }
-        ctx.stroke();
-        
-        // Draw centerline
-        ctx.beginPath();
-        ctx.strokeStyle = '#6c757d';
-        ctx.lineWidth = 0.5;
-        ctx.moveTo(0, height / 2);
-        ctx.lineTo(width, height / 2);
-        ctx.stroke();
-        
-        // Draw cursor at current time
-        const cursorX = (currentTime / duration) * width;
-        ctx.beginPath();
-        ctx.strokeStyle = '#fd7e14';
-        ctx.lineWidth = 2;
-        ctx.moveTo(cursorX, 0);
-        ctx.lineTo(cursorX, height);
-        ctx.stroke();
-        
-        // Add click event listener to canvas for seeking
-        canvas.addEventListener('click', function(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const timePos = (x / width) * duration;
-            
-            // Set current time
-            currentTime = Math.max(0, Math.min(duration, timePos));
-            audioPlayer.currentTime = currentTime;
-            updateTimeDisplay();
-            drawWaveform();
-        });
-    }
-    
-    // Draw timeline with markers and segments
-    function drawTimeline() {
-        // Clear timeline
-        timelineContainer.innerHTML = '';
-        
-        // If no waveform data or duration, draw a simple timeline
-        if (!duration) {
-            // Draw a simple timeline with 0 and duration markers
-            const simpleDuration = 60; // Default 60 seconds if no duration available
-            const width = timelineContainer.clientWidth;
-            
-            // Start marker (0s)
-            const startMarker = document.createElement('div');
-            startMarker.className = 'position-absolute';
-            startMarker.style.left = '0px';
-            startMarker.style.top = '0';
-            startMarker.style.bottom = '0';
-            startMarker.style.width = '1px';
-            startMarker.style.backgroundColor = '#6c757d';
-            
-            const startLabel = document.createElement('div');
-            startLabel.className = 'position-absolute text-light small';
-            startLabel.style.left = '0px';
-            startLabel.style.bottom = '0';
-            startLabel.textContent = '0.0s';
-            
-            // End marker
-            const endMarker = document.createElement('div');
-            endMarker.className = 'position-absolute';
-            endMarker.style.left = (width - 1) + 'px';
-            endMarker.style.top = '0';
-            endMarker.style.bottom = '0';
-            endMarker.style.width = '1px';
-            endMarker.style.backgroundColor = '#6c757d';
-            
-            const endLabel = document.createElement('div');
-            endLabel.className = 'position-absolute text-light small';
-            endLabel.style.left = (width - 30) + 'px';
-            endLabel.style.bottom = '0';
-            endLabel.textContent = simpleDuration.toFixed(1) + 's';
-            
-            timelineContainer.appendChild(startMarker);
-            timelineContainer.appendChild(startLabel);
-            timelineContainer.appendChild(endMarker);
-            timelineContainer.appendChild(endLabel);
-            
-            // Skip the rest if we don't have proper data
-            return;
-        }
-        
-        // Calculate number of markers
-        const width = timelineContainer.clientWidth;
-        const maxMarkers = 10;
-        const timeStep = Math.ceil(duration / maxMarkers);
-        
-        // Draw time markers
-        for (let time = 0; time <= duration; time += timeStep) {
-            const markerX = (time / duration) * width;
-            
-            const marker = document.createElement('div');
-            marker.className = 'position-absolute';
-            marker.style.left = markerX + 'px';
-            marker.style.top = '0';
-            marker.style.bottom = '0';
-            marker.style.width = '1px';
-            marker.style.backgroundColor = '#6c757d';
-            
-            const label = document.createElement('div');
-            label.className = 'position-absolute text-light small';
-            label.style.left = (markerX - 10) + 'px';
-            label.style.bottom = '0';
-            label.textContent = time.toFixed(1) + 's';
-            
-            timelineContainer.appendChild(marker);
-            timelineContainer.appendChild(label);
-        }
-        
-        // Draw segments
-        segments.forEach(segment => {
-            const segmentStart = (segment.onset / duration) * width;
-            const segmentEnd = (segment.offset / duration) * width;
-            
-            const segmentMarker = document.createElement('div');
-            segmentMarker.className = 'position-absolute';
-            segmentMarker.style.left = Math.max(0, segmentStart) + 'px';
-            segmentMarker.style.width = (segmentEnd - segmentStart) + 'px';
-            segmentMarker.style.top = '5px';
-            segmentMarker.style.height = '20px';
-            segmentMarker.style.backgroundColor = '#007bff';
-            segmentMarker.style.opacity = '0.7';
-            segmentMarker.style.borderRadius = '2px';
-            segmentMarker.title = `Segment ${segment.id}: ${segment.onset.toFixed(2)}s - ${segment.offset.toFixed(2)}s`;
-            
-            timelineContainer.appendChild(segmentMarker);
-        });
-    }
-    
-    // Update time display
-    function updateTimeDisplay() {
-        // Ensure currentTime is a valid number
-        const time = Number.isFinite(currentTime) ? currentTime : 0;
-        currentTimeEl.textContent = time.toFixed(2) + 's';
-        
-        // Avoid division by zero if duration is not set
-        const percentage = duration ? ((time / duration) * 100) : 0;
-        progressBar.style.width = percentage + '%';
-    }
-    
-    // State variables
-    let isPlaying = false;
-    
-    // Update play/pause buttons state
-    function updatePlayButtons() {
-        if (isPlaying) {
-            playBtn.disabled = true;
-            pauseBtn.disabled = false;
-            stopBtn.disabled = false;
-        } else {
-            playBtn.disabled = false;
-            pauseBtn.disabled = true;
-            stopBtn.disabled = true;
-        }
-    }
-    
-    // Audio player event listeners
-    audioPlayer.addEventListener('timeupdate', function() {
-        currentTime = audioPlayer.currentTime;
-        updateTimeDisplay();
-        drawWaveform();
-    });
-    
-    audioPlayer.addEventListener('play', function() {
-        isPlaying = true;
-        updatePlayButtons();
-    });
-    
-    audioPlayer.addEventListener('pause', function() {
-        isPlaying = false;
-        updatePlayButtons();
-    });
-    
-    audioPlayer.addEventListener('ended', function() {
-        isPlaying = false;
-        updatePlayButtons();
-    });
-    
-    // Control button event listeners
-    playBtn.addEventListener('click', function() {
-        audioPlayer.play();
-    });
-    
-    pauseBtn.addEventListener('click', function() {
-        audioPlayer.pause();
-    });
-    
-    stopBtn.addEventListener('click', function() {
-        audioPlayer.pause();
-        audioPlayer.currentTime = 0;
-        currentTime = 0;
-        updateTimeDisplay();
-        drawWaveform();
-    });
-    
-    // Make progress bar clickable
-    const progressContainer = document.getElementById('progress-container');
-    progressContainer.addEventListener('click', function(e) {
-        const rect = this.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left;
-        const clickPosition = offsetX / rect.width;
-        
-        // Set current time based on click position
-        currentTime = clickPosition * duration;
-        audioPlayer.currentTime = currentTime;
-        updateTimeDisplay();
-        drawWaveform();
-    });
-    
-    // Play segment functionality is not needed anymore since we removed segment buttons
-    
-    // Window resize event
-    window.addEventListener('resize', function() {
-        drawWaveform();
-        drawTimeline();
-    });
-    
-    // Initialize
-    loadWaveformData();
-    updateTimeDisplay();
-});
-</script>
+<!-- Include the waveform player script -->
+<script src="{% static 'js/waveform_player.js' %}"></script>
 {% endblock %}
 
 {% endblock %}

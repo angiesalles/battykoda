@@ -12,17 +12,25 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Automation</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'battycoda_app:detection_run_list' %}">Classification Runs</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Classification</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Classification Runs</a></li>
                         <li class="breadcrumb-item active" aria-current="page">{{ run.name }}</li>
                     </ol>
                 </nav>
                 
-                {% if run.status == 'completed' %}
-                <a href="{% url 'battycoda_app:apply_detection_results' run_id=run.id %}" class="btn btn-success">
-                    <i class="fas fa-check me-1"></i> Apply All Classifications
-                </a>
-                {% endif %}
+                <div class="btn-group" role="group">
+                    <a href="{% url 'battycoda_app:delete_detection_run' run_id=run.id %}" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-1"></i> Delete Run
+                    </a>
+                    {% if run.status == 'completed' %}
+                    <a href="{% url 'battycoda_app:create_task_batch_from_detection_run' run_id=run.id %}" class="btn btn-success">
+                        <i class="fas fa-tasks me-1"></i> Create Tasks for Review
+                    </a>
+                    <a href="{% url 'battycoda_app:recording_detail' recording_id=run.segmentation.recording.id %}" class="btn btn-info">
+                        <i class="fas fa-volume-up me-1"></i> View Recording
+                    </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
@@ -42,10 +50,10 @@
                                     <td>{{ run.name }}</td>
                                 </tr>
                                 <tr>
-                                    <th>Batch</th>
+                                    <th>Recording</th>
                                     <td>
-                                        <a href="{% url 'battycoda_app:task_batch_detail' batch_id=run.batch.id %}">
-                                            {{ run.batch.name }}
+                                        <a href="{% url 'battycoda_app:recording_detail' recording_id=run.segmentation.recording.id %}">
+                                            {{ run.segmentation.recording.name }}
                                         </a>
                                     </td>
                                 </tr>
@@ -140,8 +148,8 @@
                         <table class="table table-dark table-hover" id="resultsTable">
                             <thead>
                                 <tr>
-                                    <th>Task</th>
                                     <th>Segment</th>
+                                    <th>Time Position</th>
                                     {% for call_type in call_types %}
                                     <th>{{ call_type.short_name }}</th>
                                     {% endfor %}
@@ -152,11 +160,11 @@
                                 {% for result_item in results %}
                                 <tr>
                                     <td>
-                                        <a href="{% url 'battycoda_app:annotate_task' task_id=result_item.task.id %}" target="_blank">
-                                            Task #{{ result_item.task.id }}
+                                        <a href="{% url 'battycoda_app:segment_recording' recording_id=run.segmentation.recording.id %}#segment-{{ result_item.segment.id }}" target="_blank">
+                                            Segment #{{ result_item.segment.id }}
                                         </a>
                                     </td>
-                                    <td>{{ result_item.task.onset|floatformat:2 }}s - {{ result_item.task.offset|floatformat:2 }}s</td>
+                                    <td>{{ result_item.segment.onset|floatformat:2 }}s - {{ result_item.segment.offset|floatformat:2 }}s</td>
                                     
                                     {% for prob in result_item.probabilities %}
                                     <td class="probability-cell" data-value="{{ prob.probability }}">
@@ -177,13 +185,9 @@
                                     
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="{% url 'battycoda_app:apply_detection_result_for_task' run_id=run.id task_id=result_item.task.id %}" 
-                                               class="btn btn-sm btn-success">
-                                                <i class="fas fa-check"></i> Apply
-                                            </a>
-                                            <a href="{% url 'battycoda_app:annotate_task' task_id=result_item.task.id %}" 
+                                            <a href="{% url 'battycoda_app:segment_recording' recording_id=run.segmentation.recording.id %}#segment-{{ result_item.segment.id }}" 
                                                class="btn btn-sm btn-primary" target="_blank">
-                                                <i class="fas fa-edit"></i> Annotate
+                                                <i class="fas fa-external-link-alt"></i> View in Editor
                                             </a>
                                         </div>
                                     </td>
@@ -195,9 +199,9 @@
                     {% else %}
                     <div class="alert alert-info">
                         {% if run.status == 'pending' or run.status == 'in_progress' %}
-                        <p class="mb-0">Detection is still in progress. Results will appear here when complete.</p>
+                        <p class="mb-0">Classification is still in progress. Results will appear here when complete.</p>
                         {% else %}
-                        <p class="mb-0">No detection results available.</p>
+                        <p class="mb-0">No classification results available.</p>
                         {% endif %}
                     </div>
                     {% endif %}

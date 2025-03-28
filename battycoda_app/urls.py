@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_automation, views_debug, views_project, views_recordings, views_species, views_task_batch
+from . import views, views_automation, views_batch_upload, views_debug, views_project, views_recordings, views_species, views_task_batch
 
 app_name = "battycoda_app"
 
@@ -24,7 +24,6 @@ urlpatterns = [
     # Test static file serving (disabled - using built-in Django static file handling)
     # path('test-static/<path:filename>', views.test_static_view, name='test_static'),
     # Task management routes
-    path("tasks/", views.task_list_view, name="task_list"),
     path("tasks/<int:task_id>/", views.task_detail_view, name="task_detail"),
     # Individual task creation removed - tasks are now only created through batches
     path("tasks/batches/", views.task_batch_list_view, name="task_batch_list"),
@@ -37,13 +36,14 @@ urlpatterns = [
     path("tasks/annotate/<int:task_id>/", views.task_annotation_view, name="annotate_task"),
     # Automation routes
     path("automation/", views_automation.automation_home_view, name="automation_home"),
-    path("automation/runs/", views_automation.detection_run_list_view, name="detection_run_list"),
     path("automation/runs/<int:run_id>/", views_automation.detection_run_detail_view, name="detection_run_detail"),
     path("automation/runs/create/", views_automation.create_detection_run_view, name="create_detection_run"),
-    path("automation/runs/create/<int:batch_id>/", views_automation.create_detection_run_view, name="create_detection_run_for_batch"),
+    path("automation/runs/create/<int:segmentation_id>/", views_automation.create_detection_run_view, name="create_detection_run_for_segmentation"),
     path("automation/runs/<int:run_id>/status/", views_automation.detection_run_status_view, name="detection_run_status"),
     path("automation/runs/<int:run_id>/apply/", views_automation.apply_detection_results_view, name="apply_detection_results"),
-    path("automation/runs/<int:run_id>/apply/<int:task_id>/", views_automation.apply_detection_results_view, name="apply_detection_result_for_task"),
+    path("automation/runs/<int:run_id>/apply/<int:segment_id>/", views_automation.apply_detection_results_view, name="apply_detection_result_for_segment"),
+    path("automation/runs/<int:run_id>/create-tasks/", views_automation.create_task_batch_from_detection_run, name="create_task_batch_from_detection_run"),
+    path("automation/runs/<int:run_id>/delete/", views_automation.delete_detection_run_view, name="delete_detection_run"),
     # Species management routes
     path("species/", views_species.species_list_view, name="species_list"),
     path("species/<int:species_id>/", views_species.species_detail_view, name="species_detail"),
@@ -77,7 +77,7 @@ urlpatterns = [
     path("recordings/", views_recordings.recording_list_view, name="recording_list"),
     path("recordings/<int:recording_id>/", views_recordings.recording_detail_view, name="recording_detail"),
     path("recordings/create/", views_recordings.create_recording_view, name="create_recording"),
-    path("recordings/batch-upload/", views_recordings.batch_upload_recordings_view, name="batch_upload_recordings"),
+    path("recordings/batch-upload/", views_batch_upload.batch_upload_recordings_view, name="batch_upload_recordings"),
     path("recordings/<int:recording_id>/edit/", views_recordings.edit_recording_view, name="edit_recording"),
     path("recordings/<int:recording_id>/delete/", views_recordings.delete_recording_view, name="delete_recording"),
     path("recordings/<int:recording_id>/segment/", views_recordings.segment_recording_view, name="segment_recording"),
@@ -93,6 +93,7 @@ urlpatterns = [
     # Segmentation management
     path("segmentation/", views_recordings.batch_segmentation_view, name="batch_segmentation"),
     path("segmentation/jobs/status/", views_recordings.segmentation_jobs_status_view, name="segmentation_jobs_status"),
+    path("segmentation/<int:segmentation_id>/activate/", views_recordings.activate_segmentation_view, name="activate_segmentation"),
     
     # Segment management
     path("segments/<int:recording_id>/add/", views_recordings.add_segment_view, name="add_segment"),

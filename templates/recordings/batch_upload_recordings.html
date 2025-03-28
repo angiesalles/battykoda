@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load static %}
 
 {% block title %}BattyCoda - Batch Upload Recordings{% endblock %}
 
@@ -27,31 +26,44 @@
 
     <div class="card bg-dark">
         <div class="card-header">
-            <h5 class="mb-0">Batch Upload Recordings</h5>
+            <h5 class="mb-0">Simple Batch Upload</h5>
         </div>
         <div class="card-body">
-            <form id="batch-upload-form" method="post" enctype="multipart/form-data">
+            <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i> Upload WAV files as a ZIP archive. If you have pickle files, include them in a separate ZIP archive.
+            </div>
+            
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
                 <!-- File Upload Section -->
                 <h6 class="text-muted mb-3">File Upload</h6>
                 <div class="row mb-4">
                     <div class="col-md-6 mb-3">
-                        <label for="wav_files" class="form-label">WAV Files* <small class="text-muted">(Multiple files allowed)</small></label>
-                        <input type="file" name="wav_files" id="wav_files" class="form-control bg-dark text-light border-secondary" multiple accept=".wav">
-                        <small class="form-text text-muted">Select multiple WAV files to upload</small>
+                        <label for="wav_zip" class="form-label">WAV Files ZIP*</label>
+                        <input type="file" name="wav_zip" id="wav_zip" class="form-control bg-dark text-light border-secondary" accept=".zip">
+                        <small class="form-text text-muted">Upload a ZIP file containing WAV audio files</small>
                     </div>
                     
                     <div class="col-md-6 mb-3">
-                        <label for="pickle_files" class="form-label">Pickle Files <small class="text-muted">(Optional)</small></label>
-                        <input type="file" name="pickle_files" id="pickle_files" class="form-control bg-dark text-light border-secondary" multiple accept=".pickle">
-                        <small class="form-text text-muted">Select matching pickle files (filename.wav.pickle)</small>
+                        <label for="pickle_zip" class="form-label">Pickle Files ZIP <small class="text-muted">(Optional)</small></label>
+                        <input type="file" name="pickle_zip" id="pickle_zip" class="form-control bg-dark text-light border-secondary" accept=".zip">
+                        <small class="form-text text-muted">Upload a ZIP file containing matching pickle files</small>
                     </div>
                 </div>
                 
                 <!-- Shared Metadata Section -->
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i> The following metadata will be applied to all uploaded recordings.
+                </div>
+                
+                <div class="alert alert-primary mb-4">
+                    <h6 class="mb-2"><i class="fas fa-lightbulb"></i> Tips for batch uploads:</h6>
+                    <ul class="mb-0">
+                        <li>Each pickle file should match a WAV file name (e.g., recording.wav.pickle)</li>
+                        <li>For best results, keep file names unique and descriptive</li>
+                        <li>Files will be processed after upload completes</li>
+                    </ul>
                 </div>
                 
                 <!-- Description Section -->
@@ -146,47 +158,4 @@
         </div>
     </div>
 </div>
-
-{% block extra_scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Add Bootstrap classes to form inputs
-    const formInputs = document.querySelectorAll('input, select, textarea');
-    formInputs.forEach(input => {
-        if (!input.classList.contains('form-check-input') && !input.classList.contains('form-control')) {
-            input.classList.add('form-control');
-            input.classList.add('bg-dark');
-            input.classList.add('text-light');
-            input.classList.add('border-secondary');
-        }
-    });
-    
-    // Initialize form validation
-    const form = document.getElementById('batch-upload-form');
-    form.addEventListener('submit', function(event) {
-        const wavFilesInput = document.getElementById('wav_files');
-        if (wavFilesInput.files.length === 0) {
-            event.preventDefault();
-            alert('Please select at least one WAV file to upload.');
-            return false;
-        }
-        
-        // Create loading indicator
-        if (wavFilesInput.files.length > 0) {
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
-            
-            // Add upload progress message
-            const formElement = document.getElementById('batch-upload-form');
-            const progressDiv = document.createElement('div');
-            progressDiv.className = 'alert alert-info mt-3';
-            progressDiv.innerHTML = '<strong>Uploading files...</strong> This may take a few minutes depending on the number and size of files.';
-            formElement.appendChild(progressDiv);
-        }
-    });
-});
-</script>
-{% endblock %}
-
 {% endblock %}

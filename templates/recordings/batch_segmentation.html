@@ -13,6 +13,32 @@
 {% endblock %}
 
 {% block data_table %}
+<!-- Debug Visualization Modal -->
+<div class="modal fade" id="vizModal" tabindex="-1" aria-labelledby="vizModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vizModalLabel">Segmentation Debug Visualization</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="vizImage" src="" alt="Debug Visualization" class="img-fluid">
+                <p class="text-muted mt-3">
+                    This visualization shows the segmentation process steps: 
+                    original signal, absolute signal, smoothed signal with threshold, 
+                    and binary mask with detected segments.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a id="vizDownloadLink" href="" download class="btn btn-primary">
+                    <i class="fas fa-download"></i> Download Image
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="segmentation-jobs-container">
     <div class="text-center py-4" id="loading-jobs">
         <div class="spinner-border text-primary" role="status">
@@ -27,6 +53,7 @@
                 <thead>
                     <tr>
                         <th>Recording</th>
+                        <th>Segmentation</th>
                         <th>Started</th>
                         <th>Status</th>
                         <th>Progress</th>
@@ -171,12 +198,38 @@
                                     statusBadge = '<span class="badge bg-secondary">Unknown</span>';
                                 }
                                 
+                                // Add active badge if this is the active segmentation
+                                if (job.is_active) {
+                                    statusBadge += '<br><span class="badge bg-primary mt-1" data-bs-toggle="tooltip" title="Current active segmentation">Active</span>';
+                                }
+                                
                                 // Add algorithm badge if available
                                 if (job.algorithm_name) {
                                     statusBadge += `
                                         <br><span class="badge bg-secondary mt-1" data-bs-toggle="tooltip" 
                                         title="${job.algorithm_type}">
                                             <i class="fas fa-cogs"></i> ${job.algorithm_name}
+                                        </span>
+                                    `;
+                                }
+                                
+                                // Add manually edited badge if applicable
+                                if (job.manually_edited) {
+                                    statusBadge += `
+                                        <br><span class="badge bg-warning mt-1" data-bs-toggle="tooltip" 
+                                        title="This segmentation has been manually edited">
+                                            <i class="fas fa-edit"></i> Manually Edited
+                                        </span>
+                                    `;
+                                }
+                                
+                                // Add debug visualization badge if available
+                                if (job.debug_visualization && job.debug_visualization.url) {
+                                    statusBadge += `
+                                        <br><span class="badge bg-info mt-1 viz-badge" data-bs-toggle="tooltip" 
+                                        title="Debug visualization available" 
+                                        data-viz-url="${job.debug_visualization.url}">
+                                            <i class="fas fa-chart-line"></i> Debug Viz
                                         </span>
                                     `;
                                 }
@@ -206,6 +259,7 @@
                                 // Populate row cells
                                 row.innerHTML = `
                                     <td><a href="${job.view_url}" class="text-decoration-none">${job.recording_name}</a></td>
+                                    <td>${job.name || "Unnamed Segmentation"}</td>
                                     <td>${job.start_time}</td>
                                     <td>${statusBadge}</td>
                                     <td>${progressBar}</td>
@@ -223,6 +277,26 @@
                             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
                             var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
                                 return new bootstrap.Tooltip(tooltipTriggerEl);
+                            });
+                            
+                            // Add click handlers for visualization badges
+                            document.querySelectorAll('.viz-badge').forEach(function(badge) {
+                                badge.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    
+                                    // Get the visualization URL from the data attribute
+                                    const vizUrl = this.getAttribute('data-viz-url');
+                                    
+                                    // Set the image source in the modal
+                                    document.getElementById('vizImage').src = vizUrl;
+                                    
+                                    // Set the download link
+                                    document.getElementById('vizDownloadLink').href = vizUrl;
+                                    
+                                    // Show the modal
+                                    const vizModal = new bootstrap.Modal(document.getElementById('vizModal'));
+                                    vizModal.show();
+                                });
                             });
                             
                             // Update item count

@@ -21,6 +21,7 @@
 <th>Name</th>
 <th>Species</th>
 <th>Duration</th>
+<th>Sample Rate</th>
 <th>Segments</th>
 <th>Created</th>
 <th>Actions</th>
@@ -40,6 +41,7 @@
 {% block item_fields %}
 <td>{{ item.species.name }}</td>
 <td>{{ item.duration|default:"Unknown"|floatformat:2 }} sec</td>
+<td>{{ item.sample_rate|default:"Unknown" }} Hz</td>
 <td>{{ item.segments.count }}</td>
 <td>{{ item.created_at|date:"M d, Y" }}</td>
 {% endblock %}

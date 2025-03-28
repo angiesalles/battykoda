@@ -21,7 +21,7 @@ class UserLoginForm(AuthenticationForm):
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ["group", "is_admin"]  # Added group and admin fields
+        fields = ["group", "is_admin", "theme"]  # Added theme option
 
     def __init__(self, *args, **kwargs):
         # Get the user making the request
@@ -33,6 +33,13 @@ class UserProfileForm(forms.ModelForm):
             self.fields.pop("is_admin", None)
             if "group" in self.fields:
                 self.fields["group"].disabled = True
+                
+        # Add styling to the theme select field
+        if "theme" in self.fields:
+            self.fields["theme"].widget.attrs.update({
+                "class": "form-control bg-dark text-light",
+                "onchange": "updatePreviewColors(this.value)"
+            })
 
 
 class TaskBatchForm(forms.ModelForm):
@@ -261,21 +268,47 @@ class RecordingForm(forms.ModelForm):
         }
         
     def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)
+        self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
         
         # Set empty label for dropdowns
         self.fields["species"].empty_label = "Select a species"
         self.fields["project"].empty_label = "Select a project"
         
-        if user:
+        # Store user profile for validation
+        self.profile = None
+        
+        if self.user:
             # Get or create user profile
-            profile, created = UserProfile.objects.get_or_create(user=user)
+            self.profile, created = UserProfile.objects.get_or_create(user=self.user)
             
             # Filter species and projects by user's group
-            if profile.group:
-                self.fields["species"].queryset = self.fields["species"].queryset.filter(group=profile.group)
-                self.fields["project"].queryset = self.fields["project"].queryset.filter(group=profile.group)
+            if self.profile.group:
+                self.fields["species"].queryset = self.fields["species"].queryset.filter(group=self.profile.group)
+                self.fields["project"].queryset = self.fields["project"].queryset.filter(group=self.profile.group)
+    
+    def clean_name(self):
+        """Validate that recording name is unique within the group"""
+        name = self.cleaned_data.get('name')
+        
+        # If we have a profile with a group, check for uniqueness
+        if self.profile and self.profile.group:
+            # Get the instance ID (if editing) or None (if creating)
+            instance_id = self.instance.id if self.instance else None
+            
+            # Check if a recording with this name already exists in the group
+            # Exclude the current instance if editing
+            existing_query = Recording.objects.filter(name=name, group=self.profile.group)
+            if instance_id:
+                existing_query = existing_query.exclude(id=instance_id)
+            
+            if existing_query.exists():
+                raise forms.ValidationError(
+                    "A recording with this name already exists in your group. "
+                    "Please choose a different name."
+                )
+        
+        return name
 
 
 class SegmentForm(forms.ModelForm):
@@ -283,7 +316,7 @@ class SegmentForm(forms.ModelForm):
     
     class Meta:
         model = Segment
-        fields = ["name", "onset", "offset", "call_type", "notes"]
+        fields = ["name", "onset", "offset", "notes"]
         widgets = {
             "onset": forms.NumberInput(attrs={"step": "0.01", "class": "form-control"}),
             "offset": forms.NumberInput(attrs={"step": "0.01", "class": "form-control"}),
@@ -293,16 +326,6 @@ class SegmentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         recording = kwargs.pop("recording", None)
         super().__init__(*args, **kwargs)
-        
-        # Limit call types to those associated with the recording's species
-        if recording and recording.species:
-            self.fields["call_type"].queryset = Call.objects.filter(species=recording.species)
-        else:
-            self.fields["call_type"].queryset = Call.objects.none()
-            
-        # Set empty label for call_type
-        self.fields["call_type"].empty_label = "Select a call type (optional)"
-        self.fields["call_type"].required = False
         
     def clean(self):
         cleaned_data = super().clean()
@@ -322,11 +345,6 @@ class SegmentFormSet(forms.BaseModelFormSet):
     def __init__(self, *args, **kwargs):
         recording = kwargs.pop("recording", None)
         super().__init__(*args, **kwargs)
-        
-        for form in self.forms:
-            form.fields["call_type"].queryset = Call.objects.filter(species=recording.species) if recording else Call.objects.none()
-            form.fields["call_type"].empty_label = "Select a call type (optional)"
-            form.fields["call_type"].required = False
     
     def clean(self):
         """Validate that segments don't overlap"""

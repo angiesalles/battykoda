@@ -15,8 +15,13 @@
         </nav>
         <div class="btn-group" role="group">
             <button id="create-tasks-btn" class="btn btn-success" {% if not segments %}disabled{% endif %}>
-                <i class="fas fa-tasks"></i> Create Tasks
+                <i class="fas fa-tag"></i> Create Classification
             </button>
+            {% if recording.segmentation %}
+            <a href="{% url 'battycoda_app:create_detection_run_for_segmentation' segmentation_id=recording.segmentation.id %}" class="btn btn-success">
+                <i class="fas fa-tag"></i> Run Classification
+            </a>
+            {% endif %}
             <a href="{% url 'battycoda_app:auto_segment_recording' recording_id=recording.id %}" class="btn btn-info">
                 <i class="fas fa-magic"></i> Auto Segment
             </a>
@@ -46,77 +51,23 @@
     <div class="row">
         <!-- Waveform and segmentation tools -->
         <div class="col-lg-8">
+            <!-- Include the reusable waveform player with selection and zoom enabled -->
+            {% include "recordings/includes/waveform_player.html" with recording=recording container_id="segment-waveform" height=300 allow_selection=True show_zoom=True segments=segments_json %}
+            
+            <!-- Segmentation actions -->
             <div class="card bg-dark mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Waveform Segmentation: {{ recording.name }}</h5>
-                    <span class="badge bg-info">{{ recording.duration|default:"0"|floatformat:2 }}s</span>
+                    <h5 class="mb-0">Segmentation Actions</h5>
+                    {% if active_segmentation %}
+                    <span class="badge bg-primary">{{ active_segmentation.name }}</span>
+                    {% endif %}
                 </div>
-                <div class="card-body p-2">
-                    <!-- Audio visualization and segmentation interface -->
-                    <div id="waveform-container" class="mb-3" style="height: 200px; background-color: #1a1a1a;">
-                        <div id="loading-waveform" class="d-flex justify-content-center align-items-center h-100">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Timeline visualization -->
-                    <div id="timeline-container" class="position-relative mb-3" style="height: 30px; background-color: #1a1a1a;">
-                        <!-- Timeline markers will be added here via JavaScript -->
-                    </div>
-                    
-                    <!-- Audio controls -->
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="btn-group">
-                            <button id="play-btn" class="btn btn-primary">
-                                <i class="fas fa-play"></i> Play
-                            </button>
-                            <button id="pause-btn" class="btn btn-secondary" disabled>
-                                <i class="fas fa-pause"></i> Pause
-                            </button>
-                            <button id="stop-btn" class="btn btn-secondary" disabled>
-                                <i class="fas fa-stop"></i> Stop
-                            </button>
-                        </div>
-                        
-                        <div class="d-flex align-items-center">
-                            <span id="current-time" class="badge bg-dark me-2">0.00s</span>
-                            <div class="progress flex-grow-1" style="width: 150px; height: 10px;">
-                                <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
-                            </div>
-                            <span id="total-time" class="badge bg-dark ms-2">{{ recording.duration|default:"0"|floatformat:2 }}s</span>
-                        </div>
-                        
-                        <div class="btn-group">
-                            <button id="zoom-in-btn" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-search-plus"></i> Zoom In
-                            </button>
-                            <button id="zoom-out-btn" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-search-minus"></i> Zoom Out
-                            </button>
-                            <button id="reset-zoom-btn" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-expand"></i> Reset
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Segmentation actions -->
+                <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="btn-group">
                             <button id="add-segment-btn" class="btn btn-success">
                                 <i class="fas fa-plus"></i> Add Segment
                             </button>
-                            <button id="set-start-btn" class="btn btn-outline-info">
-                                <i class="fas fa-chevron-left"></i> Set Start
-                            </button>
-                            <button id="set-end-btn" class="btn btn-outline-info">
-                                <i class="fas fa-chevron-right"></i> Set End
-                            </button>
-                        </div>
-                        
-                        <div>
-                            <span id="selection-range" class="badge bg-info">No Selection</span>
                         </div>
                         
                         <div class="form-check form-switch">
@@ -124,6 +75,26 @@
                             <label class="form-check-label" for="auto-segment-toggle">Auto-segment on play</label>
                         </div>
                     </div>
+                    
+                    {% if all_segmentations.count > 1 %}
+                    <div class="mt-3">
+                        <label for="segmentation-selector" class="form-label">Active Segmentation:</label>
+                        <select id="segmentation-selector" class="form-select bg-dark text-light border-secondary">
+                            {% for segmentation in all_segmentations %}
+                            <option value="{{ segmentation.id }}" {% if active_segmentation and active_segmentation.id == segmentation.id %}selected{% endif %}>
+                                {{ segmentation.name }} 
+                                {% if segmentation.algorithm %}({{ segmentation.algorithm }}){% endif %}
+                                {% if segmentation.is_active %}[Active]{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="d-grid mt-2">
+                            <button id="switch-segmentation-btn" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-exchange-alt"></i> Switch Segmentation
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             
@@ -147,7 +118,9 @@
         <div class="col-lg-4">
             <div class="card bg-dark">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Segments</h5>
+                    <div>
+                        <h5 class="mb-0">Segments</h5>
+                    </div>
                     <div>
                         <span id="segments-count" class="badge bg-info me-2">{{ segments|length }}</span>
                         <button id="clear-segments-btn" class="btn btn-sm btn-danger" {% if not segments %}disabled{% endif %}>
@@ -164,7 +137,6 @@
                                         <th>#</th>
                                         <th>Time Range</th>
                                         <th>Duration</th>
-                                        <th>Call Type</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -174,13 +146,6 @@
                                         <td>{{ segment.id }}</td>
                                         <td>{{ segment.onset|floatformat:2 }}s - {{ segment.offset|floatformat:2 }}s</td>
                                         <td>{{ segment.duration|floatformat:2 }}s</td>
-                                        <td>
-                                            {% if segment.call_type %}
-                                            <span class="badge bg-primary">{{ segment.call_type.short_name }}</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">Unclassified</span>
-                                            {% endif %}
-                                        </td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <button class="btn btn-outline-primary play-segment-btn" 
@@ -193,7 +158,6 @@
                                                         data-segment-name="{{ segment.name|default:'' }}"
                                                         data-segment-onset="{{ segment.onset }}"
                                                         data-segment-offset="{{ segment.offset }}"
-                                                        data-segment-call-type="{{ segment.call_type.id|default:'' }}"
                                                         data-segment-notes="{{ segment.notes|default:'' }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
@@ -246,15 +210,6 @@
                             </div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label for="segment-call-type-input" class="form-label">Call Type</label>
-                            <select class="form-select bg-dark text-light border-secondary" id="segment-call-type-input" name="call_type">
-                                <option value="">-- Select Call Type --</option>
-                                {% for call in recording.species.calls.all %}
-                                    <option value="{{ call.id }}">{{ call.short_name }}{% if call.long_name %} ({{ call.long_name }}){% endif %}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                         
                         <div class="mb-3">
                             <label for="segment-notes-input" class="form-label">Notes</label>
@@ -271,9 +226,6 @@
         </div>
     </div>
 </div>
-
-<!-- Audio element (hidden) -->
-<audio id="audio-player" src="{{ recording.wav_file.url }}" preload="auto" style="display: none;"></audio>
 
 <!-- Confirm Clear Segments Modal -->
 <div class="modal fade" id="clear-segments-modal" tabindex="-1" aria-labelledby="clear-segments-modal-label" aria-hidden="true">
@@ -300,51 +252,40 @@
     <div class="modal-dialog">
         <div class="modal-content bg-dark text-light">
             <div class="modal-header">
-                <h5 class="modal-title" id="create-tasks-modal-label">Create Tasks from Segments</h5>
+                <h5 class="modal-title" id="create-tasks-modal-label">Run Classification</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>This will create a new task for each segment that doesn't already have an associated task.</p>
-                <p>The tasks will be grouped into a new batch.</p>
+                <p>This will take you to the algorithm selection page where you can run automated classification on all segments.</p>
+                <p>You'll be able to choose which classification algorithm to use for these segments.</p>
                 <hr>
-                <p>Number of segments: <span id="create-tasks-count" class="badge bg-info">{{ segments|length }}</span></p>
+                <p>Number of segments to classify: <span id="create-tasks-count" class="badge bg-info">{{ segments|length }}</span></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <a href="{% url 'battycoda_app:create_tasks_from_segments' recording_id=recording.id %}" class="btn btn-success">Create Tasks</a>
+                <a href="{% url 'battycoda_app:create_detection_run_for_segmentation' segmentation_id=active_segmentation.id %}" class="btn btn-success">Select Classification Algorithm</a>
             </div>
         </div>
     </div>
 </div>
 
 {% block extra_scripts %}
+<!-- Include the waveform player script -->
+<script src="{% static 'js/waveform_player.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // DOM elements
-    const audioPlayer = document.getElementById('audio-player');
-    const playBtn = document.getElementById('play-btn');
-    const pauseBtn = document.getElementById('pause-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const progressBar = document.getElementById('progress-bar');
-    const currentTimeEl = document.getElementById('current-time');
-    const totalTimeEl = document.getElementById('total-time');
-    const waveformContainer = document.getElementById('waveform-container');
-    const timelineContainer = document.getElementById('timeline-container');
-    const segmentsContainer = document.getElementById('segments-container');
-    const segmentsList = document.getElementById('segments-list');
-    const noSegmentsMessage = document.getElementById('no-segments-message');
-    const segmentsCountBadge = document.getElementById('segments-count');
-    const loadingWaveform = document.getElementById('loading-waveform');
-    const selectionRangeEl = document.getElementById('selection-range');
+    // Get the waveform elements from our component
+    const audioPlayer = document.getElementById('segment-waveform-audio');
+    const waveformContainer = document.getElementById('segment-waveform');
+    const selectionRangeEl = document.getElementById('segment-waveform-selection-range');
     
-    // Buttons
-    const setStartBtn = document.getElementById('set-start-btn');
-    const setEndBtn = document.getElementById('set-end-btn');
+    // Segment UI elements
+    const segmentsContainer = document.getElementById('segments-container');
+    let segmentsList = document.getElementById('segments-list');
+    let noSegmentsMessage = document.getElementById('no-segments-message');
+    const segmentsCountBadge = document.getElementById('segments-count');
     const addSegmentBtn = document.getElementById('add-segment-btn');
     const clearSegmentsBtn = document.getElementById('clear-segments-btn');
-    const zoomInBtn = document.getElementById('zoom-in-btn');
-    const zoomOutBtn = document.getElementById('zoom-out-btn');
-    const resetZoomBtn = document.getElementById('reset-zoom-btn');
     const createTasksBtn = document.getElementById('create-tasks-btn');
     
     // Form elements
@@ -355,7 +296,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentNameInput = document.getElementById('segment-name-input');
     const segmentOnsetInput = document.getElementById('segment-onset-input');
     const segmentOffsetInput = document.getElementById('segment-offset-input');
-    const segmentCallTypeInput = document.getElementById('segment-call-type-input');
     const segmentNotesInput = document.getElementById('segment-notes-input');
     const cancelSegmentBtn = document.getElementById('cancel-segment-btn');
     const autoSegmentToggle = document.getElementById('auto-segment-toggle');
@@ -364,15 +304,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmClearSegmentsBtn = document.getElementById('confirm-clear-segments-btn');
     
     // State
-    let currentTime = 0;
     let duration = {{ recording.duration|default:0 }};
-    let isPlaying = false;
+    let segments = [];
     let selectionStart = null;
     let selectionEnd = null;
-    let waveformData = null;
-    let segments = [];
-    let zoomLevel = 1;
-    let zoomOffset = 0;
     
     // Initialize segments from server data
     {% for segment in segments %}
@@ -381,343 +316,9 @@ document.addEventListener('DOMContentLoaded', function() {
         name: "{{ segment.name|default:'' }}",
         onset: {{ segment.onset }},
         offset: {{ segment.offset }},
-        call_type: {% if segment.call_type %}"{{ segment.call_type.id }}"{% else %}null{% endif %},
         notes: "{{ segment.notes|default:'' }}"
     });
     {% endfor %}
-    
-    // Load waveform data
-    async function loadWaveformData() {
-        try {
-            const response = await fetch("{% url 'battycoda_app:recording_waveform_data' recording_id=recording.id %}");
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            
-            // Always update duration if available, even on error
-            if (data.duration !== undefined && data.duration !== null) {
-                duration = data.duration || 0;
-                totalTimeEl.textContent = duration.toFixed(2) + 's';
-            }
-            
-            if (data.success) {
-                waveformData = data.waveform;
-                
-                // Hide loading indicator
-                loadingWaveform.style.display = 'none';
-                
-                // Draw waveform
-                drawWaveform();
-                drawTimeline();
-                updateSegmentsDisplay();
-            } else {
-                throw new Error(data.error || 'Failed to load waveform data');
-            }
-        } catch (error) {
-            console.error('Error loading waveform data:', error);
-            // Hide loading indicator
-            loadingWaveform.style.display = 'none';
-            
-            waveformContainer.innerHTML = `
-                <div class="alert alert-danger m-3">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    Error loading waveform: ${error.message}
-                </div>
-            `;
-            
-            // Still attempt to draw the timeline with empty data
-            drawTimeline();
-        }
-    }
-    
-    // Draw waveform
-    function drawWaveform() {
-        if (!waveformData) return;
-        
-        // Create canvas
-        waveformContainer.innerHTML = '';
-        const canvas = document.createElement('canvas');
-        canvas.width = waveformContainer.clientWidth;
-        canvas.height = waveformContainer.clientHeight;
-        waveformContainer.appendChild(canvas);
-        
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        
-        // Clear canvas
-        ctx.clearRect(0, 0, width, height);
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(0, 0, width, height);
-        
-        // Calculate visible range based on zoom
-        const visibleDataPoints = waveformData.length / zoomLevel;
-        const startIdx = Math.floor(zoomOffset * waveformData.length);
-        const endIdx = Math.min(startIdx + visibleDataPoints, waveformData.length);
-        
-        // Draw waveform
-        ctx.beginPath();
-        ctx.strokeStyle = '#4dabf7';
-        ctx.lineWidth = 1;
-        
-        const step = Math.max(1, Math.floor((endIdx - startIdx) / width));
-        for (let i = 0; i < width; i++) {
-            const dataIdx = startIdx + Math.floor(i * (endIdx - startIdx) / width);
-            if (dataIdx < waveformData.length) {
-                const value = waveformData[dataIdx];
-                const y = (0.5 - value / 2) * height;
-                if (i === 0) {
-                    ctx.moveTo(i, y);
-                } else {
-                    ctx.lineTo(i, y);
-                }
-            }
-        }
-        ctx.stroke();
-        
-        // Draw centerline
-        ctx.beginPath();
-        ctx.strokeStyle = '#6c757d';
-        ctx.lineWidth = 0.5;
-        ctx.moveTo(0, height / 2);
-        ctx.lineTo(width, height / 2);
-        ctx.stroke();
-        
-        // Draw selection
-        if (selectionStart !== null && selectionEnd !== null) {
-            const startX = (selectionStart / duration) * width / zoomLevel - zoomOffset * width;
-            const endX = (selectionEnd / duration) * width / zoomLevel - zoomOffset * width;
-            
-            ctx.fillStyle = 'rgba(255, 193, 7, 0.3)';
-            ctx.fillRect(startX, 0, endX - startX, height);
-            
-            // Draw selection boundaries
-            ctx.beginPath();
-            ctx.strokeStyle = '#ffc107';
-            ctx.lineWidth = 2;
-            ctx.moveTo(startX, 0);
-            ctx.lineTo(startX, height);
-            ctx.moveTo(endX, 0);
-            ctx.lineTo(endX, height);
-            ctx.stroke();
-        }
-        
-        // Draw cursor at current time
-        const cursorX = (currentTime / duration) * width / zoomLevel - zoomOffset * width;
-        ctx.beginPath();
-        ctx.strokeStyle = '#fd7e14';
-        ctx.lineWidth = 2;
-        ctx.moveTo(cursorX, 0);
-        ctx.lineTo(cursorX, height);
-        ctx.stroke();
-        
-        // Add click event listener to canvas
-        canvas.addEventListener('click', function(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const timePos = (x / width) * duration * zoomLevel + (zoomOffset * duration);
-            
-            // Set current time
-            currentTime = Math.max(0, Math.min(duration, timePos));
-            audioPlayer.currentTime = currentTime;
-            updateTimeDisplay();
-            drawWaveform();
-        });
-    }
-    
-    // Draw timeline
-    function drawTimeline() {
-        // Clear timeline
-        timelineContainer.innerHTML = '';
-        
-        // If no waveform data or duration, draw a simple timeline
-        if (!waveformData || !duration) {
-            // Draw a simple timeline with 0 and duration markers
-            const simpleDuration = duration || 60; // Default 60 seconds if no duration available
-            const width = timelineContainer.clientWidth;
-            
-            // Start marker (0s)
-            const startMarker = document.createElement('div');
-            startMarker.className = 'position-absolute';
-            startMarker.style.left = '0px';
-            startMarker.style.top = '0';
-            startMarker.style.bottom = '0';
-            startMarker.style.width = '1px';
-            startMarker.style.backgroundColor = '#6c757d';
-            
-            const startLabel = document.createElement('div');
-            startLabel.className = 'position-absolute text-light small';
-            startLabel.style.left = '0px';
-            startLabel.style.bottom = '0';
-            startLabel.textContent = '0.0s';
-            
-            // End marker
-            const endMarker = document.createElement('div');
-            endMarker.className = 'position-absolute';
-            endMarker.style.left = (width - 1) + 'px';
-            endMarker.style.top = '0';
-            endMarker.style.bottom = '0';
-            endMarker.style.width = '1px';
-            endMarker.style.backgroundColor = '#6c757d';
-            
-            const endLabel = document.createElement('div');
-            endLabel.className = 'position-absolute text-light small';
-            endLabel.style.left = (width - 30) + 'px';
-            endLabel.style.bottom = '0';
-            endLabel.textContent = simpleDuration.toFixed(1) + 's';
-            
-            timelineContainer.appendChild(startMarker);
-            timelineContainer.appendChild(startLabel);
-            timelineContainer.appendChild(endMarker);
-            timelineContainer.appendChild(endLabel);
-            
-            // Skip the rest if we don't have proper data
-            return;
-        }
-        
-        // Calculate visible range based on zoom
-        const visibleDuration = duration / zoomLevel;
-        const startTime = zoomOffset * duration;
-        const endTime = Math.min(startTime + visibleDuration, duration);
-        
-        // Calculate number of markers
-        const width = timelineContainer.clientWidth;
-        const maxMarkers = 10;
-        const timeStep = Math.ceil(visibleDuration / maxMarkers);
-        
-        // Draw time markers
-        for (let time = Math.floor(startTime); time <= endTime; time += timeStep) {
-            const markerX = ((time - startTime) / visibleDuration) * width;
-            
-            const marker = document.createElement('div');
-            marker.className = 'position-absolute';
-            marker.style.left = markerX + 'px';
-            marker.style.top = '0';
-            marker.style.bottom = '0';
-            marker.style.width = '1px';
-            marker.style.backgroundColor = '#6c757d';
-            
-            const label = document.createElement('div');
-            label.className = 'position-absolute text-light small';
-            label.style.left = (markerX - 10) + 'px';
-            label.style.bottom = '0';
-            label.textContent = time.toFixed(1) + 's';
-            
-            timelineContainer.appendChild(marker);
-            timelineContainer.appendChild(label);
-        }
-        
-        // Draw segments
-        segments.forEach(segment => {
-            const segmentStart = ((segment.onset - startTime) / visibleDuration) * width;
-            const segmentEnd = ((segment.offset - startTime) / visibleDuration) * width;
-            
-            // Skip segments outside the visible range
-            if (segmentEnd < 0 || segmentStart > width) {
-                return;
-            }
-            
-            const segmentMarker = document.createElement('div');
-            segmentMarker.className = 'position-absolute';
-            segmentMarker.style.left = Math.max(0, segmentStart) + 'px';
-            segmentMarker.style.width = (segmentEnd - segmentStart) + 'px';
-            segmentMarker.style.top = '5px';
-            segmentMarker.style.height = '20px';
-            segmentMarker.style.backgroundColor = '#007bff';
-            segmentMarker.style.opacity = '0.7';
-            segmentMarker.style.borderRadius = '2px';
-            segmentMarker.title = `Segment ${segment.id}: ${segment.onset.toFixed(2)}s - ${segment.offset.toFixed(2)}s`;
-            
-            timelineContainer.appendChild(segmentMarker);
-        });
-    }
-    
-    // Update time display
-    function updateTimeDisplay() {
-        // Ensure currentTime is a valid number
-        const time = Number.isFinite(currentTime) ? currentTime : 0;
-        currentTimeEl.textContent = time.toFixed(2) + 's';
-        
-        // Avoid division by zero if duration is not set
-        const percentage = duration ? ((time / duration) * 100) : 0;
-        progressBar.style.width = percentage + '%';
-    }
-    
-    // Update selection display
-    function updateSelectionDisplay() {
-        if (selectionStart !== null && selectionEnd !== null) {
-            // Ensure both values are numbers and not null before using toFixed
-            const start = Number.isFinite(selectionStart) ? selectionStart : 0;
-            const end = Number.isFinite(selectionEnd) ? selectionEnd : 0;
-            const selectionDuration = end - start;
-            selectionRangeEl.textContent = `Selection: ${start.toFixed(2)}s - ${end.toFixed(2)}s (${selectionDuration.toFixed(2)}s)`;
-        } else {
-            selectionRangeEl.textContent = 'No Selection';
-        }
-    }
-    
-    // Update segments table
-    function updateSegmentsDisplay() {
-        // Update count
-        segmentsCountBadge.textContent = segments.length;
-        
-        // Toggle visibility of no segments message and clear button
-        if (segments.length === 0) {
-            if (segmentsList) {
-                // Create no segments message if it doesn't exist
-                if (!noSegmentsMessage) {
-                    const msgDiv = document.createElement('div');
-                    msgDiv.id = 'no-segments-message';
-                    msgDiv.className = 'text-center p-4';
-                    msgDiv.innerHTML = `
-                        <div class="mb-3">
-                            <i class="fas fa-cut fa-4x text-muted"></i>
-                        </div>
-                        <h5>No segments found</h5>
-                        <p class="text-muted">Create segments by selecting regions on the waveform</p>
-                    `;
-                    segmentsContainer.innerHTML = '';
-                    segmentsContainer.appendChild(msgDiv);
-                } else {
-                    noSegmentsMessage.style.display = 'block';
-                }
-            }
-            clearSegmentsBtn.disabled = true;
-            createTasksBtn.disabled = true;
-        } else {
-            if (noSegmentsMessage) {
-                noSegmentsMessage.style.display = 'none';
-            }
-            
-            // Create table if it doesn't exist
-            if (!segmentsList) {
-                const table = document.createElement('table');
-                table.className = 'table table-dark table-hover table-striped mb-0';
-                table.innerHTML = `
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Time Range</th>
-                            <th>Duration</th>
-                            <th>Call Type</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="segments-list"></tbody>
-                `;
-                segmentsContainer.innerHTML = '';
-                segmentsContainer.appendChild(table);
-            }
-            
-            clearSegmentsBtn.disabled = false;
-            createTasksBtn.disabled = false;
-        }
-        
-        // Redraw waveform and timeline to show segments
-        drawWaveform();
-        drawTimeline();
-    }
     
     // Add a new segment
     async function addSegment(segment) {
@@ -726,7 +327,6 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('name', segment.name || '');
             formData.append('onset', segment.onset);
             formData.append('offset', segment.offset);
-            formData.append('call_type', segment.call_type || '');
             formData.append('notes', segment.notes || '');
             
             const response = await fetch("{% url 'battycoda_app:add_segment' recording_id=recording.id %}", {
@@ -745,7 +345,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     name: segment.name || '',
                     onset: segment.onset,
                     offset: segment.offset,
-                    call_type: segment.call_type || null,
                     notes: segment.notes || ''
                 });
                 
@@ -759,11 +358,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${data.segment.onset.toFixed(2)}s - ${data.segment.offset.toFixed(2)}s</td>
                         <td>${(data.segment.offset - data.segment.onset).toFixed(2)}s</td>
                         <td>
-                            ${data.segment.call_type ? 
-                              `<span class="badge bg-primary">${data.segment.call_type}</span>` : 
-                              `<span class="badge bg-secondary">Unclassified</span>`}
-                        </td>
-                        <td>
                             <div class="btn-group btn-group-sm">
                                 <button class="btn btn-outline-primary play-segment-btn" 
                                         data-onset="${data.segment.onset}" 
@@ -772,11 +366,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </button>
                                 <button class="btn btn-outline-warning edit-segment-btn" 
                                         data-segment-id="${data.segment.id}"
-                                        data-segment-name="${segment.name || ''}"
+                                        data-segment-name="${data.segment.name || ''}"
                                         data-segment-onset="${data.segment.onset}"
                                         data-segment-offset="${data.segment.offset}"
-                                        data-segment-call-type="${segment.call_type || ''}"
-                                        data-segment-notes="${segment.notes || ''}">
+                                        data-segment-notes="${data.segment.notes || ''}">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button class="btn btn-outline-danger delete-segment-btn" 
@@ -813,7 +406,6 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('name', segment.name || '');
             formData.append('onset', segment.onset);
             formData.append('offset', segment.offset);
-            formData.append('call_type', segment.call_type || '');
             formData.append('notes', segment.notes || '');
             
             const response = await fetch(`{% url 'battycoda_app:edit_segment' segment_id=0 %}`.replace('0', segment.id), {
@@ -834,7 +426,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         name: segment.name || '',
                         onset: segment.onset,
                         offset: segment.offset,
-                        call_type: segment.call_type || null,
                         notes: segment.notes || ''
                     };
                 }
@@ -845,20 +436,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     row.cells[1].textContent = `${data.segment.onset.toFixed(2)}s - ${data.segment.offset.toFixed(2)}s`;
                     row.cells[2].textContent = `${(data.segment.offset - data.segment.onset).toFixed(2)}s`;
                     
-                    // Update call type cell
-                    if (data.segment.call_type) {
-                        row.cells[3].innerHTML = `<span class="badge bg-primary">${data.segment.call_type}</span>`;
-                    } else {
-                        row.cells[3].innerHTML = `<span class="badge bg-secondary">Unclassified</span>`;
-                    }
-                    
                     // Update data attributes for buttons
                     const editBtn = row.querySelector('.edit-segment-btn');
                     if (editBtn) {
                         editBtn.dataset.segmentName = segment.name || '';
                         editBtn.dataset.segmentOnset = data.segment.onset;
                         editBtn.dataset.segmentOffset = data.segment.offset;
-                        editBtn.dataset.segmentCallType = segment.call_type || '';
                         editBtn.dataset.segmentNotes = segment.notes || '';
                     }
                     
@@ -897,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             if (data.success) {
                 // Remove the segment from the array
-                segments = segments.filter(s => s.id !== segmentId);
+                segments = segments.filter(s => s.id !== parseInt(segmentId));
                 
                 // Remove row from table if it exists
                 const row = document.getElementById(`segment-row-${segmentId}`);
@@ -908,6 +491,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Update display
                 updateSegmentsDisplay();
                 
+                // Explicitly update waveform player
+                if (window.waveformPlayers && window.waveformPlayers['segment-waveform']) {
+                    const waveformSegments = segments.map(segment => ({
+                        id: segment.id,
+                        onset: segment.onset,
+                        offset: segment.offset
+                    }));
+                    window.waveformPlayers['segment-waveform'].setSegments(waveformSegments);
+                }
+                
+                console.log(`Segment ${segmentId} deleted. Remaining segments:`, segments);
+                
                 return true;
             } else {
                 throw new Error(data.error || 'Failed to delete segment');
@@ -916,6 +511,116 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error deleting segment:', error);
             alert('Error deleting segment: ' + error.message);
             return false;
+        }
+    }
+    
+    // Update segments display
+    function updateSegmentsDisplay() {
+        // Update count
+        segmentsCountBadge.textContent = segments.length;
+        
+        // Toggle visibility of no segments message and clear button
+        if (segments.length === 0) {
+            // No segments case - show message
+            segmentsContainer.innerHTML = '';
+            const msgDiv = document.createElement('div');
+            msgDiv.id = 'no-segments-message';
+            msgDiv.className = 'text-center p-4';
+            msgDiv.innerHTML = `
+                <div class="mb-3">
+                    <i class="fas fa-cut fa-4x text-muted"></i>
+                </div>
+                <h5>No segments found</h5>
+                <p class="text-muted">Create segments by selecting regions on the waveform</p>
+            `;
+            segmentsContainer.appendChild(msgDiv);
+            
+            // Update reference to no segments message
+            noSegmentsMessage = msgDiv;
+            
+            // Disable buttons
+            clearSegmentsBtn.disabled = true;
+            createTasksBtn.disabled = true;
+        } else {
+            // Check if we need to create a new table (no segments -> segments)
+            if (!document.querySelector('#segments-container table')) {
+                // Remove no segments message if it exists
+                if (noSegmentsMessage) {
+                    noSegmentsMessage.remove();
+                    noSegmentsMessage = null;
+                }
+                
+                // Create table structure
+                segmentsContainer.innerHTML = '';
+                const table = document.createElement('table');
+                table.className = 'table table-dark table-hover table-striped mb-0';
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Time Range</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="segments-list"></tbody>
+                `;
+                segmentsContainer.appendChild(table);
+                
+                // Update reference to segments list
+                segmentsList = document.getElementById('segments-list');
+                
+                // Re-add all segments to the new table
+                segments.forEach(segment => {
+                    const row = document.createElement('tr');
+                    row.id = `segment-row-${segment.id}`;
+                    row.dataset.segmentId = segment.id;
+                    row.innerHTML = `
+                        <td>${segment.id}</td>
+                        <td>${segment.onset.toFixed(2)}s - ${segment.offset.toFixed(2)}s</td>
+                        <td>${(segment.offset - segment.onset).toFixed(2)}s</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary play-segment-btn" 
+                                        data-onset="${segment.onset}" 
+                                        data-offset="${segment.offset}">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="btn btn-outline-warning edit-segment-btn" 
+                                        data-segment-id="${segment.id}"
+                                        data-segment-name="${segment.name || ''}"
+                                        data-segment-onset="${segment.onset}"
+                                        data-segment-offset="${segment.offset}"
+                                        data-segment-notes="${segment.notes || ''}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger delete-segment-btn" 
+                                        data-segment-id="${segment.id}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    segmentsList.appendChild(row);
+                    
+                    // Add event listeners to buttons
+                    addSegmentButtonListeners(row);
+                });
+            }
+            
+            // Enable buttons
+            clearSegmentsBtn.disabled = false;
+            createTasksBtn.disabled = false;
+        }
+        
+        // Update the waveform player with the new segments
+        if (window.waveformPlayers && window.waveformPlayers['segment-waveform']) {
+            const waveformSegments = segments.map(segment => ({
+                id: segment.id,
+                onset: segment.onset,
+                offset: segment.offset
+            }));
+            window.waveformPlayers['segment-waveform'].setSegments(waveformSegments);
         }
     }
     
@@ -929,19 +634,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const offset = parseFloat(this.dataset.offset);
                 
                 // Set current time and play
-                currentTime = onset;
                 audioPlayer.currentTime = onset;
                 audioPlayer.play();
-                isPlaying = true;
-                updatePlayButtons();
                 
                 // Stop at the end of the segment
                 const duration = offset - onset;
                 setTimeout(() => {
-                    if (isPlaying && currentTime >= offset) {
+                    if (audioPlayer.currentTime >= offset) {
                         audioPlayer.pause();
-                        isPlaying = false;
-                        updatePlayButtons();
                     }
                 }, duration * 1000);
             });
@@ -956,7 +656,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 segmentNameInput.value = this.dataset.segmentName || '';
                 segmentOnsetInput.value = this.dataset.segmentOnset;
                 segmentOffsetInput.value = this.dataset.segmentOffset;
-                segmentCallTypeInput.value = this.dataset.segmentCallType || '';
                 segmentNotesInput.value = this.dataset.segmentNotes || '';
                 
                 // Show form
@@ -979,95 +678,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Spectrogram status checking - disabled
-    function checkSpectrogramStatus() {
-        // Function disabled - spectrogram generation is not needed for this view
-        console.log("Spectrogram generation is disabled");
-        return;
-    }
-    
-    // Update play/pause buttons state
-    function updatePlayButtons() {
-        if (isPlaying) {
-            playBtn.disabled = true;
-            pauseBtn.disabled = false;
-            stopBtn.disabled = false;
-        } else {
-            playBtn.disabled = false;
-            pauseBtn.disabled = true;
-            stopBtn.disabled = true;
+    // Check for selection changes from the waveform component
+    function checkForSelectionChanges() {
+        if (selectionRangeEl) {
+            const selectionText = selectionRangeEl.textContent;
+            if (selectionText && selectionText !== 'No Selection') {
+                // Parse selection from the text "Selection: 1.23s - 4.56s (3.33s)"
+                const match = selectionText.match(/Selection: (\d+\.\d+)s - (\d+\.\d+)s/);
+                if (match) {
+                    selectionStart = parseFloat(match[1]);
+                    selectionEnd = parseFloat(match[2]);
+                }
+            } else if (selectionText === 'No Selection') {
+                selectionStart = null;
+                selectionEnd = null;
+            }
         }
     }
-    
-    // Event Listeners
-    
-    // Audio player time update
-    audioPlayer.addEventListener('timeupdate', function() {
-        currentTime = audioPlayer.currentTime;
-        updateTimeDisplay();
-        drawWaveform();
-    });
-    
-    // Audio player ended
-    audioPlayer.addEventListener('ended', function() {
-        isPlaying = false;
-        updatePlayButtons();
-    });
-    
-    // Play button
-    playBtn.addEventListener('click', function() {
-        audioPlayer.play();
-        isPlaying = true;
-        updatePlayButtons();
-    });
-    
-    // Pause button
-    pauseBtn.addEventListener('click', function() {
-        audioPlayer.pause();
-        isPlaying = false;
-        updatePlayButtons();
-    });
-    
-    // Stop button
-    stopBtn.addEventListener('click', function() {
-        audioPlayer.pause();
-        audioPlayer.currentTime = 0;
-        currentTime = 0;
-        isPlaying = false;
-        updateTimeDisplay();
-        updatePlayButtons();
-        drawWaveform();
-    });
-    
-    // Set start button
-    setStartBtn.addEventListener('click', function() {
-        selectionStart = currentTime;
-        if (selectionEnd === null || selectionEnd < selectionStart) {
-            selectionEnd = Math.min(currentTime + 0.5, duration);
-        }
-        updateSelectionDisplay();
-        drawWaveform();
-    });
-    
-    // Set end button
-    setEndBtn.addEventListener('click', function() {
-        selectionEnd = currentTime;
-        if (selectionStart === null || selectionStart > selectionEnd) {
-            selectionStart = Math.max(currentTime - 0.5, 0);
-        }
-        updateSelectionDisplay();
-        drawWaveform();
-    });
     
     // Add segment button
     addSegmentBtn.addEventListener('click', function() {
+        // First check if the selection has been updated
+        checkForSelectionChanges();
+        
         if (selectionStart !== null && selectionEnd !== null) {
             // Set form values
             segmentIdInput.value = '';
             segmentNameInput.value = '';
             segmentOnsetInput.value = selectionStart.toFixed(2);
             segmentOffsetInput.value = selectionEnd.toFixed(2);
-            segmentCallTypeInput.value = '';
             segmentNotesInput.value = '';
             
             // Show form
@@ -1109,7 +748,6 @@ document.addEventListener('DOMContentLoaded', function() {
             name: segmentNameInput.value,
             onset: onset,
             offset: offset,
-            call_type: segmentCallTypeInput.value,
             notes: segmentNotesInput.value
         };
         
@@ -1125,12 +763,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Hide form
         segmentFormCard.style.display = 'none';
-        
-        // Clear selection
-        selectionStart = null;
-        selectionEnd = null;
-        updateSelectionDisplay();
-        drawWaveform();
     });
     
     // Cancel segment button
@@ -1156,27 +788,6 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.hide();
     });
     
-    // Zoom buttons
-    zoomInBtn.addEventListener('click', function() {
-        zoomLevel = Math.min(zoomLevel * 1.5, 10);
-        drawWaveform();
-        drawTimeline();
-    });
-    
-    zoomOutBtn.addEventListener('click', function() {
-        zoomLevel = Math.max(zoomLevel / 1.5, 1);
-        zoomOffset = 0;
-        drawWaveform();
-        drawTimeline();
-    });
-    
-    resetZoomBtn.addEventListener('click', function() {
-        zoomLevel = 1;
-        zoomOffset = 0;
-        drawWaveform();
-        drawTimeline();
-    });
-    
     // Create tasks button
     createTasksBtn.addEventListener('click', function() {
         // Show modal
@@ -1185,45 +796,69 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.show();
     });
     
-    // Auto-segment toggle
-    audioPlayer.addEventListener('playing', function() {
-        if (autoSegmentToggle.checked) {
-            // Clear selection
-            selectionStart = currentTime;
-            selectionEnd = null;
-        }
-    });
+    // Segmentation switcher
+    const switchSegmentationBtn = document.getElementById('switch-segmentation-btn');
+    const segmentationSelector = document.getElementById('segmentation-selector');
     
-    audioPlayer.addEventListener('pause', function() {
-        if (autoSegmentToggle.checked && selectionStart !== null) {
-            selectionEnd = currentTime;
+    if (switchSegmentationBtn && segmentationSelector) {
+        switchSegmentationBtn.addEventListener('click', async function() {
+            const segmentationId = segmentationSelector.value;
+            if (!segmentationId) return;
             
-            // Only create segment if it's at least 0.1 seconds long
-            if (selectionEnd - selectionStart >= 0.1) {
-                // Auto add segment
-                const segment = {
-                    name: '',
-                    onset: selectionStart,
-                    offset: selectionEnd,
-                    call_type: '',
-                    notes: ''
-                };
+            try {
+                // Send request to activate the selected segmentation
+                const response = await fetch(`{% url 'battycoda_app:activate_segmentation' segmentation_id=0 %}`.replace('0', segmentationId), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
                 
-                addSegment(segment);
-                
-                // Clear selection
-                selectionStart = null;
-                selectionEnd = null;
-                updateSelectionDisplay();
+                const data = await response.json();
+                if (data.success) {
+                    // Reload the page to see the new active segmentation
+                    window.location.reload();
+                } else {
+                    throw new Error(data.message || 'Failed to switch segmentation');
+                }
+            } catch (error) {
+                console.error('Error switching segmentation:', error);
+                alert('Error switching segmentation: ' + error.message);
             }
-        }
-    });
+        });
+    }
     
-    // Window resize event
-    window.addEventListener('resize', function() {
-        drawWaveform();
-        drawTimeline();
-    });
+    // Auto-segment toggle with waveform player
+    if (autoSegmentToggle && audioPlayer) {
+        let autoSegmentStart = null;
+        
+        audioPlayer.addEventListener('play', function() {
+            if (autoSegmentToggle.checked) {
+                autoSegmentStart = audioPlayer.currentTime;
+            }
+        });
+        
+        audioPlayer.addEventListener('pause', function() {
+            if (autoSegmentToggle.checked && autoSegmentStart !== null) {
+                const autoSegmentEnd = audioPlayer.currentTime;
+                
+                // Only create segment if it's at least 0.1 seconds long
+                if (autoSegmentEnd - autoSegmentStart >= 0.1) {
+                    // Auto add segment
+                    const segment = {
+                        name: '',
+                        onset: autoSegmentStart,
+                        offset: autoSegmentEnd,
+                            notes: ''
+                    };
+                    
+                    addSegment(segment);
+                    autoSegmentStart = null;
+                }
+            }
+        });
+    }
     
     // Add event listeners to existing segment buttons
     if (segmentsList) {
@@ -1234,12 +869,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize
-    loadWaveformData();
-    updateTimeDisplay();
-    updateSelectionDisplay();
-    
-    // Spectrogram checking disabled
-    // No need to check for spectrogram status
+    updateSegmentsDisplay();
 });
 </script>
 {% endblock %}

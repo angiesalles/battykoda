@@ -1,0 +1,106 @@
+{% comment %}
+Reusable waveform player component
+Parameters:
+- recording: The recording object
+- container_id: A unique ID for the waveform container (optional, defaults to "waveform-container")
+- height: Height of the waveform in pixels (optional, defaults to 200)
+- allow_selection: Whether to show selection controls (optional, defaults to false)
+- show_zoom: Whether to show zoom controls (optional, defaults to false)
+{% endcomment %}
+
+{% if not container_id %}
+    {% with container_id="waveform-container" %}
+        {% include "recordings/includes/waveform_player.html" with recording=recording container_id=container_id %}
+    {% endwith %}
+{% else %}
+    <!-- Waveform visualization and player component -->
+    <div class="card bg-dark mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Audio Playback & Waveform</h5>
+            <span id="{{ container_id }}-status" class="badge bg-info">Loading...</span>
+        </div>
+        <div class="card-body p-2">
+            <!-- Waveform visualization -->
+            <div id="{{ container_id }}" style="height: {{ height|default:"200" }}px; background-color: #1a1a1a; position: relative;">
+                <div id="{{ container_id }}-loading" class="d-flex justify-content-center align-items-center h-100">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Timeline visualization -->
+            <div id="{{ container_id }}-timeline" class="position-relative mt-2" style="height: 30px; background-color: #1a1a1a;">
+                <!-- Timeline markers will be added here via JavaScript -->
+            </div>
+            
+            <!-- Audio controls -->
+            <div class="d-flex align-items-center justify-content-between my-2">
+                <div class="btn-group">
+                    <button id="{{ container_id }}-play-btn" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Play
+                    </button>
+                    <button id="{{ container_id }}-pause-btn" class="btn btn-secondary" disabled>
+                        <i class="fas fa-pause"></i> Pause
+                    </button>
+                    <button id="{{ container_id }}-stop-btn" class="btn btn-secondary" disabled>
+                        <i class="fas fa-stop"></i> Stop
+                    </button>
+                </div>
+                
+                <div class="d-flex align-items-center mx-2 flex-grow-1">
+                    <span id="{{ container_id }}-current-time" class="badge bg-dark me-2">0.00s</span>
+                    <div id="{{ container_id }}-progress-container" class="progress flex-grow-1" style="height: 10px; cursor: pointer;">
+                        <div id="{{ container_id }}-progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <span id="{{ container_id }}-total-time" class="badge bg-dark ms-2">{{ recording.duration|default:"0"|floatformat:2 }}s</span>
+                </div>
+                
+                {% if show_zoom %}
+                <div class="btn-group">
+                    <button id="{{ container_id }}-zoom-in-btn" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-search-plus"></i> Zoom In
+                    </button>
+                    <button id="{{ container_id }}-zoom-out-btn" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-search-minus"></i> Zoom Out
+                    </button>
+                    <button id="{{ container_id }}-reset-zoom-btn" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-expand"></i> Reset
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if allow_selection %}
+            <!-- Selection controls -->
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="btn-group">
+                    <button id="{{ container_id }}-set-start-btn" class="btn btn-outline-info">
+                        <i class="fas fa-chevron-left"></i> Set Start
+                    </button>
+                    <button id="{{ container_id }}-set-end-btn" class="btn btn-outline-info">
+                        <i class="fas fa-chevron-right"></i> Set End
+                    </button>
+                </div>
+                
+                <div>
+                    <span id="{{ container_id }}-selection-range" class="badge bg-info">No Selection</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Audio element (hidden) -->
+    <audio id="{{ container_id }}-audio" preload="auto" style="display: none;">
+        <source src="{% url 'battycoda_app:stream_recording_audio' recording_id=recording.id %}" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize waveform player for {{ container_id }}
+        initWaveformPlayer("{{ container_id }}", {{ recording.id }}, {{ allow_selection|yesno:"true,false" }}, {{ show_zoom|yesno:"true,false" }}, {% if segments %}{{ segments|safe }}{% else %}null{% endif %});
+    });
+    </script>
+{% endif %}

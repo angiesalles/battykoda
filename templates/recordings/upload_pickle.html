@@ -16,14 +16,22 @@
                         Upload a pickle file containing onset and offset data to automatically create segments for this recording.
                     </p>
                     
-                    <p class="alert alert-info">
-                        <strong>Note:</strong> The pickle file should contain onset and offset timestamps as either:
+                    {% if has_existing_segmentation %}
+                    <div class="alert alert-info">
+                        <strong>Note:</strong> This recording already has one or more segmentations. Uploading a pickle file will create an additional segmentation that you can switch between.
+                    </div>
+                    {% endif %}
+                    
+                    <div class="alert alert-info">
+                        <strong>Pickle File Format Requirements:</strong>
+                        <p>The uploaded pickle file should contain segment timestamps in one of these formats:</p>
                         <ul>
-                            <li>A dictionary with 'onsets' and 'offsets' keys</li>
-                            <li>A list or tuple where the first element is onsets and the second is offsets</li>
+                            <li><strong>Dictionary format:</strong> <code>{"onsets": [0.1, 0.5, 1.2], "offsets": [0.3, 0.7, 1.5]}</code></li>
+                            <li><strong>List/tuple format:</strong> <code>([0.1, 0.5, 1.2], [0.3, 0.7, 1.5])</code></li>
                         </ul>
-                        Each onset/offset pair will create a new segment in the recording.
-                    </p>
+                        <p>Each onset/offset pair (e.g., 0.1→0.3, 0.5→0.7) defines one segment in the recording.</p>
+                        <p>Times should be in seconds and the number of onsets must match the number of offsets.</p>
+                    </div>
                     
                     <form method="post" enctype="multipart/form-data" id="pickle-upload-form">
                         {% csrf_token %}
@@ -47,9 +55,15 @@
 {% block javascript %}
 <script>
 $(document).ready(function() {
+    // Check for existing segmentation
+    const hasExistingSegmentation = {% if has_existing_segmentation %}true{% else %}false{% endif %};
+    
     // Handle form submission
     $('#pickle-upload-form').on('submit', function(e) {
         e.preventDefault();
+        
+        // No need to confirm since we now support multiple segmentations
+        // Just proceed with uploading the pickle file
         
         // Show loading indicator
         const submitBtn = $(this).find('button[type="submit"]');

@@ -48,9 +48,12 @@
                                 <a href="{% url 'battycoda_app:annotate_batch' batch.id %}" class="btn btn-primary">
                                     <i class="fas fa-tasks"></i> Annotate Tasks
                                 </a>
-                                <a href="{% url 'battycoda_app:create_detection_run_for_batch' batch_id=batch.id %}" class="btn btn-info">
-                                    <i class="fas fa-robot"></i> Run Automated Detection
+                                <!-- "Run Automated Detection" button removed as it's no longer applicable in new workflow -->
+                                {% if batch.detection_run %}
+                                <a href="{% url 'battycoda_app:detection_run_detail' run_id=batch.detection_run.id %}" class="btn btn-info">
+                                    <i class="fas fa-robot"></i> View Source Classification
                                 </a>
+                                {% endif %}
                                 <a href="{% url 'battycoda_app:export_task_batch' batch.id %}" class="btn btn-success">
                                     <i class="fas fa-file-export"></i> Export Results
                                 </a>

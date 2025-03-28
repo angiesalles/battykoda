@@ -287,11 +287,12 @@ def create_demo_task_batch(user):
     """
     import pickle
     import traceback
-
     from django.core.files import File
     from django.db import transaction
+    from django.utils import timezone
 
-    from .models import Project, Species, Task, TaskBatch
+    from .models import Classifier, DetectionRun, Project, Recording, Segment, Segmentation, Species, TaskBatch
+    from .audio.tasks import run_dummy_classifier
     from .audio.utils import process_pickle_file
 
     logger.info(f"Creating demo task batch for user {user.username}")
@@ -348,92 +349,157 @@ def create_demo_task_batch(user):
             logger.warning("Sample pickle file not found, skipping task batch creation")
             return None
 
-        # Create the task batch
-        batch_name = "Demo Bat Calls"
-
-        # Create and save the TaskBatch
-        batch = TaskBatch(
-            name=batch_name,
+        # Step 1: Create a demo recording
+        recording = Recording(
+            name="Demo Bat Recording",
             description="Sample bat calls for demonstration and practice",
             created_by=user,
-            wav_file_name="bat1_angie_19.wav",
             species=species,
             project=project,
             group=group,
         )
-
-        # Save the batch to get an ID
-        batch.save()
-
+        recording.save()
+        
         # Attach the WAV file
         with open(wav_path, "rb") as wav_file:
-            batch.wav_file.save("bat1_angie_19.wav", File(wav_file), save=True)
-
-        logger.info(f"Created task batch {batch.name} for user {user.username}")
-
-        # Load the pickle file and process it once to get onsets and offsets
+            recording.wav_file.save("bat1_angie_19.wav", File(wav_file), save=True)
+        
+        logger.info(f"Created demo recording for user {user.username}")
+        
+        # Step 2: Load the pickle file and create segments
         try:
+            # Open and process the pickle file
             with open(pickle_path, "rb") as f:
-                # Process the pickle file using our standard utility
                 onsets, offsets = process_pickle_file(f)
             
-            # Create tasks for each onset-offset pair inside a transaction
-            tasks_created = 0
+            # Create segments from the onset/offset pairs
+            segments_created = 0
             with transaction.atomic():
+                # First, create the segmentation object
+                segmentation = Segmentation(
+                    recording=recording,
+                    status='completed',  # Already completed
+                    progress=100,
+                    created_by=user,
+                    manually_edited=False,
+                )
+                segmentation.save()
+                
                 # Only use the first 10 entries to keep the demo manageable
                 max_entries = min(10, len(onsets))
-
+                
+                # Create segments
                 for i in range(max_entries):
-                    try:
-                        # Convert numpy types to Python native types if needed
-                        onset_value = float(onsets[i])
-                        offset_value = float(offsets[i])
-
-                        # Create and save the task
-                        task = Task(
-                            wav_file_name=batch.wav_file_name,
-                            onset=onset_value,
-                            offset=offset_value,
-                            species=batch.species,
-                            project=batch.project,
+                    # Convert numpy types to Python native types if needed
+                    onset_value = float(onsets[i])
+                    offset_value = float(offsets[i])
+                    
+                    # Create and save the segment
+                    segment = Segment(
+                        recording=recording,
+                        name=f"Segment {i+1}",
+                        onset=onset_value,
+                        offset=offset_value,
+                        created_by=user
+                    )
+                    segment.save()
+                    segments_created += 1
+            
+            logger.info(f"Created segmentation with {segments_created} segments for demo recording")
+            
+            # Step 3: Run the dummy classifier on the segments
+            try:
+                # Find the dummy classifier
+                dummy_classifier = Classifier.objects.get(name='Dummy Classifier')
+                
+                # Create a detection run
+                detection_run = DetectionRun.objects.create(
+                    name="Demo Classification Run",
+                    segmentation=segmentation,
+                    created_by=user,
+                    group=group,
+                    classifier=dummy_classifier,
+                    algorithm_type='full_probability',
+                    status='pending',
+                    progress=0
+                )
+                
+                # Run the dummy classifier directly (not through Celery)
+                run_dummy_classifier(detection_run.id)
+                
+                # Make sure the run is marked as completed
+                detection_run.refresh_from_db()
+                if detection_run.status != 'completed':
+                    detection_run.status = 'completed'
+                    detection_run.progress = 100
+                    detection_run.save()
+                
+                logger.info(f"Completed dummy classification for demo recording")
+                
+                # Step 4: Create a task batch from the detection run
+                from .models import DetectionResult, CallProbability, Task
+                
+                # Create a unique batch name with timestamp
+                batch_name = f"Demo Bat Calls ({timezone.now().strftime('%Y%m%d-%H%M%S')})"
+                
+                # Create the task batch
+                batch = TaskBatch.objects.create(
+                    name=batch_name,
+                    description="Sample bat calls for demonstration and practice",
+                    created_by=user,
+                    wav_file_name=recording.wav_file.name,
+                    wav_file=recording.wav_file,
+                    species=species,
+                    project=project,
+                    group=group,
+                    detection_run=detection_run  # Link to the detection run
+                )
+                
+                # Create tasks for each detection result's segment
+                tasks_created = 0
+                with transaction.atomic():
+                    # Get all detection results from this run
+                    results = DetectionResult.objects.filter(detection_run=detection_run)
+                    
+                    for result in results:
+                        segment = result.segment
+                        
+                        # Get the highest probability call type
+                        top_probability = CallProbability.objects.filter(
+                            detection_result=result
+                        ).order_by('-probability').first()
+                        
+                        # Create a task for this segment
+                        task = Task.objects.create(
+                            wav_file_name=recording.wav_file.name,
+                            onset=segment.onset,
+                            offset=segment.offset,
+                            species=species,
+                            project=project,
                             batch=batch,
                             created_by=user,
                             group=group,
-                            status="pending",
+                            # Use the highest probability call type as the initial label
+                            label=top_probability.call.short_name if top_probability else None,
+                            status="pending"
                         )
-                        task.save()
+                        
+                        # Link the task back to the segment
+                        segment.task = task
+                        segment.save()
+                        
                         tasks_created += 1
-                    except Exception as e:
-                        logger.error(f"Error creating task {i}: {str(e)}")
-                        logger.error(traceback.format_exc())
-                        raise  # Re-raise to trigger transaction rollback
-
-            logger.info(f"Created {tasks_created} tasks for batch {batch.name}")
-            
-            # Create recording and segments using the same onsets/offsets
-            try:
-                # Use our utility function to create the recording and segments
-                recording, segments_created = create_recording_from_batch(batch, onsets=onsets, offsets=offsets)
                 
-                if recording:
-                    logger.info(f"Created recording with {segments_created} segments for demo batch {batch.name}")
-                else:
-                    logger.warning(f"Failed to create recording for demo batch {batch.name}")
-            except Exception as e:
-                logger.error(f"Error creating recording from demo batch: {str(e)}")
-                logger.error(traceback.format_exc())
-                # Don't fail task batch creation if recording creation fails
+                logger.info(f"Created {tasks_created} tasks for demo batch {batch.name}")
+                return batch
             
-            return batch
-
+            except Classifier.DoesNotExist:
+                logger.error("Dummy classifier not found. Make sure the Dummy Classifier exists in the database.")
+                return None
+                
         except Exception as e:
             logger.error(f"Error processing pickle file: {str(e)}")
             logger.error(traceback.format_exc())
-
-            # Delete the batch if pickle processing failed
-            if batch.id:
-                batch.delete()
-
             return None
 
     except Exception as e:

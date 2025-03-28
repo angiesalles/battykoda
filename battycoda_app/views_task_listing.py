@@ -45,7 +45,7 @@ def task_detail_view(request, task_id):
     # Check if user has permission to view this task
     if task.created_by != request.user and (not request.user.profile.group or task.group != request.user.profile.group):
         messages.error(request, "You don't have permission to view this task.")
-        return redirect("battycoda_app:task_list")
+        return redirect("battycoda_app:task_batch_list")
 
     # For editing, check if the user is the creator or a group admin
     can_edit = (task.created_by == request.user) or (
@@ -80,7 +80,7 @@ def create_task_view(request):
             task.save()
 
             messages.success(request, "Task created successfully.")
-            return redirect("battycoda_app:task_list")
+            return redirect("battycoda_app:task_batch_list")
     else:
         form = TaskForm(user=request.user)
 

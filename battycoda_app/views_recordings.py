@@ -1,3 +1,4 @@
+import fnmatch
 import hashlib
 import logging
 import mimetypes
@@ -11,6 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.utils import timezone
 
 # Removed unused import: http_date
 from django.shortcuts import get_object_or_404, redirect, render
@@ -19,7 +21,7 @@ from django.urls import reverse
 # Removed unused import: generate_recording_spectrogram
 from .audio.utils import process_pickle_file
 from .forms import RecordingForm, SegmentForm, SegmentFormSetFactory
-from .models import Recording, Segment, UserProfile
+from .models import Recording, Segment, Segmentation, UserProfile
 
 # Set up logging
 logger = logging.getLogger("battycoda.views_recordings")
@@ -218,8 +220,35 @@ def segment_recording_view(request, recording_id):
         messages.error(request, "You don't have permission to segment this recording.")
         return redirect("battycoda_app:recording_list")
 
-    # Get existing segments
-    segments = Segment.objects.filter(recording=recording).order_by("onset")
+    # Get active segmentation for this recording
+    try:
+        active_segmentation = Segmentation.objects.get(recording=recording, is_active=True)
+        
+        # Get segments from the active segmentation
+        segments = Segment.objects.filter(segmentation=active_segmentation).order_by("onset")
+        
+        # Add segmentation info to context
+        segmentation_info = {
+            'id': active_segmentation.id,
+            'name': active_segmentation.name,
+            'algorithm': active_segmentation.algorithm.name if active_segmentation.algorithm else "Manual",
+            'created_at': active_segmentation.created_at,
+            'manually_edited': active_segmentation.manually_edited
+        }
+    except Segmentation.DoesNotExist:
+        # No active segmentation, return empty queryset
+        segments = Segment.objects.none()
+        segmentation_info = None
+        
+        # Check if there are any segmentations at all
+        if Segmentation.objects.filter(recording=recording).exists():
+            # Activate the most recent segmentation
+            latest_segmentation = Segmentation.objects.filter(recording=recording).order_by('-created_at').first()
+            latest_segmentation.is_active = True
+            latest_segmentation.save()
+            
+            # Redirect to refresh the page with the newly activated segmentation
+            return redirect("battycoda_app:segment_recording", recording_id=recording.id)
 
     # Generate spectrogram if needed
     try:
@@ -243,10 +272,26 @@ def segment_recording_view(request, recording_id):
         logger.error(f"Error checking/generating spectrogram: {str(e)}")
         spectrogram_url = None
 
+    # Convert segments to JSON
+    import json
+    segments_json = []
+    for segment in segments:
+        segments_json.append({
+            'id': segment.id,
+            'onset': segment.onset,
+            'offset': segment.offset
+        })
+    
+    # Get all segmentations for the dropdown
+    all_segmentations = Segmentation.objects.filter(recording=recording).order_by('-created_at')
+    
     context = {
         "recording": recording,
         "segments": segments,
+        "segments_json": json.dumps(segments_json),
         "spectrogram_url": spectrogram_url,
+        "active_segmentation": segmentation_info,
+        "all_segmentations": all_segmentations,
     }
 
     return render(request, "recordings/segment_recording.html", context)
@@ -268,7 +313,7 @@ def add_segment_view(request, recording_id):
             segment = form.save(commit=False)
             segment.recording = recording
             segment.created_by = request.user
-            segment.save()
+            segment.save()  # This will automatically mark the segmentation as manually edited
             
             return JsonResponse({
                 "success": True,
@@ -278,7 +323,7 @@ def add_segment_view(request, recording_id):
                     "onset": segment.onset,
                     "offset": segment.offset,
                     "duration": segment.duration(),
-                    "call_type": segment.call_type.short_name if segment.call_type else "Unclassified"
+                    "manually_edited": True  # Indicate this segment was manually edited
                 }
             })
         else:
@@ -301,7 +346,7 @@ def edit_segment_view(request, segment_id):
     if request.method == "POST":
         form = SegmentForm(request.POST, instance=segment, recording=recording)
         if form.is_valid():
-            segment = form.save()
+            segment = form.save()  # This will automatically mark the segmentation as manually edited
             
             return JsonResponse({
                 "success": True,
@@ -311,7 +356,7 @@ def edit_segment_view(request, segment_id):
                     "onset": segment.onset,
                     "offset": segment.offset,
                     "duration": segment.duration(),
-                    "call_type": segment.call_type.short_name if segment.call_type else "Unclassified"
+                    "manually_edited": True  # Indicate this segment was manually edited
                 }
             })
         else:
@@ -460,7 +505,19 @@ def upload_pickle_segments_view(request, recording_id):
     if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
         messages.error(request, "You don't have permission to add segments to this recording.")
         return redirect("battycoda_app:recording_detail", recording_id=recording.id)
+        
+    # Check for existing segmentations (but no need to warn now that we support multiple segmentations)
+    existing_segmentations = Segmentation.objects.filter(recording=recording)
     
+    # Set up context for GET requests
+    if request.method == "GET":
+        context = {
+            "recording": recording,
+            "has_existing_segmentation": existing_segmentations.exists(),
+        }
+        return render(request, "recordings/upload_pickle.html", context)
+    
+    # Handle POST requests
     if request.method == "POST" and request.FILES.get("pickle_file"):
         pickle_file = request.FILES["pickle_file"]
         
@@ -471,6 +528,28 @@ def upload_pickle_segments_view(request, recording_id):
             # Create segments from the onset/offset pairs
             segments_created = 0
             with transaction.atomic():
+                # Mark all existing segmentations as inactive
+                Segmentation.objects.filter(recording=recording, is_active=True).update(is_active=False)
+                
+                # Create a new Segmentation entry first
+                segmentation = Segmentation.objects.create(
+                    recording=recording,
+                    name=f"Pickle Import {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    algorithm=None,  # No algorithm for manual upload
+                    status='completed',
+                    progress=100,
+                    is_active=True,
+                    manually_edited=False,
+                    created_by=request.user
+                )
+                
+                # We no longer need to delete existing segments since we support multiple segmentations
+                # Just counting for logging purposes
+                existing_count = Segment.objects.filter(recording=recording).count()
+                if existing_count > 0:
+                    logger.info(f"Recording {recording.id} already has {existing_count} segments from previous segmentations")
+                
+                # Create new segments
                 for i in range(len(onsets)):
                     try:
                         # Create segment name
@@ -479,12 +558,13 @@ def upload_pickle_segments_view(request, recording_id):
                         # Create and save the segment
                         segment = Segment(
                             recording=recording,
+                            segmentation=segmentation,  # Link to the new segmentation
                             name=segment_name,
                             onset=onsets[i],
                             offset=offsets[i],
                             created_by=request.user
                         )
-                        segment.save()
+                        segment.save(manual_edit=False)  # Don't mark as manually edited for pickle uploads
                         segments_created += 1
                     except Exception as e:
                         logger.error(f"Error creating segment {i}: {str(e)}")
@@ -521,137 +601,6 @@ def upload_pickle_segments_view(request, recording_id):
 
 
 @login_required
-def batch_upload_recordings_view(request):
-    """Handle batch upload of multiple recordings with optional pickle segmentation files"""
-    
-    # Get user profile
-    profile, created = UserProfile.objects.get_or_create(user=request.user)
-    
-    # Check if user has a group
-    if not profile.group:
-        messages.error(request, "You must be assigned to a group to upload recordings")
-        return redirect("battycoda_app:recording_list")
-    
-    if request.method == "POST":
-        form = RecordingForm(request.POST, request.FILES, user=request.user)
-        
-        # Process form for common metadata
-        if form.is_valid():
-            # Get common fields from the form but don't save yet
-            species = form.cleaned_data.get("species")
-            project = form.cleaned_data.get("project")
-            recorded_date = form.cleaned_data.get("recorded_date")
-            location = form.cleaned_data.get("location")
-            equipment = form.cleaned_data.get("equipment")
-            environmental_conditions = form.cleaned_data.get("environmental_conditions")
-            
-            # Get uploaded wav files
-            wav_files = request.FILES.getlist("wav_files")
-            
-            if not wav_files:
-                messages.error(request, "Please select at least one WAV file to upload")
-                return redirect("battycoda_app:batch_upload_recordings")
-            
-            success_count = 0
-            error_count = 0
-            segmented_count = 0
-            
-            # Process each WAV file
-            for wav_file in wav_files:
-                try:
-                    with transaction.atomic():
-                        # Create a Recording object for this file
-                        file_name = Path(wav_file.name).stem  # Get file name without extension
-                        recording = Recording(
-                            name=file_name,  # Use file name as recording name
-                            description=form.cleaned_data.get("description"),
-                            wav_file=wav_file,
-                            recorded_date=recorded_date,
-                            location=location,
-                            equipment=equipment,
-                            environmental_conditions=environmental_conditions,
-                            species=species,
-                            project=project,
-                            group=profile.group,
-                            created_by=request.user
-                        )
-                        
-                        # Save the recording
-                        recording.save()
-                        
-                        # Check if there's a matching pickle file in the uploaded files
-                        pickle_filename = f"{wav_file.name}.pickle"
-                        pickle_file = None
-                        
-                        for uploaded_file in request.FILES.getlist("pickle_files"):
-                            if uploaded_file.name == pickle_filename:
-                                pickle_file = uploaded_file
-                                break
-                        
-                        # Process pickle file if found
-                        if pickle_file:
-                            try:
-                                # Process the pickle file
-                                onsets, offsets = process_pickle_file(pickle_file)
-                                
-                                # Create segments from the onset/offset pairs
-                                segments_created = 0
-                                for i in range(len(onsets)):
-                                    try:
-                                        # Create segment name
-                                        segment_name = f"Segment {i+1}"
-                                        
-                                        # Create and save the segment
-                                        segment = Segment(
-                                            recording=recording,
-                                            name=segment_name,
-                                            onset=onsets[i],
-                                            offset=offsets[i],
-                                            created_by=request.user
-                                        )
-                                        segment.save()
-                                        segments_created += 1
-                                    except Exception as e:
-                                        logger.error(f"Error creating segment {i} for {recording.name}: {str(e)}")
-                                
-                                if segments_created > 0:
-                                    segmented_count += 1
-                                    logger.info(f"Created {segments_created} segments for recording {recording.name}")
-                            except Exception as e:
-                                logger.error(f"Error processing pickle file for {recording.name}: {str(e)}")
-                                logger.error(traceback.format_exc())
-                        
-                        success_count += 1
-                except Exception as e:
-                    logger.error(f"Error creating recording from {wav_file.name}: {str(e)}")
-                    logger.error(traceback.format_exc())
-                    error_count += 1
-            
-            # Success message
-            if success_count > 0:
-                success_msg = f"Successfully uploaded {success_count} recordings"
-                if segmented_count > 0:
-                    success_msg += f" with {segmented_count} segmented automatically from pickle files"
-                messages.success(request, success_msg)
-            
-            # Error message
-            if error_count > 0:
-                messages.error(request, f"Failed to upload {error_count} recordings. See logs for details.")
-            
-            # Redirect to the recordings list
-            return redirect("battycoda_app:recording_list")
-    else:
-        # GET request - display the form
-        form = RecordingForm(user=request.user)
-    
-    context = {
-        "form": form,
-    }
-    
-    return render(request, "recordings/batch_upload_recordings.html", context)
-
-
-@login_required
 def get_audio_waveform_data(request, recording_id):
     """Get waveform data for a recording in JSON format"""
     recording = get_object_or_404(Recording, id=recording_id)
@@ -673,15 +622,46 @@ def get_audio_waveform_data(request, recording_id):
         if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
             audio_data = np.mean(audio_data, axis=1)
         
-        # Resample to reduce data size (target ~1000-2000 points for visualization)
-        target_points = 2000
-        if len(audio_data) > target_points:
-            # Resample using scipy for better quality
-            resampled_data = signal.resample(audio_data, target_points)
+        # Get the actual length of audio data
+        original_length = len(audio_data)
+        logger.info(f"Original audio length: {original_length} samples")
+        
+        # Resample to get adequate detail for visualization (increased for better detail)
+        target_points = 8000  # Increased from 2000 for more detail
+        
+        # Make sure we're processing the entire file
+        if original_length > target_points:
+            # For each pixel in the waveform, find min and max to capture the waveform envelope
+            min_max_data = []
+            samples_per_point = original_length // (target_points // 2)  # We need 2 points (min & max) per pixel
+            
+            for i in range(0, original_length, samples_per_point):
+                chunk = audio_data[i:min(i + samples_per_point, original_length)]
+                if len(chunk) > 0:
+                    # Find min and max to preserve the waveform shape
+                    chunk_min = np.min(chunk)
+                    chunk_max = np.max(chunk)
+                    # Add both min and max to represent the waveform envelope
+                    min_max_data.append(chunk_min)
+                    min_max_data.append(chunk_max)
+            
+            # Ensure we have exactly target_points
+            if len(min_max_data) > target_points:
+                min_max_data = min_max_data[:target_points]
+            elif len(min_max_data) < target_points:
+                # Pad with zeros if needed
+                min_max_data.extend([0] * (target_points - len(min_max_data)))
+            
+            resampled_data = np.array(min_max_data)
         else:
+            # For shorter files, use the original data
             resampled_data = audio_data
             
-        # Convert to list and normalize between -1 and 1
+            # For very short files, interpolate to have enough points
+            if len(resampled_data) < 1000:
+                resampled_data = signal.resample(resampled_data, max(1000, len(resampled_data)*2))
+        
+        # Normalize between -1 and 1 for waveform visualization
         max_val = np.max(np.abs(resampled_data))
         if max_val > 0:
             normalized_data = resampled_data / max_val
@@ -757,33 +737,73 @@ def auto_segment_recording_view(request, recording_id, algorithm_id=None):
     
     # Get the selected algorithm
     if algorithm_id:
-        algorithm = get_object_or_404(SegmentationAlgorithm, id=algorithm_id, is_active=True)
+        # Use filter().first() instead of get() to avoid MultipleObjectsReturned error
+        try:
+            logger.info(f"GET: Auto-segment with algorithm_id={algorithm_id}, type={type(algorithm_id)}")
+            algorithm = SegmentationAlgorithm.objects.filter(id=int(algorithm_id), is_active=True).first()
+            if not algorithm:
+                # Fallback to the first algorithm if specified one not found
+                algorithm = algorithms.first()
+                logger.warning(f"Algorithm with ID {algorithm_id} not found, using first available: {algorithm.id} - {algorithm.name}")
+            else:
+                logger.info(f"Selected algorithm: {algorithm.id} - {algorithm.name}")
+        except Exception as e:
+            logger.error(f"Error getting algorithm by ID: {str(e)}")
+            algorithm = algorithms.first()
     else:
         # Use the first available algorithm (usually Standard Threshold)
         algorithm = algorithms.first()
+        if algorithm:
+            logger.info(f"Using default algorithm: {algorithm.id} - {algorithm.name}")
+    
+    # Check for existing segmentations, but we no longer need to warn since we support multiple segmentations
+    try:
+        # Get the count of existing segmentations for information purposes
+        existing_segmentations_count = Segmentation.objects.filter(recording=recording).count()
+        existing_segmentation = None
+    except Exception:
+        existing_segmentations_count = 0
+        existing_segmentation = None
     
     if request.method == "POST":
+        # Log the POST data for debugging
+        logger.info(f"POST data: {dict(request.POST.items())}")
+        
         # Get parameters from request
-        algorithm_id = request.POST.get("algorithm", algorithm.id if algorithm else None)
+        algorithm_id = request.POST.get("algorithm")
+        logger.info(f"Algorithm ID from POST: {algorithm_id!r}")
         min_duration_ms = request.POST.get("min_duration_ms", 10)
         smooth_window = request.POST.get("smooth_window", 3)
         threshold_factor = request.POST.get("threshold_factor", 0.5)
         
-        # Get the algorithm
+        # Get the algorithm by ID if specified
         if algorithm_id:
-            algorithm = get_object_or_404(SegmentationAlgorithm, id=algorithm_id, is_active=True)
+            try:
+                # Debug logs
+                logger.info(f"Auto-segment with algorithm_id={algorithm_id}, type={type(algorithm_id)}")
+                # Use filter().first() instead of get() to avoid MultipleObjectsReturned error
+                algorithm = SegmentationAlgorithm.objects.filter(id=int(algorithm_id), is_active=True).first()
+                if not algorithm:
+                    messages.error(request, f"Segmentation algorithm with ID {algorithm_id} not found.")
+                    return redirect("battycoda_app:auto_segment_recording", recording_id=recording_id)
+                logger.info(f"Selected algorithm: {algorithm.id} - {algorithm.name}")
+            except Exception as e:
+                logger.error(f"Error getting algorithm: {str(e)}")
+                messages.error(request, f"Error selecting algorithm: {str(e)}")
+                return redirect("battycoda_app:auto_segment_recording", recording_id=recording_id)
             
             # Check if user has access to this algorithm
             if algorithm.group and (not profile.group or algorithm.group != profile.group):
                 messages.error(request, "You don't have permission to use this algorithm.")
                 return redirect("battycoda_app:auto_segment_recording", recording_id=recording_id)
         else:
-            # No algorithm selected, use default
+            # No algorithm selected - select the first algorithm as default
             algorithm = algorithms.first()
-            
-            if not algorithm:
-                messages.error(request, "No segmentation algorithms available.")
-                return redirect("battycoda_app:segment_recording", recording_id=recording_id)
+            if algorithm:
+                logger.info(f"No algorithm explicitly selected, defaulting to: {algorithm.id} - {algorithm.name}")
+            else:
+                messages.error(request, "No segmentation algorithm was selected and no default algorithm is available.")
+                return redirect("battycoda_app:auto_segment_recording", recording_id=recording_id)
         
         # Convert to appropriate types
         try:
@@ -806,44 +826,47 @@ def auto_segment_recording_view(request, recording_id, algorithm_id=None):
         try:
             from celery import current_app
 
-            # Launch Celery task
+            # Check if debug visualization is requested
+            debug_visualization = request.POST.get("debug_visualization", False) == "on"
+            
+            # Launch Celery task with debug visualization if requested
             task = current_app.send_task(
                 algorithm.celery_task,
-                args=[recording.id, min_duration_ms, smooth_window, threshold_factor]
+                args=[recording.id, min_duration_ms, smooth_window, threshold_factor, debug_visualization]
             )
             
             # Store task ID in session for status checking
             request.session[f"auto_segment_task_{recording_id}"] = task.id
             
-            # Create or update a Segmentation entry to track this job
-            segmentation, created = Segmentation.objects.get_or_create(
-                recording=recording,
-                defaults={
-                    'created_by': request.user
-                }
-            )
-            
-            # Update the segmentation
-            segmentation.algorithm = algorithm
-            segmentation.task_id = task.id
-            segmentation.status = 'in_progress'
-            segmentation.progress = 0
-            segmentation.save()
+            # Delete any existing segments for this recording
+            with transaction.atomic():
+                # Delete existing segments
+                existing_count = Segment.objects.filter(recording=recording).count()
+                if existing_count > 0:
+                    logger.info(f"Deleting {existing_count} existing segments for recording {recording.id}")
+                    Segment.objects.filter(recording=recording).delete()
+                
+                # Mark all existing segmentations as inactive
+                Segmentation.objects.filter(recording=recording, is_active=True).update(is_active=False)
+                
+                # Create a new Segmentation entry to track this job
+                segmentation = Segmentation.objects.create(
+                    recording=recording,
+                    name=f"{algorithm.name} {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    created_by=request.user,
+                    algorithm=algorithm,
+                    task_id=task.id,
+                    status='in_progress',
+                    progress=0,
+                    is_active=True,
+                    manually_edited=False
+                )
             
             # Set success message
             messages.success(request, f"Automated segmentation started using {algorithm.name}. This may take a few moments to complete.")
-            
-            # Handle AJAX requests
-            if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse({
-                    "success": True, 
-                    "message": f"Automated segmentation task started using {algorithm.name}",
-                    "task_id": task.id,
-                    "segmentation_id": segmentation.id
-                })
                 
-            # Redirect to segment view
-            return redirect("battycoda_app:segment_recording", recording_id=recording_id)
+            # Redirect to segmentation batch overview
+            return redirect("battycoda_app:batch_segmentation")
             
         except Exception as e:
             logger.error(f"Error starting auto segmentation task: {str(e)}")
@@ -851,13 +874,9 @@ def auto_segment_recording_view(request, recording_id, algorithm_id=None):
             
             # Set error message
             messages.error(request, f"Error starting segmentation: {str(e)}")
-            
-            # Handle AJAX requests
-            if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse({"success": False, "error": str(e)})
                 
-            # Redirect to segment view
-            return redirect("battycoda_app:segment_recording", recording_id=recording_id)
+            # Redirect back to the auto segment form
+            return redirect("battycoda_app:auto_segment_recording", recording_id=recording_id)
     
     # GET request - display form for configuring segmentation or return JSON if AJAX
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -884,6 +903,7 @@ def auto_segment_recording_view(request, recording_id, algorithm_id=None):
         "min_duration_ms": algorithm.default_min_duration_ms if algorithm else 10,
         "smooth_window": algorithm.default_smooth_window if algorithm else 3,
         "threshold_factor": algorithm.default_threshold_factor if algorithm else 0.5,
+        "existing_segmentation": existing_segmentation,
     }
     
     return render(request, "recordings/auto_segment.html", context)
@@ -944,13 +964,20 @@ def auto_segment_status_view(request, recording_id):
                     if f"auto_segment_task_{recording_id}" in request.session:
                         del request.session[f"auto_segment_task_{recording_id}"]
                     
-                    return JsonResponse({
+                    # Prepare response with basic information
+                    response_data = {
                         "success": True,
                         "status": "completed",
                         "message": message,
                         "segments_created": segments_created,
                         "result": task_result
-                    })
+                    }
+                    
+                    # Add debug visualization info if available
+                    if task_result.get("debug_visualization"):
+                        response_data["debug_visualization"] = task_result["debug_visualization"]
+                        
+                    return JsonResponse(response_data)
                 else:
                     # Task returned error status
                     error_message = task_result.get("message", "Unknown error in segmentation task")
@@ -1188,10 +1215,12 @@ def segmentation_jobs_status_view(request):
         # Count segments
         segments_count = segmentation.recording.segments.count()
         
+        # Basic job information
         formatted_job = {
             'id': segmentation.id,
             'recording_id': segmentation.recording.id,
             'recording_name': segmentation.recording.name,
+            'name': segmentation.name,
             'status': segmentation.status,
             'progress': segmentation.progress,
             'start_time': segmentation.created_at.strftime('%Y-%m-%d %H:%M:%S'),
@@ -1201,7 +1230,61 @@ def segmentation_jobs_status_view(request):
             'view_url': reverse('battycoda_app:segment_recording', kwargs={'recording_id': segmentation.recording.id}),
             'retry_url': reverse('battycoda_app:auto_segment_recording', kwargs={'recording_id': segmentation.recording.id}),
             'is_processing': segmentation.is_processing,
+            'manually_edited': segmentation.manually_edited,
+            'is_active': segmentation.is_active,
         }
+        
+        # Check for debug visualization
+        debug_path = os.path.join(settings.MEDIA_ROOT, 'segmentation_debug')
+        if os.path.exists(debug_path):
+            # Look for debug images associated with this recording
+            debug_pattern = f"segmentation_debug_{segmentation.recording.id}_*.png"
+            debug_files = []
+            for file in os.listdir(debug_path):
+                if fnmatch.fnmatch(file, debug_pattern):
+                    debug_files.append(file)
+            
+            # Sort by newest first (based on filename timestamp)
+            debug_files.sort(reverse=True)
+            
+            # If we found any debug visualizations, add the URL to the most recent one
+            if debug_files:
+                formatted_job['debug_visualization'] = {
+                    'url': f"/media/segmentation_debug/{debug_files[0]}"
+                }
+        
         formatted_jobs.append(formatted_job)
     
     return JsonResponse({'success': True, 'jobs': formatted_jobs})
+
+
+@login_required
+def activate_segmentation_view(request, segmentation_id):
+    """Activate a segmentation and deactivate all others for the same recording"""
+    # Get the segmentation to activate
+    segmentation = get_object_or_404(Segmentation, id=segmentation_id)
+    recording = segmentation.recording
+    
+    # Check if the user has permission to edit this recording
+    profile = request.user.profile
+    if recording.created_by != request.user and (not profile.group or recording.group != profile.group):
+        messages.error(request, "You don't have permission to modify segmentations for this recording.")
+        return redirect("battycoda_app:recording_list")
+    
+    # Deactivate all segmentations for this recording
+    Segmentation.objects.filter(recording=recording).update(is_active=False)
+    
+    # Activate the requested segmentation
+    segmentation.is_active = True
+    segmentation.save()
+    
+    # Handle AJAX requests
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "success": True,
+            "message": f"Activated segmentation: {segmentation.name}"
+        })
+    
+    # Redirect back to the recording's segmentation view
+    messages.success(request, f"Activated segmentation: {segmentation.name}")
+    return redirect("battycoda_app:segment_recording", recording_id=recording.id)

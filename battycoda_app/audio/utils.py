@@ -270,6 +270,196 @@ def normal_hwin():
     return (8, 8)
 
 
+def get_spectrogram_ticks(task, sample_rate=None, normal_window_size=None, overview_window_size=None):
+    """Generate tick mark data for spectrograms.
+    
+    Args:
+        task: Task model instance containing onset and offset
+        sample_rate: Sample rate of the recording in Hz (optional)
+        normal_window_size: Tuple of (pre_window, post_window) in milliseconds for detail view
+        overview_window_size: Tuple of (pre_window, post_window) in milliseconds for overview
+        
+    Returns:
+        dict: Dictionary containing x and y tick data for both detail and overview views
+    """
+    # Use default window sizes if not provided
+    if normal_window_size is None:
+        normal_window_size = normal_hwin()
+    if overview_window_size is None:
+        overview_window_size = overview_hwin()
+    
+    # Calculate call duration in milliseconds
+    call_duration_ms = (task.offset - task.onset) * 1000
+    
+    # Detail view x-axis positions (percentages)
+    detail_left_pos = 0
+    detail_zero_pos = 50
+    detail_call_end_pos = 75
+    detail_right_pos = 100
+    
+    # Overview x-axis positions (percentages)
+    overview_left_pos = 0
+    overview_zero_pos = 30
+    overview_call_end_pos = 60
+    overview_right_pos = 100
+    
+    # Generate x-axis ticks data for detail view
+    # First set up the major ticks
+    x_ticks_detail = [
+        {
+            "id": "left-tick-detail",
+            "position": detail_left_pos,
+            "value": f"-{normal_window_size[0]:.1f} ms",
+            "type": "major"
+        },
+        {
+            "id": "zero-tick-detail",
+            "position": detail_zero_pos,
+            "value": "0.0 ms",
+            "type": "major"
+        },
+        {
+            "id": "call-end-tick-detail",
+            "position": detail_call_end_pos,
+            "value": f"{call_duration_ms:.1f} ms",
+            "type": "major"
+        },
+        {
+            "id": "right-tick-detail",
+            "position": detail_right_pos,
+            "value": f"+{normal_window_size[1]:.1f} ms",
+            "type": "major"
+        }
+    ]
+    
+    # Add intermediate minor ticks
+    # Between left and zero
+    if detail_left_pos < detail_zero_pos:
+        x_ticks_detail.append({
+            "id": "minor-left-zero-detail",
+            "position": (detail_left_pos + detail_zero_pos) / 2,
+            "value": "",
+            "type": "minor"
+        })
+    
+    # Between zero and call-end
+    if detail_zero_pos < detail_call_end_pos:
+        x_ticks_detail.append({
+            "id": "minor-zero-callend-detail",
+            "position": (detail_zero_pos + detail_call_end_pos) / 2,
+            "value": "",
+            "type": "minor"
+        })
+    
+    # Between call-end and right
+    if detail_call_end_pos < detail_right_pos:
+        x_ticks_detail.append({
+            "id": "minor-callend-right-detail",
+            "position": (detail_call_end_pos + detail_right_pos) / 2,
+            "value": "",
+            "type": "minor"
+        })
+    
+    # Generate x-axis ticks data for overview
+    x_ticks_overview = [
+        {
+            "id": "left-tick-overview",
+            "position": overview_left_pos,
+            "value": f"-{overview_window_size[0]:.1f} ms",
+            "type": "major"
+        },
+        {
+            "id": "zero-tick-overview",
+            "position": overview_zero_pos,
+            "value": "0.0 ms",
+            "type": "major"
+        },
+        {
+            "id": "call-end-tick-overview",
+            "position": overview_call_end_pos,
+            "value": f"{call_duration_ms:.1f} ms",
+            "type": "major"
+        },
+        {
+            "id": "right-tick-overview",
+            "position": overview_right_pos,
+            "value": f"+{overview_window_size[1]:.1f} ms",
+            "type": "major"
+        }
+    ]
+    
+    # Add intermediate minor ticks for overview
+    # Between left and zero
+    if overview_left_pos < overview_zero_pos:
+        x_ticks_overview.append({
+            "id": "minor-left-zero-overview",
+            "position": (overview_left_pos + overview_zero_pos) / 2,
+            "value": "",
+            "type": "minor"
+        })
+    
+    # Between zero and call-end
+    if overview_zero_pos < overview_call_end_pos:
+        x_ticks_overview.append({
+            "id": "minor-zero-callend-overview",
+            "position": (overview_zero_pos + overview_call_end_pos) / 2,
+            "value": "",
+            "type": "minor"
+        })
+    
+    # Between call-end and right
+    if overview_call_end_pos < overview_right_pos:
+        x_ticks_overview.append({
+            "id": "minor-callend-right-overview",
+            "position": (overview_call_end_pos + overview_right_pos) / 2,
+            "value": "",
+            "type": "minor"
+        })
+    
+    # Generate y-axis ticks for frequency
+    if not sample_rate:
+        raise ValueError("Sample rate is required for spectrogram ticks")
+        
+    # Nyquist frequency (maximum possible frequency in the recording) is half the sample rate
+    max_freq = sample_rate / 2 / 1000  # Convert to kHz
+    
+    # Increase the number of ticks for more granularity
+    num_ticks = 11  # 0%, 10%, 20%, ..., 100%
+    y_ticks = []
+    
+    # Generate main ticks
+    for i in range(num_ticks):
+        position = i * (100 / (num_ticks - 1))  # Positions from 0% to 100%
+        value = max_freq - (max_freq * position / 100)  # Values from max_freq to 0 kHz
+        
+        # Add the tick with a size class for styling
+        y_ticks.append({
+            "position": position,
+            "value": int(value),  # Integer values for cleaner display
+            "type": "major"  # Mark as major tick for styling
+        })
+        
+    # Add intermediate minor ticks between major ticks for extra precision
+    if num_ticks > 2:  # Only add minor ticks if we have enough space
+        for i in range(num_ticks - 1):
+            # Calculate position halfway between major ticks
+            position = (i * (100 / (num_ticks - 1))) + ((100 / (num_ticks - 1)) / 2)
+            value = max_freq - (max_freq * position / 100)
+            
+            # Add minor tick (without displaying the value)
+            y_ticks.append({
+                "position": position,
+                "value": "",  # No value displayed for minor ticks
+                "type": "minor"  # Mark as minor tick for styling
+            })
+    
+    return {
+        "x_ticks_detail": x_ticks_detail,
+        "x_ticks_overview": x_ticks_overview, 
+        "y_ticks": y_ticks
+    }
+
+
 def process_pickle_file(pickle_file):
     """Process a pickle file that contains onset and offset data.
     
@@ -335,7 +525,7 @@ def process_pickle_file(pickle_file):
         raise
 
 
-def auto_segment_audio(audio_path, min_duration_ms=10, smooth_window=3, threshold_factor=0.5):
+def auto_segment_audio(audio_path, min_duration_ms=10, smooth_window=3, threshold_factor=0.5, debug_visualization=False):
     """
     Automatically segment audio using the following steps:
     1. Take absolute value of the signal
@@ -348,12 +538,21 @@ def auto_segment_audio(audio_path, min_duration_ms=10, smooth_window=3, threshol
         min_duration_ms: Minimum segment duration in milliseconds
         smooth_window: Window size for smoothing filter
         threshold_factor: Threshold factor (between 0-1) to apply
+        debug_visualization: If True, generates a visualization of the segmentation process
         
     Returns:
-        tuple: (onsets, offsets) as lists of floats in seconds
+        tuple: (onsets, offsets, [debug_path]) as lists of floats in seconds and optional debug image path
     """
     try:
         import soundfile as sf
+
+        # Import visualization libraries if debug_visualization is enabled
+        if debug_visualization:
+            import matplotlib
+            matplotlib.use('Agg')  # Use non-interactive backend
+            import matplotlib.pyplot as plt
+            import tempfile
+            import os
 
         # Load the audio file
         audio_data, sample_rate = sf.read(audio_path)
@@ -430,9 +629,296 @@ def auto_segment_audio(audio_path, min_duration_ms=10, smooth_window=3, threshol
         logger.info(f"Automated segmentation found {len(onsets)} potential segments")
         logger.info(f"After minimum duration filtering: {len(filtered_onsets)} segments")
         
+        # Generate debug visualization if requested
+        if debug_visualization:
+            debug_path = None
+            try:
+                # Create a figure with multiple subplots
+                fig, axes = plt.subplots(4, 1, figsize=(15, 12), sharex=True)
+                
+                # Time axis in seconds
+                time_axis = np.arange(len(audio_data)) / sample_rate
+                
+                # 1. Plot the original signal
+                axes[0].plot(time_axis, audio_data)
+                axes[0].set_title('Original Signal')
+                axes[0].set_ylabel('Amplitude')
+                
+                # 2. Plot the absolute signal
+                axes[1].plot(time_axis, abs_signal)
+                axes[1].set_title('Absolute Signal')
+                axes[1].set_ylabel('Amplitude')
+                
+                # 3. Plot the smoothed signal with threshold
+                axes[2].plot(time_axis, smoothed_signal)
+                axes[2].axhline(y=threshold, color='r', linestyle='--', label=f'Threshold: {threshold:.6f}')
+                axes[2].set_title(f'Smoothed Signal (window={smooth_window}) with Threshold (factor={threshold_factor})')
+                axes[2].set_ylabel('Amplitude')
+                axes[2].legend()
+                
+                # 4. Plot the binary mask with detected segments
+                # Make sure binary_mask and time_axis have the same length for plotting
+                if len(binary_mask) != len(time_axis):
+                    logger.info(f"Fixing binary mask length for threshold plot: {len(binary_mask)} vs {len(time_axis)}")
+                    if len(binary_mask) < len(time_axis):
+                        # Pad binary mask if it's too short
+                        padding = np.zeros(len(time_axis) - len(binary_mask))
+                        binary_mask_plot = np.concatenate([binary_mask, padding])
+                    else:
+                        # Truncate binary mask if it's too long
+                        binary_mask_plot = binary_mask[:len(time_axis)]
+                else:
+                    binary_mask_plot = binary_mask
+                    
+                axes[3].plot(time_axis, binary_mask_plot, label='Binary mask')
+                
+                # Add vertical lines for onsets (green) and offsets (red)
+                for onset in filtered_onsets:
+                    axes[3].axvline(x=onset, color='g', linestyle='--')
+                    
+                for offset in filtered_offsets:
+                    axes[3].axvline(x=offset, color='r', linestyle='-.')
+                    
+                # Marking segments that were filtered out (too short)
+                for i in range(len(onsets)):
+                    if i not in valid_segments:
+                        # Draw a light red box over rejected segments
+                        axes[3].axvspan(onsets[i], offsets[i], alpha=0.2, color='red')
+                
+                axes[3].set_title(f'Binary Mask with Detected Segments (min duration={min_duration_ms}ms)')
+                axes[3].set_xlabel('Time (s)')
+                axes[3].set_ylabel('State (0/1)')
+                
+                # Adjust layout
+                plt.tight_layout()
+                
+                # Save to a temporary file
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                    debug_path = tmp_file.name
+                    plt.savefig(debug_path, dpi=100)
+                    plt.close()
+                
+                # Log the debug file location
+                logger.info(f"Created segmentation debug visualization at {debug_path}")
+                
+            except Exception as viz_error:
+                logger.error(f"Error creating debug visualization: {str(viz_error)}")
+                logger.error(traceback.format_exc())
+                # If there's an error with visualization, still return the segments
+            
+            return filtered_onsets, filtered_offsets, debug_path
+        
+        # Return without visualization path if debug_visualization is False
         return filtered_onsets, filtered_offsets
         
     except Exception as e:
         logger.error(f"Error in auto_segment_audio: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
+
+
+def energy_based_segment_audio(audio_path, min_duration_ms=10, smooth_window=3, threshold_factor=0.5, debug_visualization=False):
+    """
+    Segment audio based on energy levels using the following steps:
+    1. Calculate the short-time energy of the signal
+    2. Smooth the energy curve
+    3. Apply an adaptive threshold based on the energy statistics
+    4. Reject markings shorter than the minimum duration
+    
+    Args:
+        audio_path: Path to the audio file
+        min_duration_ms: Minimum segment duration in milliseconds
+        smooth_window: Window size for smoothing filter
+        threshold_factor: Threshold factor (between 0-1) to apply to energy detection
+        debug_visualization: If True, generates a visualization of the segmentation process
+        
+    Returns:
+        tuple: (onsets, offsets, [debug_path]) as lists of floats in seconds and optional debug image path
+    """
+    try:
+        import soundfile as sf
+
+        # Import visualization libraries if debug_visualization is enabled
+        if debug_visualization:
+            import matplotlib
+            matplotlib.use('Agg')  # Use non-interactive backend
+            import matplotlib.pyplot as plt
+            import tempfile
+            import os
+
+        # Load the audio file
+        audio_data, sample_rate = sf.read(audio_path)
+        logger.info(f"Loaded audio file for energy-based segmentation: {audio_path}")
+        logger.info(f"Audio shape: {audio_data.shape}, sample rate: {sample_rate}")
+        
+        # For stereo files, use the first channel for detection
+        if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+            audio_data = audio_data[:, 0]
+            logger.info(f"Using first channel from stereo recording for detection")
+        
+        # Step 1: Calculate short-time energy
+        # Set the frame size for energy calculation (adjust based on expected call frequency)
+        frame_size = int(0.01 * sample_rate)  # 10ms frames
+        energy = np.zeros(len(audio_data) // frame_size)
+        
+        for i in range(len(energy)):
+            # Calculate energy for each frame
+            start = i * frame_size
+            end = min(start + frame_size, len(audio_data))
+            frame = audio_data[start:end]
+            # Energy is sum of squared amplitudes
+            energy[i] = np.sum(frame ** 2) / len(frame)
+        
+        # Interpolate energy back to signal length for easier visualization
+        energy_full = np.interp(
+            np.linspace(0, len(energy), len(audio_data)), 
+            np.arange(len(energy)), 
+            energy
+        )
+        
+        # Step 2: Smooth the energy curve with a moving average filter
+        if smooth_window > 1:
+            kernel = np.ones(smooth_window) / smooth_window
+            smoothed_energy = np.convolve(energy_full, kernel, mode='same')
+        else:
+            smoothed_energy = energy_full
+        
+        # Step 3: Apply threshold 
+        # Calculate adaptive threshold based on the energy statistics
+        energy_mean = np.mean(smoothed_energy)
+        energy_std = np.std(smoothed_energy)
+        threshold = energy_mean + (threshold_factor * energy_std)
+        
+        logger.info(f"Energy segmentation thresholds - Mean: {energy_mean:.6f}, Std: {energy_std:.6f}, Threshold: {threshold:.6f}")
+        
+        # Create binary mask where energy exceeds threshold
+        binary_mask = smoothed_energy > threshold
+        
+        # Find transitions in the binary mask (0->1 and 1->0)
+        transitions = np.diff(binary_mask.astype(int))
+        onset_samples = np.where(transitions == 1)[0] + 1  # +1 because diff reduces length by 1
+        offset_samples = np.where(transitions == -1)[0] + 1
+        
+        # Handle edge cases
+        if binary_mask[0]:
+            # Signal starts above threshold, insert onset at sample 0
+            onset_samples = np.insert(onset_samples, 0, 0)
+            
+        if binary_mask[-1]:
+            # Signal ends above threshold, append offset at the last sample
+            offset_samples = np.append(offset_samples, len(binary_mask) - 1)
+        
+        # Ensure we have the same number of onsets and offsets
+        if len(onset_samples) > len(offset_samples):
+            # More onsets than offsets - trim extra onsets
+            onset_samples = onset_samples[:len(offset_samples)]
+        elif len(offset_samples) > len(onset_samples):
+            # More offsets than onsets - trim extra offsets
+            offset_samples = offset_samples[:len(onset_samples)]
+            
+        # Convert sample indices to time in seconds
+        onsets = onset_samples / sample_rate
+        offsets = offset_samples / sample_rate
+        
+        # Step 4: Reject segments shorter than the minimum duration
+        min_samples = int((min_duration_ms / 1000) * sample_rate)
+        valid_segments = []
+        
+        for i in range(len(onsets)):
+            duration_samples = offset_samples[i] - onset_samples[i]
+            if duration_samples >= min_samples:
+                valid_segments.append(i)
+        
+        # Filter onsets and offsets to only include valid segments
+        filtered_onsets = [onsets[i] for i in valid_segments]
+        filtered_offsets = [offsets[i] for i in valid_segments]
+        
+        logger.info(f"Energy-based segmentation found {len(onsets)} potential segments")
+        logger.info(f"After minimum duration filtering: {len(filtered_onsets)} segments")
+        
+        # Generate debug visualization if requested
+        if debug_visualization:
+            debug_path = None
+            try:
+                # Create a figure with multiple subplots
+                fig, axes = plt.subplots(4, 1, figsize=(15, 12), sharex=True)
+                
+                # Time axis in seconds
+                time_axis = np.arange(len(audio_data)) / sample_rate
+                
+                # 1. Plot the original signal
+                axes[0].plot(time_axis, audio_data)
+                axes[0].set_title('Original Signal')
+                axes[0].set_ylabel('Amplitude')
+                
+                # 2. Plot the energy curve
+                axes[1].plot(time_axis, energy_full)
+                axes[1].set_title('Energy')
+                axes[1].set_ylabel('Energy')
+                
+                # 3. Plot the smoothed energy with threshold
+                axes[2].plot(time_axis, smoothed_energy)
+                axes[2].axhline(y=threshold, color='r', linestyle='--', label=f'Threshold: {threshold:.6f}')
+                axes[2].set_title(f'Smoothed Energy (window={smooth_window}) with Threshold (factor={threshold_factor})')
+                axes[2].set_ylabel('Energy')
+                axes[2].legend()
+                
+                # 4. Plot the binary mask with detected segments
+                # Make sure binary_mask and time_axis have the same length for plotting
+                if len(binary_mask) != len(time_axis):
+                    logger.info(f"Fixing binary mask length for energy plot: {len(binary_mask)} vs {len(time_axis)}")
+                    if len(binary_mask) < len(time_axis):
+                        # Pad binary mask if it's too short
+                        padding = np.zeros(len(time_axis) - len(binary_mask))
+                        binary_mask_plot = np.concatenate([binary_mask, padding])
+                    else:
+                        # Truncate binary mask if it's too long
+                        binary_mask_plot = binary_mask[:len(time_axis)]
+                else:
+                    binary_mask_plot = binary_mask
+                    
+                axes[3].plot(time_axis, binary_mask_plot, label='Binary mask')
+                
+                # Add vertical lines for onsets (green) and offsets (red)
+                for onset in filtered_onsets:
+                    axes[3].axvline(x=onset, color='g', linestyle='--')
+                    
+                for offset in filtered_offsets:
+                    axes[3].axvline(x=offset, color='r', linestyle='-.')
+                    
+                # Marking segments that were filtered out (too short)
+                for i in range(len(onsets)):
+                    if i not in valid_segments:
+                        # Draw a light red box over rejected segments
+                        axes[3].axvspan(onsets[i], offsets[i], alpha=0.2, color='red')
+                
+                axes[3].set_title(f'Binary Mask with Detected Segments (min duration={min_duration_ms}ms)')
+                axes[3].set_xlabel('Time (s)')
+                axes[3].set_ylabel('State (0/1)')
+                
+                # Adjust layout
+                plt.tight_layout()
+                
+                # Save to a temporary file
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                    debug_path = tmp_file.name
+                    plt.savefig(debug_path, dpi=100)
+                    plt.close()
+                
+                # Log the debug file location
+                logger.info(f"Created energy segmentation debug visualization at {debug_path}")
+                
+            except Exception as viz_error:
+                logger.error(f"Error creating debug visualization: {str(viz_error)}")
+                logger.error(traceback.format_exc())
+                # If there's an error with visualization, still return the segments
+            
+            return filtered_onsets, filtered_offsets, debug_path
+        
+        # Return without visualization path if debug_visualization is False
+        return filtered_onsets, filtered_offsets
+        
+    except Exception as e:
+        logger.error(f"Error in energy_based_segment_audio: {str(e)}")
         logger.error(traceback.format_exc())
         raise

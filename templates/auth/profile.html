@@ -18,6 +18,7 @@
             <p><strong>Email:</strong> {{ user.email }}</p>
             <p><strong>Last Login:</strong> {{ user.last_login }}</p>
             <p><strong>Account Created:</strong> {{ user.date_joined }}</p>
+            <p><strong>Theme:</strong> {% if user.profile.theme == 'default' %}Default (Red){% elif user.profile.theme == 'blue' %}Blue/Green{% else %}{{ user.profile.theme|title }}{% endif %}</p>
         </div>
     </div>
     

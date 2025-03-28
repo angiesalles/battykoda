@@ -9,6 +9,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
     <link href="{% static 'css/main.css' %}" rel="stylesheet">
+    <link href="{% static 'css/themes.css' %}" rel="stylesheet">
     <style>
         /* Custom styles for Bootstrap */
         .btn-success {
@@ -32,10 +33,15 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 12px rgba(0,0,0,0.3);
         }
+        
+        /* Fix for browser tab title color */
+        title {
+            color: black !important;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body {% if user.is_authenticated %}class="theme-{{ user.profile.theme|default:'default' }}"{% endif %}>
 <div class="header">
     <h1>BattyCoda</h1>
     <p>Animal Vocalization Analysis Tool</p>

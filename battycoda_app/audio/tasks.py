@@ -228,13 +228,13 @@ def generate_recording_spectrogram(self, recording_id):
 @shared_task(bind=True, name="battycoda_app.audio.tasks.run_call_detection")
 def run_call_detection(self, detection_run_id):
     """
-    Run automated call detection on a batch using the configured classifier.
+    Run automated call classification on segments using the configured classifier.
     
     Args:
         detection_run_id: ID of the DetectionRun model
         
     Returns:
-        dict: Result of the detection process
+        dict: Result of the classification process
     """
     import json
     import os
@@ -247,9 +247,9 @@ def run_call_detection(self, detection_run_id):
     import numpy as np
     import requests
 
-    from ..models import Call, CallProbability, Classifier, DetectionResult, DetectionRun, Task
+    from ..models import Call, CallProbability, Classifier, DetectionResult, DetectionRun, Segment, Segmentation
     
-    logger.info(f"Starting call detection for run {detection_run_id}")
+    logger.info(f"Starting call classification for run {detection_run_id}")
     
     try:
         # Get the detection run
@@ -262,7 +262,7 @@ def run_call_detection(self, detection_run_id):
         if not classifier:
             try:
                 classifier = Classifier.objects.get(name='R-direct Classifier')
-                logger.info(f"Using default R-direct classifier for detection run {detection_run_id}")
+                logger.info(f"Using default R-direct classifier for classification run {detection_run_id}")
             except Classifier.DoesNotExist:
                 error_msg = "No classifier specified and default R-direct classifier not found"
                 logger.error(error_msg)
@@ -282,18 +282,18 @@ def run_call_detection(self, detection_run_id):
         detection_run.status = "in_progress"
         detection_run.save()
         
-        # Get all tasks in the batch
-        tasks = Task.objects.filter(batch=detection_run.batch)
-        total_tasks = tasks.count()
+        # Get all segments from the recording
+        segments = Segment.objects.filter(recording=detection_run.segmentation.recording)
+        total_segments = segments.count()
         
-        if total_tasks == 0:
+        if total_segments == 0:
             detection_run.status = "failed"
-            detection_run.error_message = "No tasks found in batch"
+            detection_run.error_message = "No segments found in recording"
             detection_run.save()
-            return {"status": "error", "message": "No tasks found in batch"}
+            return {"status": "error", "message": "No segments found in recording"}
         
         # Get all possible call types for this species
-        calls = Call.objects.filter(species=detection_run.batch.species)
+        calls = Call.objects.filter(species=detection_run.segmentation.recording.species)
         
         if not calls:
             detection_run.status = "failed"
@@ -301,13 +301,13 @@ def run_call_detection(self, detection_run_id):
             detection_run.save()
             return {"status": "error", "message": "No call types found for this species"}
         
-        # Get the batch's WAV file path
-        batch = detection_run.batch
+        # Get the recording's WAV file path
+        recording = detection_run.segmentation.recording
         wav_file_path = None
         
-        if batch.wav_file:
-            wav_file_path = batch.wav_file.path
-            logger.info(f"Using WAV file from batch: {wav_file_path}")
+        if recording.wav_file:
+            wav_file_path = recording.wav_file.path
+            logger.info(f"Using WAV file from recording: {wav_file_path}")
         
         if not wav_file_path or not os.path.exists(wav_file_path):
             detection_run.status = "failed"
@@ -335,11 +335,11 @@ def run_call_detection(self, detection_run_id):
             detection_run.save()
             return {"status": "error", "message": error_msg}
         
-        # Process each task by sending segments to R-direct service
-        for i, task in enumerate(tasks):
+        # Process each segment by sending to the R-direct service
+        for i, segment in enumerate(segments):
             try:
                 # Extract audio segment from WAV file
-                segment_data = extract_audio_segment(wav_file_path, task.onset, task.offset)
+                segment_data = extract_audio_segment(wav_file_path, segment.onset, segment.offset)
                 
                 # Save segment to a temporary file
                 with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
@@ -347,17 +347,17 @@ def run_call_detection(self, detection_run_id):
                     sf.write(temp_path, segment_data, samplerate=250000)  # Assuming 250kHz sampling rate
                 
                 # Log segment info for debugging
-                logger.info(f"Created temporary file for task {task.id}: {temp_path}")
+                logger.info(f"Created temporary file for segment {segment.id}: {temp_path}")
                 logger.info(f"Segment duration: {len(segment_data)/250000:.4f}s")
                 
                 # Prepare files for upload
                 files = {
-                    'file': (f"segment_{task.id}.wav", open(temp_path, 'rb'), 'audio/wav')
+                    'file': (f"segment_{segment.id}.wav", open(temp_path, 'rb'), 'audio/wav')
                 }
                 
                 # Prepare parameters for the R service
                 params = {
-                    'species': batch.species.name,
+                    'species': recording.species.name,
                     'call_types': ','.join([call.short_name for call in calls])
                 }
                 
@@ -392,7 +392,7 @@ def run_call_detection(self, detection_run_id):
                             # Create detection result
                             result = DetectionResult.objects.create(
                                 detection_run=detection_run,
-                                task=task
+                                segment=segment
                             )
                             
                             # Process results based on classifier response format
@@ -480,24 +480,24 @@ def run_call_detection(self, detection_run_id):
                     logger.error(error_msg)
                     raise ValueError(error_msg)
             
-            except Exception as task_error:
+            except Exception as segment_error:
                 # If an error occurs, don't use fallback values - we want to know about the error
-                logger.error(f"Error processing task {task.id}: {str(task_error)}")
+                logger.error(f"Error processing segment {segment.id}: {str(segment_error)}")
                 logger.error(traceback.format_exc())
                 
                 # Mark the detection run as failed
                 detection_run.status = "failed"
-                detection_run.error_message = f"Error processing task {task.id}: {str(task_error)}"
+                detection_run.error_message = f"Error processing segment {segment.id}: {str(segment_error)}"
                 detection_run.save()
                 
                 # Return error status
                 return {
                     "status": "error", 
-                    "message": f"Error processing task {task.id}: {str(task_error)}"
+                    "message": f"Error processing segment {segment.id}: {str(segment_error)}"
                 }
             
             # Update progress
-            progress = ((i + 1) / total_tasks) * 100
+            progress = ((i + 1) / total_segments) * 100
             detection_run.progress = progress
             detection_run.save()
         
@@ -508,7 +508,7 @@ def run_call_detection(self, detection_run_id):
         
         return {
             "status": "success", 
-            "message": f"Successfully processed {total_tasks} tasks using classifier: {classifier.name}",
+            "message": f"Successfully processed {total_segments} segments using classifier: {classifier.name}",
             "detection_run_id": detection_run_id
         }
         
@@ -567,8 +567,126 @@ def extract_audio_segment(wav_path, onset, offset, padding=0.01):
         raise
 
 
+@shared_task(bind=True, name="battycoda_app.audio.tasks.run_dummy_classifier")
+def run_dummy_classifier(self, detection_run_id):
+    """
+    Dummy classifier that assigns equal probability to all call types.
+    This is for testing purposes only and doesn't perform any actual classification.
+    
+    Args:
+        detection_run_id: ID of the DetectionRun model
+        
+    Returns:
+        dict: Result of the dummy classification process
+    """
+    import time
+    import traceback
+    from django.db import transaction
+    from ..models import Call, CallProbability, DetectionResult, DetectionRun, Segment
+    
+    logger.info(f"Starting dummy classification for run {detection_run_id}")
+    
+    try:
+        # Get the detection run
+        detection_run = DetectionRun.objects.get(id=detection_run_id)
+        
+        # Update status
+        detection_run.status = "in_progress"
+        detection_run.save()
+        
+        # Get all segments from the recording
+        segments = Segment.objects.filter(recording=detection_run.segmentation.recording)
+        total_segments = segments.count()
+        
+        if total_segments == 0:
+            detection_run.status = "failed"
+            detection_run.error_message = "No segments found in recording"
+            detection_run.save()
+            return {"status": "error", "message": "No segments found in recording"}
+        
+        # Get all possible call types for this species
+        calls = Call.objects.filter(species=detection_run.segmentation.recording.species)
+        
+        if not calls:
+            detection_run.status = "failed"
+            detection_run.error_message = "No call types found for this species"
+            detection_run.save()
+            return {"status": "error", "message": "No call types found for this species"}
+        
+        # Calculate equal probability for each call type
+        equal_probability = 1.0 / calls.count()
+        logger.info(f"Using equal probability of {equal_probability:.4f} for {calls.count()} call types")
+        
+        # Process each segment, assigning equal probability to all call types
+        for i, segment in enumerate(segments):
+            try:
+                with transaction.atomic():
+                    # Create detection result
+                    result = DetectionResult.objects.create(
+                        detection_run=detection_run,
+                        segment=segment
+                    )
+                    
+                    # Create equal probability for each call type
+                    for call in calls:
+                        CallProbability.objects.create(
+                            detection_result=result,
+                            call=call,
+                            probability=equal_probability
+                        )
+                
+                # Add a small delay to simulate processing time (optional)
+                time.sleep(0.05)
+                
+                # Update progress
+                progress = ((i + 1) / total_segments) * 100
+                detection_run.progress = progress
+                detection_run.save()
+                
+            except Exception as segment_error:
+                logger.error(f"Error processing segment {segment.id}: {str(segment_error)}")
+                logger.error(traceback.format_exc())
+                
+                # Mark the detection run as failed
+                detection_run.status = "failed"
+                detection_run.error_message = f"Error processing segment {segment.id}: {str(segment_error)}"
+                detection_run.save()
+                
+                # Return error status
+                return {
+                    "status": "error", 
+                    "message": f"Error processing segment {segment.id}: {str(segment_error)}"
+                }
+        
+        # Mark as completed
+        detection_run.status = "completed"
+        detection_run.progress = 100.0
+        detection_run.save()
+        
+        return {
+            "status": "success", 
+            "message": f"Successfully processed {total_segments} segments with dummy classifier",
+            "detection_run_id": detection_run_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in dummy classifier: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Update run status
+        try:
+            detection_run = DetectionRun.objects.get(id=detection_run_id)
+            detection_run.status = "failed"
+            detection_run.error_message = str(e)
+            detection_run.save()
+        except Exception as update_error:
+            logger.error(f"Failed to update detection run status: {str(update_error)}")
+        
+        return {"status": "error", "message": str(e)}
+
+
 @shared_task(bind=True, name="battycoda_app.audio.tasks.auto_segment_recording")
-def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_window=3, threshold_factor=0.5):
+def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_window=3, threshold_factor=0.5, debug_visualization=False):
     """
     Automatically segment a recording using the steps:
     1. Take absolute value of the signal
@@ -581,13 +699,16 @@ def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_w
         min_duration_ms: Minimum segment duration in milliseconds
         smooth_window: Window size for smoothing filter (number of samples)
         threshold_factor: Threshold factor (between 0-1) relative to signal statistics
+        debug_visualization: If True, generates a visualization of the segmentation process
         
     Returns:
-        dict: Result information including number of segments created
+        dict: Result information including number of segments created and optional debug image path
     """
+    from django.conf import settings
     from django.db import transaction
+    import shutil
 
-    from ..models import Recording, Segment
+    from ..models import Recording, Segment, Segmentation
     from .utils import auto_segment_audio
     
     logger.info(f"Starting automated segmentation for recording {recording_id}")
@@ -604,12 +725,93 @@ def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_w
         
         # Run the automated segmentation
         try:
-            onsets, offsets = auto_segment_audio(
-                recording.wav_file.path, 
-                min_duration_ms=min_duration_ms,
-                smooth_window=smooth_window, 
-                threshold_factor=threshold_factor
-            )
+            # Find the segmentation record created by the view using task_id
+            task_id = self.request.id
+            segmentation = Segmentation.objects.get(task_id=task_id)
+            
+            # Determine which algorithm to use based on the segmentation's algorithm type
+            algorithm = segmentation.algorithm
+            algorithm_type = "threshold"  # Default
+            
+            if algorithm and hasattr(algorithm, 'algorithm_type'):
+                algorithm_type = algorithm.algorithm_type
+            
+            logger.info(f"Using algorithm type: {algorithm_type} for segmentation")
+            
+            debug_path = None
+            if debug_visualization:
+                # Run with debug visualization using the appropriate algorithm
+                if algorithm_type == "energy":
+                    logger.info("Using energy-based segmentation algorithm")
+                    from .utils import energy_based_segment_audio
+                    onsets, offsets, debug_path = energy_based_segment_audio(
+                        recording.wav_file.path, 
+                        min_duration_ms=min_duration_ms,
+                        smooth_window=smooth_window, 
+                        threshold_factor=threshold_factor,
+                        debug_visualization=True
+                    )
+                else:
+                    # Default to threshold-based
+                    logger.info("Using threshold-based segmentation algorithm")
+                    from .utils import auto_segment_audio
+                    onsets, offsets, debug_path = auto_segment_audio(
+                        recording.wav_file.path, 
+                        min_duration_ms=min_duration_ms,
+                        smooth_window=smooth_window, 
+                        threshold_factor=threshold_factor,
+                        debug_visualization=True
+                    )
+                
+                # Move the debug image to a more permanent location in media directory
+                if debug_path and os.path.exists(debug_path):
+                    # Create directory for debug visualizations if it doesn't exist
+                    debug_dir = os.path.join(settings.MEDIA_ROOT, 'segmentation_debug')
+                    os.makedirs(debug_dir, exist_ok=True)
+                    
+                    # Create a unique filename using recording ID and timestamp
+                    from django.utils import timezone
+                    debug_filename = f"segmentation_debug_{recording_id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    permanent_debug_path = os.path.join(debug_dir, debug_filename)
+                    
+                    # Copy the file to the permanent location
+                    shutil.copy(debug_path, permanent_debug_path)
+                    
+                    # Remove the temporary file
+                    try:
+                        os.unlink(debug_path)
+                    except:
+                        pass  # Ignore errors when cleaning up temporary file
+                    
+                    # Update debug_path to the permanent location
+                    debug_path = permanent_debug_path
+                    
+                    # Get the URL-friendly path (relative to MEDIA_ROOT)
+                    from django.conf import settings
+                    debug_url = permanent_debug_path.replace(settings.MEDIA_ROOT, '').lstrip('/')
+                    
+                    logger.info(f"Saved segmentation debug visualization to {permanent_debug_path}")
+            else:
+                # Run without debug visualization using the appropriate algorithm
+                if algorithm_type == "energy":
+                    logger.info("Using energy-based segmentation algorithm")
+                    from .utils import energy_based_segment_audio
+                    onsets, offsets = energy_based_segment_audio(
+                        recording.wav_file.path, 
+                        min_duration_ms=min_duration_ms,
+                        smooth_window=smooth_window, 
+                        threshold_factor=threshold_factor
+                    )
+                else:
+                    # Default to threshold-based
+                    logger.info("Using threshold-based segmentation algorithm")
+                    from .utils import auto_segment_audio 
+                    onsets, offsets = auto_segment_audio(
+                        recording.wav_file.path, 
+                        min_duration_ms=min_duration_ms,
+                        smooth_window=smooth_window, 
+                        threshold_factor=threshold_factor
+                    )
         except Exception as e:
             error_msg = f"Error during auto-segmentation: {str(e)}"
             logger.error(error_msg)
@@ -620,22 +822,36 @@ def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_w
         segments_created = 0
         
         with transaction.atomic():
+            # Find the segmentation record created by the view using task_id
+            task_id = self.request.id
+            logger.info(f"Looking for segmentation with task_id: {task_id}")
+            
+            # Get the existing segmentation created by the view
+            segmentation = Segmentation.objects.get(task_id=task_id)
+            logger.info(f"Found existing segmentation: {segmentation.id} - {segmentation.name}")
+            
+            # Update the segmentation status to completed
+            segmentation.status = 'completed'
+            segmentation.progress = 100
+            segmentation.save()
+            
             # Create segments for each onset/offset pair
             for i in range(len(onsets)):
                 try:
                     # Generate segment name
                     segment_name = f"Auto Segment {i+1}"
                     
-                    # Create segment
+                    # Create segment and associate with the new segmentation
                     segment = Segment(
                         recording=recording,
+                        segmentation=segmentation,
                         name=segment_name,
                         onset=onsets[i],
                         offset=offsets[i],
                         created_by=recording.created_by,  # Use recording's creator
                         notes="Created by automated segmentation"
                     )
-                    segment.save()
+                    segment.save(manual_edit=False)  # Don't mark as manually edited for automated segmentation
                     segments_created += 1
                 except Exception as e:
                     logger.error(f"Error creating segment {i}: {str(e)}")
@@ -643,7 +859,7 @@ def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_w
         
         # Return success result
         logger.info(f"Successfully created {segments_created} segments from automated detection")
-        return {
+        result = {
             "status": "success",
             "recording_id": recording_id,
             "segments_created": segments_created,
@@ -654,6 +870,16 @@ def auto_segment_recording_task(self, recording_id, min_duration_ms=10, smooth_w
                 "threshold_factor": threshold_factor
             }
         }
+        
+        # Add debug visualization information if available
+        if debug_visualization and debug_path:
+            # Add the relative URL path for web access
+            result["debug_visualization"] = {
+                "file_path": debug_path,
+                "url": f"/media/segmentation_debug/{os.path.basename(debug_path)}"
+            }
+        
+        return result
         
     except Exception as e:
         logger.error(f"Error in auto_segment_recording_task: {str(e)}")

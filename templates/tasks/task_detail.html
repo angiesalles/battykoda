@@ -7,7 +7,10 @@
 <div class="container py-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:task_list' %}">Tasks</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:task_batch_list' %}">Task Batches</a></li>
+            {% if task.batch %}
+            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:task_batch_detail' task.batch.id %}">{{ task.batch.name }}</a></li>
+            {% endif %}
             <li class="breadcrumb-item active" aria-current="page">Task {{ task.id }}</li>
         </ol>
     </nav>
@@ -80,9 +83,15 @@
                     </div>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <a href="{% url 'battycoda_app:task_list' %}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left me-1"></i> Back to Tasks
+                    {% if task.batch %}
+                    <a href="{% url 'battycoda_app:task_batch_detail' task.batch.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Batch
                     </a>
+                    {% else %}
+                    <a href="{% url 'battycoda_app:task_batch_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Batches
+                    </a>
+                    {% endif %}
                 </div>
             </div>
             

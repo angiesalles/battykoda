@@ -139,83 +139,14 @@ def export_task_batch_view(request, batch_id):
 
 @login_required
 def create_task_batch_view(request):
-    """Handle creation of a new task batch with WAV file upload, creating a recording and segments from pickle"""
-    if request.method == "POST":
-        form = TaskBatchForm(request.POST, request.FILES, user=request.user)
-        if form.is_valid():
-            # Create the task batch but don't save yet
-            batch = form.save(commit=False)
-            batch.created_by = request.user
-
-            # Get user profile
-            profile, created = UserProfile.objects.get_or_create(user=request.user)
-
-            # Set group to user's current active group
-            if profile.group:
-                batch.group = profile.group
-            else:
-                # This is a critical issue - user must have a group
-                messages.error(request, "You must be assigned to a group to create a task batch")
-                return redirect("battycoda_app:create_task_batch")
-
-            # Get the WAV file from the form and set the wav_file_name from it
-            if "wav_file" in request.FILES:
-                # The wav_file field will be saved automatically when the form is saved
-                wav_file = request.FILES["wav_file"]
-                batch.wav_file_name = wav_file.name
-            else:
-                messages.error(request, "WAV file is required")
-                return redirect("battycoda_app:create_task_batch")
-
-            # Save the batch with files
-            batch.save()
-            
-            # Create a Recording object from the WAV file
-            recording = None
-            segments_created = 0
-            
-            try:
-                # Check if we have a pickle file
-                pickle_file = request.FILES.get("pickle_file")
-                
-                # Use the utility function to create the recording and segments
-                from .utils import create_recording_from_batch
-                recording, segments_created = create_recording_from_batch(batch, pickle_file=pickle_file)
-                
-                if not recording:
-                    messages.warning(request, "Task batch was created, but there was an error creating the recording")
-                elif pickle_file and segments_created == 0:
-                    messages.warning(request, f"Task batch and recording were created, but there was an error processing the pickle file")
-            except Exception as e:
-                logger.error(f"Error creating recording from task batch: {str(e)}")
-                logger.error(traceback.format_exc())
-                messages.warning(request, f"Task batch was created, but there was an error creating the recording: {str(e)}")
-
-            # Check if AJAX request
-            if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "success": True,
-                        "message": "Successfully created task batch" + 
-                                  (f" and recording with {segments_created} segments" if recording else ""),
-                        "redirect_url": reverse("battycoda_app:task_batch_detail", kwargs={"batch_id": batch.id}),
-                    }
-                )
-
-            # Prepare success message
-            success_msg = "Successfully created task batch"
-            if recording:
-                success_msg += f" and recording"
-                if segments_created > 0:
-                    success_msg += f" with {segments_created} segments"
-            
-            messages.success(request, success_msg)
-            return redirect("battycoda_app:task_batch_detail", batch_id=batch.id)
-    else:
-        form = TaskBatchForm(user=request.user)
-
-    context = {
-        "form": form,
-    }
-
-    return render(request, "tasks/create_batch.html", context)
+    """Direct creation of task batches now disabled - redirect to explanation"""
+    # Create an informational message
+    messages.info(
+        request,
+        "Task batches can now only be created from classification results. "
+        "Please create a recording, segment it, run classification, and then create a task batch "
+        "from the classification results for manual review."
+    )
+    
+    # Redirect to the task batch list
+    return redirect("battycoda_app:task_batch_list")

@@ -113,3 +113,17 @@ def multiply(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return 0
+
+
+@register.filter
+def subtract(value, arg):
+    """
+    Subtracts the argument from the value
+
+    Usage:
+        {{ value|subtract:arg }}
+    """
+    try:
+        return float(value) - float(arg)
+    except (ValueError, TypeError):
+        return 0

@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% load battycoda_tags %}
+{% load static %}
+
+{% block title %}Create Task Batch from Classification | BattyCoda{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:automation_home' %}">Classification</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'battycoda_app:detection_run_detail' run_id=run.id %}">{{ run.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Create Task Batch</li>
+        </ol>
+    </nav>
+    
+    <div class="card bg-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Create Task Batch from Classification</h2>
+            <span class="badge bg-info p-2">
+                <i class="fas fa-info-circle me-1"></i> Group: {{ request.user.profile.group.name }}
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <h5><i class="fas fa-lightbulb me-2"></i>How it works</h5>
+                <p class="mb-0">
+                    This will create a task batch from the classification results, allowing you to review and correct 
+                    the automatic classifications. Each segment will become a task with its initial label set to the 
+                    highest-probability call type from the classification results.
+                </p>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card bg-dark border-secondary">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Classification Run Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Run Name:</strong> {{ run.name }}</p>
+                                    <p><strong>Recording:</strong> {{ recording.name }}</p>
+                                    <p><strong>Classifier:</strong> {{ run.classifier.name }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Status:</strong> 
+                                        {% if run.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">{{ run.status|title }}</span>
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Species:</strong> {{ recording.species.name }}</p>
+                                    <p><strong>Project:</strong> {{ recording.project.name }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <form method="post" action="{% url 'battycoda_app:create_task_batch_from_detection_run' run_id=run.id %}">
+                {% csrf_token %}
+                
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Task Batch Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Batch Name</label>
+                                    <input type="text" id="name" name="name" class="form-control bg-dark text-light border-secondary"
+                                           value="{{ default_name }}" required>
+                                    <div class="form-text">Give your batch a descriptive name</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description</label>
+                                    <textarea id="description" name="description" class="form-control bg-dark text-light border-secondary" 
+                                              rows="3">{{ default_description }}</textarea>
+                                    <div class="form-text">Optional description of this batch's purpose</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                    <a href="{% url 'battycoda_app:detection_run_detail' run_id=run.id %}" class="btn btn-outline-secondary me-md-2">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-lg btn-primary">
+                        <i class="fas fa-tasks me-1"></i> Create Task Batch
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

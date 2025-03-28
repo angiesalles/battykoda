@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
 
-{% block title %}Automation Dashboard | BattyCoda{% endblock %}
+{% block title %}Classification Runs | BattyCoda{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="row mb-4">
         <div class="col-md-12">
-            <h1 class="mb-4">Automation Dashboard</h1>
-            <p class="lead">Use automated call detection models to analyze your audio data.</p>
+            <h1 class="mb-4">Classification Runs</h1>
+            <p class="lead">View and manage your automated call classification runs.</p>
             
             <div class="d-flex justify-content-end mb-3">
                 <a href="{% url 'battycoda_app:create_detection_run' %}" class="btn btn-primary">
-                    <i class="fas fa-plus-circle me-1"></i> New Detection Run
+                    <i class="fas fa-plus-circle me-1"></i> New Classification Run
                 </a>
             </div>
         </div>
@@ -21,29 +21,30 @@
         <div class="col-md-12">
             <div class="card bg-dark text-white mb-4">
                 <div class="card-header">
-                    <h4 class="mb-0">Recent Detection Runs</h4>
+                    <h4 class="mb-0">Classification Runs</h4>
                 </div>
                 <div class="card-body">
-                    {% if recent_runs %}
+                    {% if runs %}
                     <div class="table-responsive">
                         <table class="table table-dark table-hover">
                             <thead>
                                 <tr>
                                     <th>Name</th>
-                                    <th>Batch</th>
+                                    <th>Recording</th>
                                     <th>Status</th>
                                     <th>Progress</th>
                                     <th>Created</th>
+                                    <th>Created By</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for run in recent_runs %}
-                                <tr>
+                                {% for run in runs %}
+                                <tr data-run-id="{{ run.id }}">
                                     <td>{{ run.name }}</td>
                                     <td>
-                                        <a href="{% url 'battycoda_app:task_batch_detail' batch_id=run.batch.id %}">
-                                            {{ run.batch.name }}
+                                        <a href="{% url 'battycoda_app:recording_detail' recording_id=run.segmentation.recording.id %}">
+                                            {{ run.segmentation.recording.name }}
                                         </a>
                                     </td>
                                     <td>
@@ -70,16 +71,17 @@
                                         </div>
                                     </td>
                                     <td>{{ run.created_at|date:"M d, Y H:i" }}</td>
+                                    <td>{{ run.created_by.username }}</td>
                                     <td>
-                                        <a href="{% url 'battycoda_app:detection_run_detail' run_id=run.id %}" class="btn btn-sm btn-primary">
-                                            <i class="fas fa-eye"></i> View
-                                        </a>
-                                        {% if run.status == 'completed' %}
-                                        <a href="{% url 'battycoda_app:apply_detection_results' run_id=run.id %}" 
-                                           class="btn btn-sm btn-success">
-                                            <i class="fas fa-check"></i> Apply
-                                        </a>
-                                        {% endif %}
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'battycoda_app:detection_run_detail' run_id=run.id %}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-chart-bar"></i> View Results
+                                            </a>
+                                            <a href="{% url 'battycoda_app:delete_detection_run' run_id=run.id %}" 
+                                               class="btn btn-sm btn-danger">
+                                                <i class="fas fa-trash-alt"></i> Delete
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -87,14 +89,8 @@
                         </table>
                     </div>
                     {% else %}
-                    <p>No recent detection runs found. <a href="{% url 'battycoda_app:create_detection_run' %}">Create one</a> to get started.</p>
-                    {% endif %}
-                    
-                    {% if recent_runs %}
-                    <div class="text-center mt-3">
-                        <a href="{% url 'battycoda_app:detection_run_list' %}" class="btn btn-outline-light">
-                            View All Detection Runs
-                        </a>
+                    <div class="alert alert-info">
+                        <p class="mb-0">No classification runs found. <a href="{% url 'battycoda_app:create_detection_run' %}" class="alert-link">Create one</a> to get started.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -103,47 +99,26 @@
     </div>
 
     <div class="row">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="card bg-dark text-white mb-4">
                 <div class="card-header">
-                    <h4 class="mb-0">About Call Detection</h4>
+                    <h4 class="mb-0">About Automated Classification</h4>
                 </div>
                 <div class="card-body">
-                    <p>The automated call detection system helps you:</p>
+                    <p>The automated classification system helps you:</p>
                     <ul>
                         <li>Process large amounts of bat call data efficiently</li>
                         <li>Get probability scores for different call types</li>
                         <li>Automatically label tasks based on detection results</li>
-                        <li>Track detection progress and review results</li>
+                        <li>Track classification progress and review results</li>
                     </ul>
-                    <p>To use call detection:</p>
+                    <p>To use classification:</p>
                     <ol>
-                        <li>Create a new detection run for a task batch</li>
-                        <li>Monitor progress as the system analyzes your data</li>
-                        <li>Review detection results with probability scores</li>
-                        <li>Apply detection results to automatically label tasks</li>
+                        <li>Click "New Classification Run" to select a task batch</li>
+                        <li>Choose a classifier and wait for processing to complete</li>
+                        <li>View results with probability scores</li>
+                        <li>Apply results to automatically label tasks</li>
                     </ol>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card bg-dark text-white mb-4">
-                <div class="card-header">
-                    <h4 class="mb-0">Quick Actions</h4>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-3">
-                        <a href="{% url 'battycoda_app:create_detection_run' %}" class="btn btn-primary">
-                            <i class="fas fa-play me-1"></i> Start New Detection Run
-                        </a>
-                        <a href="{% url 'battycoda_app:detection_run_list' %}" class="btn btn-info">
-                            <i class="fas fa-list me-1"></i> View All Detection Runs
-                        </a>
-                        <a href="{% url 'battycoda_app:task_batch_list' %}" class="btn btn-secondary">
-                            <i class="fas fa-folder me-1"></i> Browse Task Batches
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>

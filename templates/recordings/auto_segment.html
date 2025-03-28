@@ -26,6 +26,13 @@
     </nav>
 </div>
 
+{% if existing_segmentation %}
+<div class="alert alert-info mb-4">
+    <i class="fas fa-info-circle"></i> 
+    <strong>Note:</strong> This recording already has one or more segmentations. Running a new segmentation will create an additional segmentation that you can switch between.
+</div>
+{% endif %}
+
 <div class="alert alert-info mb-4">
     <i class="fas fa-info-circle"></i> 
     {% if selected_algorithm %}
@@ -38,84 +45,93 @@
 </div>
 
 {% if algorithms %}
-<div class="card bg-dark mb-4">
-    <div class="card-header">
-        <h5>Choose Segmentation Algorithm</h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            {% for algo in algorithms %}
-            <div class="col-md-6 mb-3">
-                <div class="card h-100 {% if algo.id == selected_algorithm.id %}border-primary{% endif %}">
-                    <div class="card-header {% if algo.id == selected_algorithm.id %}bg-primary text-white{% endif %}">
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="algorithm" id="algorithm-{{ algo.id }}" 
-                                value="{{ algo.id }}" {% if algo.id == selected_algorithm.id %}checked{% endif %}>
-                            <label class="form-check-label" for="algorithm-{{ algo.id }}">{{ algo.name }}</label>
-                        </div>
-                        <span class="badge bg-secondary float-end">{{ algo.get_algorithm_type_display }}</span>
+<form method="post" action="{% url 'battycoda_app:auto_segment_recording' recording_id=recording.id %}" id="autoSegmentForm">
+    {% csrf_token %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5>Choose Algorithm</h5>
+                </div>
+                <div class="card-body">
+                    {% for algo in algorithms %}
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="algorithm" id="algorithm-{{ algo.id }}" 
+                            value="{{ algo.id }}" {% if algo.id == selected_algorithm.id or forloop.first and not selected_algorithm %}checked{% endif %}>
+                        <label class="form-check-label" for="algorithm-{{ algo.id }}">
+                            <strong>{{ algo.name }}</strong>
+                            <span class="badge bg-secondary ms-2">{{ algo.get_algorithm_type_display }}</span>
+                        </label>
+                        <small class="d-block text-muted mt-1">{{ algo.description }}</small>
                     </div>
-                    <div class="card-body">
-                        <p class="card-text small">{{ algo.description }}</p>
+                    {% if not forloop.last %}<hr class="my-3">{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5>Configure Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="min_duration_ms" class="form-label">Minimum Duration (ms):</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                            id="min_duration_ms" name="min_duration_ms" value="{{ min_duration_ms }}" 
+                            min="1" max="1000" required>
+                        <small class="form-text text-muted">Minimum segment duration in milliseconds. Shorter segments will be filtered out.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="smooth_window" class="form-label">Smoothing Window:</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                            id="smooth_window" name="smooth_window" value="{{ smooth_window }}" 
+                            min="1" max="100" required>
+                        <small class="form-text text-muted">Window size for the smoothing filter. Higher values create smoother detection but may miss short sounds.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="threshold_factor" class="form-label">Threshold Factor:</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                            id="threshold_factor" name="threshold_factor" value="{{ threshold_factor }}" 
+                            min="0.1" max="10" step="0.1" required>
+                        <small class="form-text text-muted">Factor used to calculate the threshold (mean + factor * std). Higher values = fewer segments detected.</small>
                     </div>
                 </div>
             </div>
-            {% endfor %}
         </div>
     </div>
-</div>
 {% endif %}
 
-<div class="card bg-dark">
-    <div class="card-header">
-        <h5>Configure Segmentation Parameters</h5>
+    <!-- No hidden fields needed since we're using the inputs directly -->
+    
+    <!-- Additional options and submit button -->
+    <div class="card bg-dark mt-4">
+        <div class="card-header">
+            <h5>Additional Options</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-4">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="debug_visualization" name="debug_visualization">
+                    <label class="form-check-label" for="debug_visualization">
+                        Generate visualization of segmentation steps
+                    </label>
+                </div>
+                <small class="form-text text-muted">Creates a detailed visualization showing signal processing steps and threshold application. Useful for debugging segmentation issues.</small>
+            </div>
+            
+            <div class="text-end">
+                <button type="submit" class="btn btn-primary" id="startSegmentationBtn">
+                    <i class="fas fa-play"></i> Start Automated Segmentation
+                </button>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <form method="post" id="autoSegmentForm">
-            {% csrf_token %}
-            
-            <!-- Hidden field for algorithm selection if none is selected in the cards above -->
-            {% if selected_algorithm %}
-            <input type="hidden" name="algorithm" value="{{ selected_algorithm.id }}" id="selected-algorithm-input">
-            {% endif %}
-            
-            <div class="form-group row mb-3">
-                <label for="min_duration_ms" class="col-sm-4 col-form-label">Minimum Duration (ms):</label>
-                <div class="col-sm-8">
-                    <input type="number" class="form-control bg-dark text-light border-secondary" id="min_duration_ms" name="min_duration_ms" 
-                           value="{{ min_duration_ms }}" min="1" max="1000" required>
-                    <small class="form-text text-muted">Minimum segment duration in milliseconds. Shorter segments will be filtered out.</small>
-                </div>
-            </div>
-            
-            <div class="form-group row mb-3">
-                <label for="smooth_window" class="col-sm-4 col-form-label">Smoothing Window:</label>
-                <div class="col-sm-8">
-                    <input type="number" class="form-control bg-dark text-light border-secondary" id="smooth_window" name="smooth_window" 
-                           value="{{ smooth_window }}" min="1" max="100" required>
-                    <small class="form-text text-muted">Window size for the smoothing filter. Higher values create smoother detection but may miss short sounds.</small>
-                </div>
-            </div>
-            
-            <div class="form-group row mb-3">
-                <label for="threshold_factor" class="col-sm-4 col-form-label">Threshold Factor:</label>
-                <div class="col-sm-8">
-                    <input type="number" class="form-control bg-dark text-light border-secondary" id="threshold_factor" name="threshold_factor" 
-                           value="{{ threshold_factor }}" min="0.1" max="10" step="0.1" required>
-                    <small class="form-text text-muted">Factor used to calculate the threshold (mean + factor * std). Higher values = fewer segments detected.</small>
-                </div>
-            </div>
-            
-            <div class="form-group row">
-                <div class="col-sm-12 text-end">
-                    <button type="submit" class="btn btn-primary" id="startSegmentationBtn">
-                        <i class="fas fa-play"></i> Start Automated Segmentation
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
+</form>
 
 <!-- Status display area - hidden initially -->
 <div class="card bg-dark mt-4" id="statusCard" style="display: none;">
@@ -143,184 +159,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        let taskStarted = false;
-        let statusCheckInterval = null;
-        
-        // Handle algorithm selection change
-        document.querySelectorAll("input[name='algorithm']").forEach(function(radio) {
-            radio.addEventListener("change", function() {
-                const algorithmId = this.value;
-                
-                // Update the hidden input in the form
-                document.getElementById("selected-algorithm-input").value = algorithmId;
-                
-                // Highlight the selected algorithm card
-                document.querySelectorAll(".card").forEach(function(card) {
-                    card.classList.remove("border-primary");
-                    card.querySelector(".card-header")?.classList.remove("bg-primary", "text-white");
-                });
-                
-                this.closest(".card").classList.add("border-primary");
-                this.closest(".card-header").classList.add("bg-primary", "text-white");
-                
-                // Fetch default parameters for the selected algorithm
-                fetch(`{% url 'battycoda_app:auto_segment_recording' recording_id=recording.id %}?algorithm_id=${algorithmId}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Update form fields with default values
-                        document.getElementById("min_duration_ms").value = data.min_duration_ms;
-                        document.getElementById("smooth_window").value = data.smooth_window;
-                        document.getElementById("threshold_factor").value = data.threshold_factor;
-                        
-                        // Update algorithm description
-                        document.querySelector(".alert-info").innerHTML = `
-                            <i class="fas fa-info-circle"></i> 
-                            <strong>${data.algorithm_name}</strong>: ${data.algorithm_description}
-                        `;
-                    }
-                })
-                .catch(error => console.error('Error fetching algorithm defaults:', error));
-            });
-        });
-        
-        // Handle form submission via AJAX
-        document.getElementById("autoSegmentForm").addEventListener("submit", function(e) {
-            e.preventDefault();
-            
-            if (taskStarted) {
-                return false; // Don't allow multiple submissions
-            }
-            
-            // Show status area
-            document.getElementById("statusCard").style.display = "block";
-            document.getElementById("statusMessage").innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting automated segmentation...';
-            document.getElementById("statusMessage").className = "alert alert-info";
-            document.getElementById("resultDetails").style.display = "none";
-            document.getElementById("viewSegmentsBtn").style.display = "none";
-            
-            // Disable form
-            document.getElementById("startSegmentationBtn").disabled = true;
-            
-            // Get selected algorithm (if any)
-            const algorithmId = document.querySelector("input[name='algorithm']:checked")?.value || 
-                               document.getElementById("selected-algorithm-input")?.value;
-            
-            // Prepare URL for the AJAX request
-            let url = "{% url 'battycoda_app:auto_segment_recording' recording_id=recording.id %}";
-            if (algorithmId) {
-                url = url + `?algorithm_id=${algorithmId}`;
-            }
-            
-            // Create FormData from the form
-            const formData = new FormData(this);
-            
-            // Send request
-            fetch(url, {
-                method: "POST",
-                body: formData,
-                headers: {
-                    "X-Requested-With": "XMLHttpRequest"
-                }
-            })
-            .then(response => response.json())
-            .then(response => {
-                if (response.success) {
-                    taskStarted = true;
-                    
-                    // Update status message
-                    document.getElementById("statusMessage").innerHTML = '<i class="fas fa-spinner fa-spin"></i> Segmentation in progress...';
-                    
-                    // Start polling for status
-                    startStatusChecking();
-                } else {
-                    // Show error
-                    document.getElementById("statusMessage").innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + (response.error || "Unknown error");
-                    document.getElementById("statusMessage").className = "alert alert-danger";
-                    document.getElementById("startSegmentationBtn").disabled = false;
-                }
-            })
-            .catch(error => {
-                // Show error
-                document.getElementById("statusMessage").innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error: ' + error;
-                document.getElementById("statusMessage").className = "alert alert-danger";
-                document.getElementById("startSegmentationBtn").disabled = false;
-            });
-        });
-        
-        // Function to start checking status at regular intervals
-        function startStatusChecking() {
-            statusCheckInterval = setInterval(checkSegmentationStatus, 3000); // Check every 3 seconds
-        }
-        
-        // Function to check segmentation status
-        function checkSegmentationStatus() {
-            fetch("{% url 'battycoda_app:auto_segment_status' recording_id=recording.id %}", {
-                method: "GET",
-                headers: {
-                    "X-Requested-With": "XMLHttpRequest"
-                }
-            })
-            .then(response => response.json())
-            .then(response => {
-                if (response.status === "completed") {
-                    // Task completed successfully
-                    clearInterval(statusCheckInterval);
-                    
-                    document.getElementById("statusMessage").innerHTML = '<i class="fas fa-check-circle"></i> ' + response.message;
-                    document.getElementById("statusMessage").className = "alert alert-success";
-                    
-                    // Show results
-                    document.getElementById("segmentsCount").textContent = response.segments_created || 0;
-                    document.getElementById("processingTime").textContent = response.processing_time || '-';
-                    
-                    // Show the details
-                    document.getElementById("resultDetails").style.display = "block";
-                    document.getElementById("viewSegmentsBtn").style.display = "block";
-                    
-                    // Re-enable the form
-                    document.getElementById("startSegmentationBtn").disabled = false;
-                    taskStarted = false;
-                } 
-                else if (response.status === "failed") {
-                    // Task failed
-                    clearInterval(statusCheckInterval);
-                    
-                    document.getElementById("statusMessage").innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + response.message;
-                    document.getElementById("statusMessage").className = "alert alert-danger";
-                    
-                    // Re-enable the form
-                    document.getElementById("startSegmentationBtn").disabled = false;
-                    taskStarted = false;
-                }
-                else if (response.status === "in_progress") {
-                    // Still running - update message to show it's still working
-                    document.getElementById("statusMessage").innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + response.message;
-                }
-                else if (response.status === "not_found") {
-                    // No task found
-                    clearInterval(statusCheckInterval);
-                    
-                    document.getElementById("statusMessage").innerHTML = '<i class="fas fa-question-circle"></i> ' + response.message;
-                    document.getElementById("statusMessage").className = "alert alert-warning";
-                    
-                    // Re-enable the form
-                    document.getElementById("startSegmentationBtn").disabled = false;
-                    taskStarted = false;
-                }
-            })
-            .catch(error => {
-                // Show error but keep checking
-                document.getElementById("statusMessage").innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error checking status: ' + error;
-                document.getElementById("statusMessage").className = "alert alert-warning";
-            });
-        }
-    });
-</script>
+<!-- No JavaScript needed - all handled server-side -->
 {% endblock %}

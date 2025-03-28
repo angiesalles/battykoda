@@ -25,7 +25,7 @@
                     {% endif %}
                     <p class="small text-light mb-1">{{ species }}</p>
                     <p class="small text-light mb-1">{{ wav_path }}</p>
-                    <p class="small text-light mb-1">{{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</p>
+                    <p class="small text-light mb-1">{{ task.onset|floatformat:4 }}s - {{ task.offset|floatformat:4 }}s ({{ task.offset|subtract:task.onset|multiply:1000|floatformat:1 }} ms)</p>
                     <p class="small text-muted mb-1">By: {{ task.created_by.username }}
                     {% if task.created_by == request.user %}(you){% endif %}</p>
                     <p class="small text-muted mb-1">Group: {{ task.group.name|default:"None" }}</p>
@@ -33,7 +33,7 @@
                 </div>
                 
                 <div class="d-grid gap-2">
-                    <a href="{% url 'battycoda_app:task_list' %}" class="btn btn-sm btn-outline-secondary">Back to Tasks</a>
+                    <a href="{% url 'battycoda_app:task_batch_list' %}" class="btn btn-sm btn-outline-secondary">Back to Tasks</a>
                     <a href="{% url 'battycoda_app:get_last_task' %}" class="btn btn-sm btn-outline-info">Last Task</a>
                     <a href="{% url 'battycoda_app:get_next_task' %}" class="btn btn-sm btn-outline-primary">Skip to Next Task</a>
                 </div>
@@ -47,34 +47,56 @@
                 <div id="spectrogram-container" class="mb-2">
                     <div class="spectrogram-wrapper">
                         <!-- Spectrogram with axes -->
-                        <div class="d-flex justify-content-center align-items-center spectrogram-container">
-                            <div class="image-container">
-                                <!-- Use pre-generated spectrogram URL if available -->
+                        <div class="spectrogram-grid-container">
+                            <!-- Y-axis label (left of y-axis ticks) -->
+                            <div class="y-axis-label">Frequency (kHz)</div>
+                            
+                            <!-- Y-axis ticks (left of spectrogram) -->
+                            <div class="y-axis-ticks">
+                                {% for tick in y_ticks %}
+                                    {% if tick.type == "major" %}
+                                    <!-- Only show major tick marks with labels -->
+                                    <div class="y-tick y-tick-major" style="top: {{ tick.position }}%">
+                                        {% if tick.value != "" %}{{ tick.value }} kHz{% endif %}
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            
+                            <!-- Empty corner (below y-axis label, left of x-axis) -->
+                            <div class="corner-spacer"></div>
+                            
+                            <!-- Spectrogram image -->
+                            <div class="spectrogram-image">
                                 <img src="{{ spectrogram_urls.channel_0_detail }}" 
                                      alt="Spectrogram" 
                                      id="main-spectrogram">
-                                     
-                                <!-- X-axis ticks overlay positioned relative to the image -->
-                                <div class="x-axis-ticks">
-                                    <div class="x-tick" style="left: 0%" id="left-tick">-{{ normal_hwin|default:"8" }} ms</div>
-                                    <div class="x-tick" style="left: 50%">0.00 s</div>
-                                    <div class="x-tick" style="left: 100%" id="right-tick">+{{ normal_hwin|default:"8" }} ms</div>
-                                </div>
-                            </div>
-                                 
-                            <!-- Y-axis ticks overlay -->
-                            <div class="y-axis-ticks">
-                                <div class="y-tick" style="top: 0%">100 kHz</div>
-                                <div class="y-tick" style="top: 20%">80 kHz</div>
-                                <div class="y-tick" style="top: 40%">60 kHz</div>
-                                <div class="y-tick" style="top: 60%">40 kHz</div>
-                                <div class="y-tick" style="top: 80%">20 kHz</div>
-                                <div class="y-tick" style="top: 100%">0 kHz</div>
                             </div>
                             
-                            <!-- Axis labels -->
-                            <div class="y-axis-label">Frequency (kHz)</div>
-                            <div class="x-axis-label">Time (s)</div>
+                            <!-- X-axis ticks (below spectrogram) -->
+                            <div class="x-axis-ticks">
+                                <!-- Two sets of ticks in separate containers for detail and overview -->
+                                <div id="detail-ticks" class="tick-set active">
+                                    {% for tick in x_ticks_detail %}
+                                        {% if tick.type == "major" %}
+                                        <!-- Only show major tick marks with labels -->
+                                        <div class="x-tick x-tick-major" style="left: {{ tick.position }}%" id="{{ tick.id }}">{{ tick.value }}</div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                
+                                <div id="overview-ticks" class="tick-set">
+                                    {% for tick in x_ticks_overview %}
+                                        {% if tick.type == "major" %}
+                                        <!-- Only show major tick marks with labels -->
+                                        <div class="x-tick x-tick-major" style="left: {{ tick.position }}%" id="{{ tick.id }}">{{ tick.value }}</div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                
+                                <!-- X-axis label moved to inside the ticks div -->
+                                <div class="x-axis-label">Time (s)</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -106,6 +128,8 @@
                         const overviewBtn = document.getElementById('overview-btn');
                         const channelToggle = document.getElementById('channel-toggle');
                         const channelLabel = document.getElementById('channel-label');
+                        const detailTicks = document.getElementById('detail-ticks');
+                        const overviewTicks = document.getElementById('overview-ticks');
                         
                         let currentChannel = 0;
                         let isOverview = false;
@@ -123,33 +147,19 @@
                             const key = `channel_${currentChannel}_${isOverview ? 'overview' : 'detail'}`;
                             
                             if (spectrogramUrls[key]) {
+                                // Update the image source
                                 mainSpectrogram.src = spectrogramUrls[key];
                                 
-                                // Also update audio player with the matching settings
+                                // Update audio player
                                 updateAudioPlayer();
                                 
-                                // Update x-axis labels based on view type
-                                const leftTick = document.getElementById('left-tick');
-                                const rightTick = document.getElementById('right-tick');
-                                
-                                const centerTick = document.querySelector('.x-tick:nth-child(2)');
-                                
+                                // Update x-axis ticks
                                 if (isOverview) {
-                                    // Overview window values from overview_hwin() function
-                                    leftTick.textContent = "-{{ overview_hwin.0|default:'150' }} ms";
-                                    rightTick.textContent = "+{{ overview_hwin.1|default:'350' }} ms";
-                                    
-                                    // Reposition center mark for asymmetrical window
-                                    const totalMs = {{ overview_hwin.0|default:'150' }} + {{ overview_hwin.1|default:'350' }};
-                                    const centerPercent = ({{ overview_hwin.0|default:'150' }} / totalMs) * 100;
-                                    centerTick.style.left = `${centerPercent}%`;
+                                    detailTicks.classList.remove('active');
+                                    overviewTicks.classList.add('active');
                                 } else {
-                                    // Normal window values from normal_hwin() function
-                                    leftTick.textContent = "-{{ normal_hwin.0|default:'8' }} ms";
-                                    rightTick.textContent = "+{{ normal_hwin.1|default:'8' }} ms";
-                                    
-                                    // Reset center mark to middle for symmetrical window
-                                    centerTick.style.left = "50%";
+                                    detailTicks.classList.add('active');
+                                    overviewTicks.classList.remove('active');
                                 }
                             } else {
                                 console.error("Spectrogram URL not found for key:", key);
@@ -159,6 +169,7 @@
                         // Set up event listeners
                         detailViewBtn.addEventListener('click', function() {
                             isOverview = false;
+                            // Update button styles
                             detailViewBtn.classList.add('active');
                             detailViewBtn.classList.remove('btn-outline-primary');
                             detailViewBtn.classList.add('btn-primary');
@@ -170,6 +181,7 @@
                         
                         overviewBtn.addEventListener('click', function() {
                             isOverview = true;
+                            // Update button styles
                             overviewBtn.classList.add('active');
                             overviewBtn.classList.remove('btn-outline-secondary');
                             overviewBtn.classList.add('btn-primary');
@@ -179,7 +191,7 @@
                             updateSpectrogram();
                         });
                         
-                        // Function to update audio player URL based on current settings
+                        // Function to update audio player URL
                         function updateAudioPlayer() {
                             const audioPlayer = document.getElementById('audio-player');
                             if (audioPlayer) {
@@ -194,7 +206,7 @@
                             updateSpectrogram();
                         });
                         
-                        // Call updateSpectrogram on page load to ensure the image is loaded immediately
+                        // Initialize on page load
                         updateSpectrogram();
                     });
                 </script>
@@ -238,9 +250,11 @@
                     {% if call_types %}
                         {% for call_type in call_types %}
                         <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" id="{{ call_type|slugify }}" name="type_call" value="{{ call_type }}">
+                            <input class="form-check-input" type="radio" id="{{ call_type|slugify }}" name="type_call" value="{{ call_type }}" 
+                                {% if task.label == call_type %}checked{% endif %}>
                             <label class="form-check-label" for="{{ call_type|slugify }}">
                                 {{ call_type }}
+                                {% if task.label == call_type %}<span class="badge bg-info ms-1">Auto</span>{% endif %}
                             </label>
                         </div>
                         {% endfor %}
@@ -259,7 +273,8 @@
                     
                     <!-- Unknown option before Other -->
                     <div class="form-check mb-2">
-                        <input class="form-check-input" type="radio" id="Unknown" name="type_call" value="Unknown" checked>
+                        <input class="form-check-input" type="radio" id="Unknown" name="type_call" value="Unknown" 
+                            {% if not task.label %}checked{% endif %}>
                         <label class="form-check-label" for="Unknown">Unknown</label>
                     </div>
                     
@@ -283,7 +298,7 @@
                     <p class="small text-light mb-1"><strong>Task ID:</strong> #{{ task.id }}</p>
                     <p class="small text-light mb-1"><strong>Species:</strong> {{ species }}</p>
                     <p class="small text-light mb-1"><strong>Project:</strong> {{ task.project }}</p>
-                    <p class="small text-light mb-1"><strong>Segment:</strong> {{ task.onset|floatformat:2 }}s - {{ task.offset|floatformat:2 }}s</p>
+                    <p class="small text-light mb-1"><strong>Segment:</strong> {{ task.onset|floatformat:4 }}s - {{ task.offset|floatformat:4 }}s ({{ task.offset|subtract:task.onset|multiply:1000|floatformat:1 }} ms)</p>
                 </div>
             </div>
         </div>
@@ -335,95 +350,170 @@
     .spectrogram-wrapper {
         position: relative;
         width: 100%;
-        padding: 30px 40px 30px 80px; /* Padding for axes (top, right, bottom, left) - reduced bottom padding */
-        margin-bottom: 10px; /* Reduced bottom margin */
+        padding: 10px;
+        margin-bottom: 10px;
     }
     
-    .spectrogram-container {
-        position: relative;
-        min-height: 300px;
+    /* Grid container for spectrogram and axes */
+    .spectrogram-grid-container {
+        display: grid;
+        grid-template-columns: 60px 1fr; /* Width for y-axis, rest for spectrogram */
+        grid-template-rows: 1fr 40px; /* Main content and x-axis ticks (with room for label) */
+        grid-template-areas:
+            "y-label spec-img"
+            "corner x-ticks";
+        gap: 0;
         width: 100%;
-        overflow: visible;
+        max-width: 100%;
     }
     
-    /* Image container to group image and x-axis ticks */
-    .image-container {
-        position: relative;
-        display: inline-block;
-    }
-    
-    /* X-axis styling */
-    .x-axis-ticks {
+    /* Grid areas */
+    .y-axis-label {
+        grid-area: y-label;
+        writing-mode: vertical-rl;
+        transform: rotate(180deg); /* Keep rotation at 180 degrees */
         position: absolute;
-        bottom: -30px;
-        left: 0;
-        width: 100%;
-        height: 20px;
+        left: -10px; /* Position it further left as requested */
+        top: 50%;
+        transform-origin: center;
+        font-size: 14px;
+        font-weight: 500;
+        color: #ddd;
+        z-index: 5;
+    }
+    
+    .y-axis-ticks {
+        grid-area: y-label;
+        position: relative;
+        width: 60px;
+        height: 100%;
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
+        justify-self: end;
     }
     
-    .x-tick {
-        position: absolute;
-        font-size: 12px;
-        color: #aaa;
-        transform: translateX(-50%);
-        white-space: nowrap;
+    .corner-spacer {
+        grid-area: corner;
+    }
+    
+    .spectrogram-image {
+        grid-area: spec-img;
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+    }
+    
+    .x-axis-ticks {
+        grid-area: x-ticks;
+        position: relative;
+        height: 100%;
+        width: 100%;
     }
     
     .x-axis-label {
         position: absolute;
-        bottom: -45px;
-        left: 50%;
-        transform: translateX(-50%);
+        bottom: -20px; /* Position it below the ticks */
+        left: 0;
+        width: 100%;
+        text-align: center;
         font-size: 14px;
         font-weight: 500;
         color: #ddd;
     }
     
+    /* Tick set container styling */
+    .tick-set {
+        display: none;
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+    
+    .tick-set.active {
+        display: block;
+    }
+    
+    /* Common styles for all x ticks */
+    .x-tick {
+        position: absolute;
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }
+    
+    /* Major ticks with labels */
+    .x-tick-major {
+        font-size: 12px;
+        color: #aaa;
+        top: 15px; /* Position below the tick mark */
+    }
+    
+    /* Removed x-tick-minor styles as they're no longer used */
+    
+    /* Add a tickmark line to all major ticks */
+    .x-tick-major::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: -12px; /* Position above the text */
+        width: 1px;
+        height: 8px;
+        background-color: #aaa;
+    }
+    
+    /* Removed duplicate x-axis-label definition */
+    
     /* Y-axis styling */
     .y-axis-ticks {
-        position: absolute;
-        top: 0;
-        left: -65px;
-        height: 100%;
+        position: relative;
         width: 60px;
+        margin-right: 10px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
     }
     
+    /* Common styles for all y-ticks */
     .y-tick {
         position: absolute;
-        font-size: 12px;
-        color: #aaa;
         text-align: right;
-        width: 100%;
         transform: translateY(-50%);
         white-space: nowrap;
+        right: 0;
     }
     
-    .y-axis-label {
-        position: absolute;
-        left: -75px;
-        top: 50%;
-        transform: rotate(-90deg) translate(0, -50%);
-        transform-origin: center left;
-        font-size: 14px;
-        font-weight: 500;
-        color: #ddd;
-        white-space: nowrap;
+    /* Major ticks with labels */
+    .y-tick-major {
+        font-size: 12px;
+        color: #aaa;
+        padding-right: 10px;
     }
+    
+    /* Removed minor tick styles as they're no longer used */
+    
+    /* Add a tickmark line to all ticks */
+    .y-tick-major::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: 0;
+        width: 6px;
+        height: 1px;
+        background-color: #aaa;
+    }
+    
+    /* This is an old definition that was causing conflicts - removed */
     
     /* Main spectrogram image */
     #main-spectrogram {
         display: block;
-        margin: 0 auto;
-        max-width: 100%;
-        height: auto;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
         box-shadow: 0 4px 8px rgba(0,0,0,0.5);
         border: 1px solid #333;
-        position: relative; /* Make this the positioning context for the x-axis */
+        margin: 0;
+        padding: 0;
     }
     
     .form-check {
