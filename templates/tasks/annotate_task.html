@@ -43,7 +43,6 @@
         <!-- Main content area -->
         <div class="col-md-8">
             <div class="spectrogram-section p-3 rounded shadow-sm" style="background-color: #1e1e1e;">
-                <h3 class="mb-2">Spectrogram</h3>
                 <div id="spectrogram-container" class="mb-2">
                     <div class="spectrogram-wrapper">
                         <!-- Spectrogram with axes -->
@@ -79,8 +78,11 @@
                                 <div id="detail-ticks" class="tick-set active">
                                     {% for tick in x_ticks_detail %}
                                         {% if tick.type == "major" %}
-                                        <!-- Only show major tick marks with labels -->
+                                        <!-- Major tick marks with labels -->
                                         <div class="x-tick x-tick-major" style="left: {{ tick.position }}%" id="{{ tick.id }}">{{ tick.value }}</div>
+                                        {% elif tick.type == "minor" %}
+                                        <!-- Minor tick marks without labels -->
+                                        <div class="x-tick x-tick-minor" style="left: {{ tick.position }}%" id="{{ tick.id }}"></div>
                                         {% endif %}
                                     {% endfor %}
                                 </div>
@@ -88,8 +90,11 @@
                                 <div id="overview-ticks" class="tick-set">
                                     {% for tick in x_ticks_overview %}
                                         {% if tick.type == "major" %}
-                                        <!-- Only show major tick marks with labels -->
+                                        <!-- Major tick marks with labels -->
                                         <div class="x-tick x-tick-major" style="left: {{ tick.position }}%" id="{{ tick.id }}">{{ tick.value }}</div>
+                                        {% elif tick.type == "minor" %}
+                                        <!-- Minor tick marks without labels -->
+                                        <div class="x-tick x-tick-minor" style="left: {{ tick.position }}%" id="{{ tick.id }}"></div>
                                         {% endif %}
                                     {% endfor %}
                                 </div>
@@ -213,7 +218,6 @@
                 
                 <!-- Audio section - reduced top margin -->
                 <div class="audio-section mt-3">
-                    <h4 class="mb-2">Audio Playback</h4>
                     <div>
                         <audio id="audio-player" controls src="{% url 'battycoda_app:audio_snippet' %}?wav_path={{ full_path|urlencode }}&call=0&channel=0&hash={{ file_hash }}&overview=False&onset={{ task.onset }}&offset={{ task.offset }}&loudness=1.0" preload="auto" class="w-100">
                             Your browser does not support the audio element.
@@ -448,10 +452,15 @@
         top: 15px; /* Position below the tick mark */
     }
     
-    /* Removed x-tick-minor styles as they're no longer used */
+    /* Minor ticks */
+    .x-tick-minor {
+        font-size: 10px;
+        color: #888;
+        top: 15px;
+    }
     
-    /* Add a tickmark line to all major ticks */
-    .x-tick-major::before {
+    /* Add a tickmark line to all ticks */
+    .x-tick-major::before, .x-tick-minor::before {
         content: "";
         position: absolute;
         left: 50%;

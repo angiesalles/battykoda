@@ -243,6 +243,13 @@ class GroupInvitationForm(forms.Form):
 
 class RecordingForm(forms.ModelForm):
     """Form for creating and editing recordings"""
+    # Make name optional - it will be set automatically for batch uploads
+    name = forms.CharField(
+        max_length=255,
+        required=False,  # Make it optional for batch upload
+        help_text="Name of the recording"
+    )
+    
     recorded_date = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date'}),
         required=False,

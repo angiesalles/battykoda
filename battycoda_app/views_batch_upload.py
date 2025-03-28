@@ -6,14 +6,18 @@ import os
 import tempfile
 import traceback
 import zipfile
+import uuid
 from pathlib import Path
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 from .audio.utils import process_pickle_file
 from .forms import RecordingForm
@@ -21,6 +25,90 @@ from .models import Recording, Segment, Segmentation, UserProfile
 
 # Set up logging
 logger = logging.getLogger("battycoda.views_batch_upload")
+
+# Dictionary to store upload progress data
+UPLOAD_PROGRESS = {}
+
+class UploadProgressMiddleware:
+    """Middleware to track upload progress"""
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+        
+    def __call__(self, request):
+        # Only track progress for the batch upload endpoint
+        if request.method == 'POST' and request.path.endswith('/batch-upload/'):
+            # Generate a unique ID for this upload
+            upload_id = str(uuid.uuid4())
+            request.upload_id = upload_id
+            UPLOAD_PROGRESS[upload_id] = {
+                'total': int(request.META.get('CONTENT_LENGTH', 0)),
+                'uploaded': 0,
+                'status': 'uploading',
+                'timestamp': timezone.now()
+            }
+            
+            # Get original read method
+            original_read = request.META.get('wsgi.input').read
+            
+            # Define a tracking read method
+            def tracking_read(*args, **kwargs):
+                # Call the original read method
+                data = original_read(*args, **kwargs)
+                
+                # Update the progress
+                if upload_id in UPLOAD_PROGRESS:
+                    UPLOAD_PROGRESS[upload_id]['uploaded'] += len(data)
+                    
+                return data
+            
+            # Replace the read method
+            request.META.get('wsgi.input').read = tracking_read
+        
+        # Get response from next middleware or view
+        response = self.get_response(request)
+        
+        # Clean up old progress entries (older than 1 hour)
+        current_time = timezone.now()
+        keys_to_delete = []
+        for key, data in UPLOAD_PROGRESS.items():
+            # Delete entries older than 1 hour
+            if (current_time - data.get('timestamp')).total_seconds() > 3600:
+                keys_to_delete.append(key)
+        
+        # Remove old entries
+        for key in keys_to_delete:
+            UPLOAD_PROGRESS.pop(key, None)
+            
+        return response
+
+@csrf_exempt
+def upload_progress_view(request):
+    """View to get upload progress"""
+    upload_id = request.GET.get('upload_id', '')
+    
+    if upload_id in UPLOAD_PROGRESS:
+        progress_data = UPLOAD_PROGRESS[upload_id]
+        total = progress_data['total']
+        uploaded = progress_data['uploaded']
+        status = progress_data['status']
+        
+        if total > 0:
+            percent = int((uploaded / total) * 100)
+        else:
+            percent = 0
+            
+        return JsonResponse({
+            'total': total,
+            'uploaded': uploaded,
+            'percent': percent,
+            'status': status
+        })
+    
+    return JsonResponse({
+        'percent': 0,
+        'status': 'unknown'
+    })
 
 
 @login_required
@@ -36,6 +124,10 @@ def batch_upload_recordings_view(request):
         return redirect("battycoda_app:recording_list")
     
     if request.method == "POST":
+        # If upload_id was set by middleware, save it in the context
+        if hasattr(request, 'upload_id'):
+            # Set upload_id in session for client-side access
+            request.session['upload_id'] = request.upload_id
         # Log the POST request
         logger.info("POST request received for batch upload")
         logger.info(f"POST data keys: {list(request.POST.keys())}")
@@ -72,17 +164,39 @@ def batch_upload_recordings_view(request):
             error_count = 0
             segmented_count = 0
             
+            # Update status if upload_id is set
+            if hasattr(request, 'upload_id') and request.upload_id in UPLOAD_PROGRESS:
+                UPLOAD_PROGRESS[request.upload_id]['status'] = 'processing'
+            
             # Create temporary directories for extracted files
             with tempfile.TemporaryDirectory() as wav_temp_dir, tempfile.TemporaryDirectory() as pickle_temp_dir:
                 # Extract WAV files from zip
                 wav_files = []
                 try:
                     with zipfile.ZipFile(wav_zip, 'r') as zip_ref:
-                        # Extract all wav files
+                        # Extract all wav files - filtering out directories and duplicate paths
+                        processed_files = set()  # Track files to avoid duplicates
+                        
+                        # Debug: print contents of the ZIP
+                        logger.info(f"ZIP file contains {len(zip_ref.namelist())} items:")
+                        for filename in zip_ref.namelist():
+                            logger.info(f"  - {filename} {'[DIR]' if filename.endswith('/') else ''}")
+                        
                         for file_info in zip_ref.infolist():
+                            # Skip directories, already processed files, and macOS metadata files
+                            if (file_info.filename.endswith('/') or 
+                                file_info.filename in processed_files or
+                                os.path.basename(file_info.filename).startswith('._')):
+                                logger.info(f"Skipping {file_info.filename} - directory, duplicate, or macOS metadata file")
+                                continue
+                                
                             if file_info.filename.lower().endswith('.wav'):
+                                logger.info(f"Processing WAV file from ZIP: {file_info.filename}")
                                 zip_ref.extract(file_info, wav_temp_dir)
-                                wav_files.append(os.path.join(wav_temp_dir, file_info.filename))
+                                extracted_path = os.path.join(wav_temp_dir, file_info.filename)
+                                wav_files.append(extracted_path)
+                                processed_files.add(file_info.filename)
+                                logger.info(f"Extracted to: {extracted_path}")
                                 
                     logger.info(f"Extracted {len(wav_files)} WAV files from ZIP")
                 except Exception as e:
@@ -96,13 +210,22 @@ def batch_upload_recordings_view(request):
                 if pickle_zip:
                     try:
                         with zipfile.ZipFile(pickle_zip, 'r') as zip_ref:
-                            # Extract all pickle files
+                            # Extract all pickle files - filtering out directories and duplicate paths
+                            processed_files = set()  # Track files to avoid duplicates
+                            
                             for file_info in zip_ref.infolist():
+                                # Skip directories, already processed files, and macOS metadata files
+                                if (file_info.filename.endswith('/') or 
+                                    file_info.filename in processed_files or 
+                                    os.path.basename(file_info.filename).startswith('._')):
+                                    continue
+                                    
                                 if file_info.filename.lower().endswith('.pickle'):
                                     zip_ref.extract(file_info, pickle_temp_dir)
                                     pickle_path = os.path.join(pickle_temp_dir, file_info.filename)
                                     # Store with basename as key for matching
                                     pickle_files_dict[os.path.basename(file_info.filename)] = pickle_path
+                                    processed_files.add(file_info.filename)
                                     
                         logger.info(f"Extracted {len(pickle_files_dict)} pickle files from ZIP")
                     except Exception as e:
@@ -124,8 +247,13 @@ def batch_upload_recordings_view(request):
                             with transaction.atomic():
                                 # Create a Recording object for this file
                                 file_name = Path(wav_file_name).stem  # Get file name without extension
+                                
+                                # Use the file name directly as the recording name
+                                recording_name = file_name
+                                
+                                # Create the recording model instance
                                 recording = Recording(
-                                    name=file_name,  # Use file name as recording name
+                                    name=recording_name,  # Use file name as recording name
                                     description=description,
                                     wav_file=wav_file,
                                     recorded_date=recorded_date,
@@ -217,6 +345,11 @@ def batch_upload_recordings_view(request):
                         logger.error(traceback.format_exc())
                         error_count += 1
             
+            # Update upload status if we have an upload_id
+            if hasattr(request, 'upload_id') and request.upload_id in UPLOAD_PROGRESS:
+                # Mark as complete
+                UPLOAD_PROGRESS[request.upload_id]['status'] = 'complete'
+                
             # Success message
             if success_count > 0:
                 success_msg = f"Successfully uploaded {success_count} recordings"

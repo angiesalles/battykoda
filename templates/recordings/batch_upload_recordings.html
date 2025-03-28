@@ -1,6 +1,12 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}BattyCoda - Batch Upload Recordings{% endblock %}
+
+{% block extra_head %}
+<!-- Include upload progress script -->
+<script src="{% static 'js/upload_progress.js' %}"></script>
+{% endblock %}
 
 {% block content %}
 <div class="container py-4">

@@ -34,8 +34,9 @@ body.theme-blue .header {
     color: black;
 }
 
-/* Fix for header h1 color - overriding the default h1 color */
-body.theme-blue .header h1 {
+/* Fix for header headings color - overriding the default heading colors */
+body.theme-blue .header h1,
+body.theme-blue .header h2 {
     color: black;
 }
 

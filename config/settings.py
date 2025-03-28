@@ -84,6 +84,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Add standard authentication middleware
     'battycoda_app.middleware.authentication_middleware.AuthenticationMiddleware',
+    # Add upload progress tracking middleware
+    'battycoda_app.views_batch_upload.UploadProgressMiddleware',
 ]
 
 

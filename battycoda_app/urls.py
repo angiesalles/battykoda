@@ -1,6 +1,18 @@
 from django.urls import path
 
-from . import views, views_automation, views_batch_upload, views_debug, views_project, views_recordings, views_species, views_task_batch
+from . import (
+    views,
+    views_audio_streaming,
+    views_automation,
+    views_batch_upload,
+    views_debug,
+    views_project,
+    views_recording_core,
+    views_recordings,
+    views_segmentation,
+    views_species,
+    views_task_batch
+)
 
 app_name = "battycoda_app"
 
@@ -73,30 +85,39 @@ urlpatterns = [
     # Debug routes
     path("debug/env/", views_debug.debug_env_view, name="debug_env"),
     
-    # Recordings management
-    path("recordings/", views_recordings.recording_list_view, name="recording_list"),
-    path("recordings/<int:recording_id>/", views_recordings.recording_detail_view, name="recording_detail"),
-    path("recordings/create/", views_recordings.create_recording_view, name="create_recording"),
+    # Recordings management - Core views
+    path("recordings/", views_recording_core.recording_list_view, name="recording_list"),
+    path("recordings/<int:recording_id>/", views_recording_core.recording_detail_view, name="recording_detail"),
+    path("recordings/create/", views_recording_core.create_recording_view, name="create_recording"),
+    path("recordings/<int:recording_id>/edit/", views_recording_core.edit_recording_view, name="edit_recording"),
+    path("recordings/<int:recording_id>/delete/", views_recording_core.delete_recording_view, name="delete_recording"),
+    
+    # Batch Upload
     path("recordings/batch-upload/", views_batch_upload.batch_upload_recordings_view, name="batch_upload_recordings"),
-    path("recordings/<int:recording_id>/edit/", views_recordings.edit_recording_view, name="edit_recording"),
-    path("recordings/<int:recording_id>/delete/", views_recordings.delete_recording_view, name="delete_recording"),
-    path("recordings/<int:recording_id>/segment/", views_recordings.segment_recording_view, name="segment_recording"),
-    path("recordings/<int:recording_id>/auto-segment/", views_recordings.auto_segment_recording_view, name="auto_segment_recording"),
-    path("recordings/<int:recording_id>/auto-segment/<int:algorithm_id>/", views_recordings.auto_segment_recording_view, name="auto_segment_recording_with_algorithm"),
-    path("recordings/<int:recording_id>/auto-segment/status/", views_recordings.auto_segment_status_view, name="auto_segment_status"),
-    path("recordings/<int:recording_id>/upload-pickle/", views_recordings.upload_pickle_segments_view, name="upload_pickle_segments"),
+    path("recordings/upload-progress/", views_batch_upload.upload_progress_view, name="upload_progress"),
+    
+    # Segmentation related views
+    path("recordings/<int:recording_id>/segment/", views_segmentation.segment_recording_view, name="segment_recording"),
+    path("recordings/<int:recording_id>/auto-segment/", views_segmentation.auto_segment_recording_view, name="auto_segment_recording"),
+    path("recordings/<int:recording_id>/auto-segment/<int:algorithm_id>/", views_segmentation.auto_segment_recording_view, name="auto_segment_recording_with_algorithm"),
+    path("recordings/<int:recording_id>/auto-segment/status/", views_segmentation.auto_segment_status_view, name="auto_segment_status"),
+    path("recordings/<int:recording_id>/upload-pickle/", views_segmentation.upload_pickle_segments_view, name="upload_pickle_segments"),
+    
+    # Audio streaming and data related views
+    path("recordings/<int:recording_id>/waveform-data/", views_audio_streaming.get_audio_waveform_data, name="recording_waveform_data"),
+    path("recordings/<int:recording_id>/stream/", views_audio_streaming.stream_audio_view, name="stream_recording_audio"),
+    
+    # Legacy views still in views_recordings.py
     path("recordings/<int:recording_id>/spectrogram-status/", views_recordings.recording_spectrogram_status_view, name="recording_spectrogram_status"),
-    path("recordings/<int:recording_id>/waveform-data/", views_recordings.get_audio_waveform_data, name="recording_waveform_data"),
     path("recordings/<int:recording_id>/create-tasks/", views_recordings.create_tasks_from_segments_view, name="create_tasks_from_segments"),
-    path("recordings/<int:recording_id>/stream/", views_recordings.stream_audio_view, name="stream_recording_audio"),
     
     # Segmentation management
-    path("segmentation/", views_recordings.batch_segmentation_view, name="batch_segmentation"),
-    path("segmentation/jobs/status/", views_recordings.segmentation_jobs_status_view, name="segmentation_jobs_status"),
+    path("segmentation/", views_segmentation.batch_segmentation_view, name="batch_segmentation"),
+    path("segmentation/jobs/status/", views_segmentation.segmentation_jobs_status_view, name="segmentation_jobs_status"),
     path("segmentation/<int:segmentation_id>/activate/", views_recordings.activate_segmentation_view, name="activate_segmentation"),
     
     # Segment management
-    path("segments/<int:recording_id>/add/", views_recordings.add_segment_view, name="add_segment"),
-    path("segments/<int:segment_id>/edit/", views_recordings.edit_segment_view, name="edit_segment"),
-    path("segments/<int:segment_id>/delete/", views_recordings.delete_segment_view, name="delete_segment"),
+    path("segments/<int:recording_id>/add/", views_segmentation.add_segment_view, name="add_segment"),
+    path("segments/<int:segment_id>/edit/", views_segmentation.edit_segment_view, name="edit_segment"),
+    path("segments/<int:segment_id>/delete/", views_segmentation.delete_segment_view, name="delete_segment"),
 ]

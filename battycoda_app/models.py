@@ -430,7 +430,7 @@ class Recording(models.Model):
     
     class Meta:
         ordering = ["-created_at"]
-        unique_together = [["name", "group"]]
+        # Removed unique_together constraint for name and group
         verbose_name = "Recording"
         verbose_name_plural = "Recordings"
     
