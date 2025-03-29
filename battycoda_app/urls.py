@@ -14,8 +14,10 @@ from . import (
     views_project,
     views_recording_core,
     views_species,
-    views_task,
+    views_task_annotation,
     views_task_batch,
+    views_task_listing,
+    views_task_navigation,
     views_tasks,
 )
 
@@ -36,21 +38,25 @@ urlpatterns = [
     # Directory and file browsing functionality removed
     # Spectrogram routes
     path("spectrogram/", views_audio.spectrogram_view, name="spectrogram"),
-    path("status/task/<str:task_id>/", views_task.task_status_view, name="task_status"),
+    path("status/task/<str:task_id>/", views_audio.task_status, name="task_status"),
     path("audio/snippet/", views_audio.audio_snippet_view, name="audio_snippet"),
     # Test static file serving (disabled - using built-in Django static file handling)
     # path('test-static/<path:filename>', views_audio.test_static_view, name='test_static'),
     # Task management routes
-    path("tasks/<int:task_id>/", views_task.task_detail_view, name="task_detail"),
+    path("tasks/<int:task_id>/", views_task_listing.task_detail_view, name="task_detail"),
     # Individual task creation removed - tasks are now only created through batches
-    path("tasks/batches/", views_task.task_batch_list_view, name="task_batch_list"),
-    path("tasks/batches/<int:batch_id>/", views_task.task_batch_detail_view, name="task_batch_detail"),
+    path("tasks/batches/", views_task_batch.task_batch_list_view, name="task_batch_list"),
+    path("tasks/batches/<int:batch_id>/", views_task_batch.task_batch_detail_view, name="task_batch_detail"),
     path("tasks/batches/<int:batch_id>/export/", views_task_batch.export_task_batch_view, name="export_task_batch"),
-    path("tasks/batches/create/", views_task.create_task_batch_view, name="create_task_batch"),
-    path("tasks/next/", views_task.get_next_task_view, name="get_next_task"),
-    path("tasks/last/", views_task.get_last_task_view, name="get_last_task"),
-    path("tasks/batch/<int:batch_id>/annotate/", views_task.get_next_task_from_batch_view, name="annotate_batch"),
-    path("tasks/annotate/<int:task_id>/", views_task.task_annotation_view, name="annotate_task"),
+    path("tasks/batches/create/", views_task_batch.create_task_batch_view, name="create_task_batch"),
+    path("tasks/next/", views_task_navigation.get_next_task_view, name="get_next_task"),
+    path("tasks/last/", views_task_navigation.get_last_task_view, name="get_last_task"),
+    path(
+        "tasks/batch/<int:batch_id>/annotate/",
+        views_task_navigation.get_next_task_from_batch_view,
+        name="annotate_batch",
+    ),
+    path("tasks/annotate/<int:task_id>/", views_task_annotation.task_annotation_view, name="annotate_task"),
     # Automation routes
     path("automation/", views_automation.automation_home_view, name="automation_home"),
     path("automation/runs/<int:run_id>/", views_automation.detection_run_detail_view, name="detection_run_detail"),
