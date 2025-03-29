@@ -26,7 +26,7 @@ class Classifier(models.Model):
     celery_task = models.CharField(
         max_length=255,
         help_text="Fully qualified Celery task name to execute this algorithm",
-        default="battycoda_app.audio.tasks.run_call_detection",
+        default="battycoda_app.audio.task_modules.detection_tasks.run_call_detection",
     )
 
     # External service parameters

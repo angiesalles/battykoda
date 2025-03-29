@@ -147,7 +147,8 @@ class Task(models.Model):
                     from celery import current_app
 
                     task = current_app.send_task(
-                        "battycoda_app.audio.tasks.generate_spectrogram_task", args=[wav_path, args, None]
+                        "battycoda_app.audio.task_modules.spectrogram_tasks.generate_spectrogram_task",
+                        args=[wav_path, args, None],
                     )
 
         except Exception as e:

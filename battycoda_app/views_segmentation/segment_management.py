@@ -62,7 +62,7 @@ def segment_recording_view(request, recording_id):
             from celery import current_app
 
             task = current_app.send_task(
-                "battycoda_app.audio.tasks.generate_recording_spectrogram", args=[recording.id]
+                "battycoda_app.audio.task_modules.spectrogram_tasks.generate_recording_spectrogram", args=[recording.id]
             )
             # Use a placeholder until it's generated
             spectrogram_url = None

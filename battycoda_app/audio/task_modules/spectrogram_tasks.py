@@ -18,7 +18,12 @@ from .base import log_performance, logger
 # Import soundfile in the functions where needed
 
 
-@shared_task(bind=True, name="battycoda_app.audio.tasks.generate_spectrogram_task", max_retries=3, retry_backoff=True)
+@shared_task(
+    bind=True,
+    name="battycoda_app.audio.task_modules.spectrogram_tasks.generate_spectrogram_task",
+    max_retries=3,
+    retry_backoff=True,
+)
 def generate_spectrogram_task(self, path, args, output_path=None):
     """
     Task to generate a spectrogram image.
@@ -98,7 +103,7 @@ def prefetch_spectrograms(self, path, base_args, call_range):
     return {"status": "disabled", "message": "Prefetching is disabled for performance reasons"}
 
 
-@shared_task(bind=True, name="battycoda_app.audio.tasks.generate_recording_spectrogram")
+@shared_task(bind=True, name="battycoda_app.audio.task_modules.spectrogram_tasks.generate_recording_spectrogram")
 def generate_recording_spectrogram(self, recording_id):
     """
     Generate a full spectrogram for a recording.

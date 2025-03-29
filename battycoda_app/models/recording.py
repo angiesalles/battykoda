@@ -89,7 +89,7 @@ class SegmentationAlgorithm(models.Model):
     celery_task = models.CharField(
         max_length=255,
         help_text="Fully qualified Celery task name to execute this algorithm",
-        default="battycoda_app.audio.tasks.auto_segment_recording",
+        default="battycoda_app.audio.task_modules.segmentation_tasks.auto_segment_recording_task",
     )
 
     # External service parameters (for external algorithms)

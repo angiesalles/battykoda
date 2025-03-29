@@ -14,7 +14,7 @@ from celery import shared_task
 from .base import extract_audio_segment, logger
 
 
-@shared_task(bind=True, name="battycoda_app.audio.tasks.run_call_detection")
+@shared_task(bind=True, name="battycoda_app.audio.task_modules.detection_tasks.run_call_detection")
 def run_call_detection(self, detection_run_id):
     """
     Run automated call classification on segments using the configured classifier.
@@ -306,7 +306,7 @@ def run_call_detection(self, detection_run_id):
         return {"status": "error", "message": str(e)}
 
 
-@shared_task(bind=True, name="battycoda_app.audio.tasks.run_dummy_classifier")
+@shared_task(bind=True, name="battycoda_app.audio.task_modules.detection_tasks.run_dummy_classifier")
 def run_dummy_classifier(self, detection_run_id):
     """
     Dummy classifier that assigns equal probability to all call types.

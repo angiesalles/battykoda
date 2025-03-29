@@ -10,7 +10,7 @@ from celery import shared_task
 from .base import logger
 
 
-@shared_task(bind=True, name="battycoda_app.audio.tasks.auto_segment_recording")
+@shared_task(bind=True, name="battycoda_app.audio.task_modules.segmentation_tasks.auto_segment_recording_task")
 def auto_segment_recording_task(
     self, recording_id, min_duration_ms=10, smooth_window=3, threshold_factor=0.5, debug_visualization=False
 ):

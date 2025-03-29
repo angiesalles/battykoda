@@ -108,7 +108,7 @@ def recording_spectrogram_status_view(request, recording_id):
 
             # No task found or task ID not stored, start a new task
             task = current_app.send_task(
-                "battycoda_app.audio.tasks.generate_recording_spectrogram", args=[recording.id]
+                "battycoda_app.audio.task_modules.spectrogram_tasks.generate_recording_spectrogram", args=[recording.id]
             )
 
             # Store task ID in session for status checks

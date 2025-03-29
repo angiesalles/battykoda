@@ -93,7 +93,8 @@ def handle_spectrogram(request):
         from celery import current_app
 
         task = current_app.send_task(
-            "battycoda_app.audio.tasks.generate_spectrogram_task", args=[path, args_dict, file_path]
+            "battycoda_app.audio.task_modules.spectrogram_tasks.generate_spectrogram_task",
+            args=[path, args_dict, file_path],
         )
 
         # Always use async mode - simpler approach

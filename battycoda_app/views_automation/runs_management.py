@@ -119,12 +119,12 @@ def create_detection_run_view(request, segmentation_id=None):
             # Launch the appropriate Celery task based on the classifier
             if classifier.name == "Dummy Classifier":
                 # Use the dummy classifier task directly
-                from battycoda_app.audio.tasks import run_dummy_classifier
+                from battycoda_app.audio.task_modules.detection_tasks import run_dummy_classifier
 
                 run_dummy_classifier.delay(run.id)
             else:
                 # For other classifiers, use the standard task
-                from battycoda_app.audio.tasks import run_call_detection
+                from battycoda_app.audio.task_modules.detection_tasks import run_call_detection
 
                 run_call_detection.delay(run.id)
 
