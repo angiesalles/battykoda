@@ -27,8 +27,7 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
     Args:
         audio_path: Path to the WAV file
         call_number: Which call to extract (only used for legacy pickle method)
-        window_size: Size of the window around the call in samples (when passed from normal_hwin/overview_hwin)
-                     or in milliseconds (when passed directly as a number)
+        window_size: Size of the window around the call in milliseconds (when passed from normal_hwin/overview_hwin)
         extra_params: Dictionary of extra parameters like onset/offset from Task model
 
     Returns:
@@ -36,162 +35,69 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
     """
     try:
         import hashlib
+        import os
 
         import numpy as np
-        import soundfile as sf
 
         # Calculate file hash based on path (for consistency across containers)
         file_hash = hashlib.md5(audio_path.encode()).hexdigest()
 
-        # Check if audio file exists
+        # Check if audio file exists - no alternative paths, just fail if not found
         if not os.path.exists(audio_path):
             logger.error(f"Audio file not found: {audio_path}")
-            # Try a few alternate paths
-            alt_paths = [
-                audio_path.replace("/app/media", ""),
-                "/app/media" + audio_path if not audio_path.startswith("/app/media") else audio_path,
-                audio_path.replace("/app/media/task_batches", "/task_batches"),
-                "/task_batches/" + os.path.basename(audio_path),
-            ]
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-            for alt_path in alt_paths:
-                if os.path.exists(alt_path):
-                    logger.info(f"Found alternate path: {alt_path}")
-                    audio_path = alt_path
-                    break
-            else:
-                # No alternate paths found
-                raise FileNotFoundError(f"Audio file not found: {audio_path}")
-
-        # Log file info
-        logger.info(f"Processing audio file: {audio_path}")
-
-        # OPTIMIZATION: If we have onset/offset data, we can read only the segment we need
-        # This avoids loading the entire file for large audio files
+        # If we have onset/offset data, use extract_audio_segment
         if extra_params and "onset" in extra_params and "offset" in extra_params:
-            try:
-                # Get file info without reading all data
-                info = sf.info(audio_path)
-                fs = info.samplerate
-
-                # Use onset/offset provided in parameters
-                onset_time = float(extra_params["onset"])
-                offset_time = float(extra_params["offset"])
-
-                # Log onset and offset
-                logger.info(
-                    f"Using task onset/offset: {onset_time:.5f}s-{offset_time:.5f}s ({int(onset_time*fs)}-{int(offset_time*fs)} samples)"
-                )
-
-                # Handle window padding (in seconds)
-                pre_padding = window_size[0] / 1000  # convert ms to seconds
-                post_padding = window_size[1] / 1000
-                start_time = max(0, onset_time - pre_padding)
-                end_time = min(info.duration, offset_time + post_padding)
-
-                # Calculate frames to read
-                start_frame = int(start_time * fs)
-                num_frames = int((end_time - start_time) * fs)
-
-                logger.debug(f"Reading segment from {start_time:.3f}s to {end_time:.3f}s")
-                logger.debug(f"Extracting segment: start_idx={start_frame}, end_idx={start_frame+num_frames}")
-
-                # Read only the segment we need
-                with sf.SoundFile(audio_path) as f:
-                    f.seek(start_frame)
-                    audio_segment = f.read(num_frames, dtype="float32")
-
-                # Handle mono files by converting to stereo
-                if len(audio_segment.shape) == 1:
-                    audio_segment = audio_segment.reshape([-1, 1])
-                    # Add second channel if missing
-                    if audio_segment.shape[1] == 1:
-                        audio_segment = np.column_stack((audio_segment, audio_segment))
-
-                # Normalize audio data (only the segment)
-                std = np.std(audio_segment)
-                if std > 0:
-                    audio_segment /= std
-
-                # Ensure output is valid
-                if np.isnan(audio_segment).any() or np.isinf(audio_segment).any():
-                    logger.warning("Audio segment contains NaN or Inf values, replacing with zeros")
-                    audio_segment = np.nan_to_num(audio_segment)
-
-                logger.info(f"Successfully extracted audio segment: shape={audio_segment.shape}")
-                return audio_segment, fs, file_hash
-
-            except Exception as e:
-                logger.error(f"Error reading segment, falling back to full file: {str(e)}")
-                logger.debug(traceback.format_exc())
-                # Fall through to standard method if optimized reading fails
-
-        # Standard method - read the entire file
-        logger.debug(f"Reading full WAV file: {audio_path}")
-        # Read audio with soundfile for better robustness
-        with sf.SoundFile(audio_path) as f:
-            fs = f.samplerate
-            audiodata = f.read(dtype="float32")
-
-        # Validate audio data
-        if audiodata is None or audiodata.size == 0:
-            logger.error(f"No audio data found in file: {audio_path}")
-            raise ValueError(f"No audio data found in file: {audio_path}")
-
-        # Convert to float if not already
-        if audiodata.dtype != np.float32 and audiodata.dtype != np.float64:
-            audiodata = audiodata.astype(np.float32) / np.iinfo(audiodata.dtype).max
-
-        # Handle mono files by converting to stereo
-        if len(audiodata.shape) == 1:
-            audiodata = audiodata.reshape([-1, 1])
-            # Add second channel if missing
-            if audiodata.shape[1] == 1:
-                audiodata = np.column_stack((audiodata, audiodata))
-
-        # Normalize audio data
-        std = np.std(audiodata)
-        if std > 0:
-            audiodata /= std
-
-        # Ensure output is valid
-        if np.isnan(audiodata).any() or np.isinf(audiodata).any():
-            logger.warning("Audio data contains NaN or Inf values, replacing with zeros")
-            audiodata = np.nan_to_num(audiodata)
-
-        # If we have onset/offset, extract just that segment
-        if extra_params and "onset" in extra_params and "offset" in extra_params:
+            # Use onset/offset provided in parameters
             onset_time = float(extra_params["onset"])
             offset_time = float(extra_params["offset"])
 
-            # Log onset and offset
-            logger.info(
-                f"Using task onset/offset: {onset_time:.5f}s-{offset_time:.5f}s ({int(onset_time*fs)}-{int(offset_time*fs)} samples)"
-            )
-
-            # Convert to samples
-            onset = int(onset_time * fs)
-            offset = int(offset_time * fs)
-
-            # Validate boundaries
-            onset = max(0, min(onset, len(audiodata) - 1))
-            offset = max(onset + 1, min(offset, len(audiodata)))
-
-            # Extract audio segment with window padding
-            pre_padding = window_size[0] / 1000
+            # Handle window padding (in seconds)
+            pre_padding = window_size[0] / 1000  # convert ms to seconds
             post_padding = window_size[1] / 1000
-            start_idx = max(0, onset - int(fs * pre_padding))
-            end_idx = min(offset + int(fs * post_padding), len(audiodata))
 
-            logger.debug(f"Extracting segment: start_idx={start_idx}, end_idx={end_idx}")
-            audio_segment = audiodata[start_idx:end_idx, :]
-            logger.info(f"Successfully extracted audio segment: shape={audio_segment.shape}")
-            return audio_segment, fs, file_hash
+            # Import the extract_audio_segment function
+            from ..task_modules.base import extract_audio_segment
 
-        # Return full audio if no segment specified
-        logger.info(f"Returning full audio: shape={audiodata.shape}")
-        return audiodata, fs, file_hash
+            # Calculate the padded segment boundaries - no need to clamp values
+            # as extract_audio_segment will handle out-of-bounds conditions
+            start_time = onset_time - pre_padding
+            end_time = offset_time + post_padding
 
+            # Use the optimized extract_audio_segment function
+            segment, sample_rate = extract_audio_segment(audio_path, start_time, end_time)
+
+            # Handle adding second channel for stereo (if needed)
+            if segment.shape[1] == 1:
+                segment = np.column_stack((segment, segment))
+
+            # Normalize audio data (only the segment)
+            std = np.std(segment)
+            if std > 0:
+                segment /= std
+
+            return segment, sample_rate, file_hash
+        else:
+            # Legacy path for cases without onset/offset (should be rare)
+            logger.warning("No onset/offset provided, falling back to reading entire file (inefficient)")
+
+            # Import the extract_audio_segment function
+            from ..task_modules.base import extract_audio_segment
+
+            # Read the entire file (0 to None means start to end)
+            audiodata, sample_rate = extract_audio_segment(audio_path, 0, None)
+
+            # Handle adding second channel for stereo (if needed)
+            if audiodata.shape[1] == 1:
+                audiodata = np.column_stack((audiodata, audiodata))
+
+            # Normalize audio data
+            std = np.std(audiodata)
+            if std > 0:
+                audiodata /= std
+
+            return audiodata, sample_rate, file_hash
     except Exception as e:
         logger.error(f"Error in get_audio_bit: {str(e)}")
         logger.debug(traceback.format_exc())

@@ -128,16 +128,16 @@ def run_call_detection(self, detection_run_id):
         for i, segment in enumerate(segments):
             try:
                 # Extract audio segment from WAV file
-                segment_data = extract_audio_segment(wav_file_path, segment.onset, segment.offset)
+                segment_data, sample_rate = extract_audio_segment(wav_file_path, segment.onset, segment.offset)
 
                 # Save segment to a temporary file
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
                     temp_path = temp_file.name
-                    sf.write(temp_path, segment_data, samplerate=250000)  # Assuming 250kHz sampling rate
+                    sf.write(temp_path, segment_data, samplerate=sample_rate)
 
                 # Log segment info for debugging
                 logger.info(f"Created temporary file for segment {segment.id}: {temp_path}")
-                logger.info(f"Segment duration: {len(segment_data)/250000:.4f}s")
+                logger.info(f"Segment duration: {len(segment_data)/sample_rate:.4f}s, sample rate: {sample_rate}Hz")
 
                 # Prepare files for upload
                 files = {"file": (f"segment_{segment.id}.wav", open(temp_path, "rb"), "audio/wav")}

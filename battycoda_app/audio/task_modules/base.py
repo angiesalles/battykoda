@@ -20,40 +20,89 @@ def log_performance(start_time, message):
         logger.info(f"PERF: {message} - {elapsed:.3f}s")
 
 
-def extract_audio_segment(wav_path, onset, offset, padding=0.01):
+def extract_audio_segment(wav_path, onset, offset=None):
     """
     Extract a segment of audio from a WAV file.
+    Uses efficient seek operation to read only the needed segment without loading the entire file.
+    Handles out-of-bounds requests by padding with zeros.
 
     Args:
         wav_path: Path to the WAV file
-        onset: Start time in seconds
-        offset: End time in seconds
-        padding: Optional padding in seconds to add before/after segment
+        onset: Start time in seconds (can be negative, will be zero-padded)
+        offset: End time in seconds, or None to read until the end of the file
+                (if greater than file duration, will be zero-padded)
 
     Returns:
-        numpy.ndarray: Audio segment data
+        tuple: (audio_data, sample_rate)
     """
     try:
-        # Load the audio file
+        import numpy as np
         import soundfile as sf
 
-        audio_data, sample_rate = sf.read(wav_path)
+        # Get file info without reading all data
+        info = sf.info(wav_path)
+        sample_rate = info.samplerate
+        duration = info.duration
+        n_channels = info.channels
 
-        # Log file information
-        logger.info(f"Loaded audio file {wav_path}: {len(audio_data)} samples, {sample_rate}Hz")
+        # Brief log of file details
+        logger.info(f"Audio file: {os.path.basename(wav_path)}, duration: {duration:.2f}s, sample rate: {sample_rate}Hz")
 
-        # Calculate sample indices with padding
-        start_sample = max(0, int((onset - padding) * sample_rate))
-        end_sample = min(len(audio_data), int((offset + padding) * sample_rate))
+        # Handle case where offset is None (read to the end)
+        if offset is None:
+            offset = duration
 
-        # Log segment bounds
-        logger.info(f"Extracting segment from {onset-padding:.4f}s to {offset+padding:.4f}s")
-        logger.info(f"Sample indices: {start_sample} to {end_sample} (length: {end_sample-start_sample})")
+        # Calculate sample positions
+        req_start_sample = int(onset * sample_rate)
+        req_end_sample = int(offset * sample_rate)
+        req_num_samples = req_end_sample - req_start_sample
 
-        # Extract the segment
-        segment = audio_data[start_sample:end_sample]
+        # Calculate valid sample range (within file bounds)
+        valid_start_sample = max(0, req_start_sample)
+        valid_end_sample = min(int(duration * sample_rate), req_end_sample)
 
-        return segment
+        # Check if padding is needed
+        needs_padding = valid_start_sample > req_start_sample or valid_end_sample < req_end_sample
+
+        if needs_padding:
+            # Handle padding for out-of-bounds requests
+            valid_num_samples = valid_end_sample - valid_start_sample
+
+            if valid_num_samples <= 0:
+                # Entire request is outside file bounds - return zeros
+                segment = np.zeros((req_num_samples, n_channels), dtype=np.float32)
+                logger.info(f"Segment entirely outside bounds ({onset:.3f}s to {offset:.3f}s), returning zeros")
+            else:
+                # Read valid portion and add padding
+                with sf.SoundFile(wav_path) as f:
+                    f.seek(valid_start_sample)
+                    valid_segment = f.read(valid_num_samples, dtype="float32")
+
+                # Handle mono audio consistently
+                if len(valid_segment.shape) == 1:
+                    valid_segment = valid_segment.reshape(-1, 1)
+
+                # Create padded segment
+                segment = np.zeros((req_num_samples, valid_segment.shape[1]), dtype=np.float32)
+                
+                # Insert valid data at the correct position
+                insert_pos = max(0, -req_start_sample)
+                segment[insert_pos : insert_pos + valid_segment.shape[0]] = valid_segment
+                
+                logger.info(f"Created padded segment from {onset:.3f}s to {offset:.3f}s")
+        else:
+            # No padding needed, just read the segment efficiently
+            with sf.SoundFile(wav_path) as f:
+                f.seek(valid_start_sample)
+                segment = f.read(valid_end_sample - valid_start_sample, dtype="float32")
+
+            # Handle mono audio consistently
+            if len(segment.shape) == 1 and segment.size > 0:
+                segment = segment.reshape(-1, 1)
+                
+            logger.info(f"Read segment directly from {onset:.3f}s to {offset:.3f}s")
+
+        return segment, sample_rate
     except Exception as e:
         logger.error(f"Error extracting audio segment: {str(e)}")
         logger.error(f"File: {wav_path}, Onset: {onset}, Offset: {offset}")
