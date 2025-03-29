@@ -398,21 +398,11 @@ def handle_audio_snippet(request):
                         padding = np.zeros(1000, dtype=np.float32)
                     audio_data = np.concatenate([audio_data, padding])
 
-                # Try using soundfile first (more robust)
-                try:
-                    import soundfile as sf
+                # Use soundfile for reliable audio writing
+                import soundfile as sf
 
-                    sf.write(file_path, audio_data, sample_rate)
-                    logger.info(f"Successfully wrote audio file using soundfile: {file_path}")
-                except Exception as sf_error:
-                    logger.warning(f"Error writing with soundfile, trying scipy: {str(sf_error)}")
-                    # Fall back to scipy if soundfile fails
-                    import scipy.io.wavfile
-
-                    # Convert to appropriate range for wavfile
-                    wav_data = (audio_data * 32767).astype(np.int16)
-                    scipy.io.wavfile.write(file_path, sample_rate, wav_data)
-                    logger.info(f"Successfully wrote audio file using scipy: {file_path}")
+                sf.write(file_path, audio_data, sample_rate)
+                logger.info(f"Successfully wrote audio file using soundfile: {file_path}")
 
                 # Verify the file was created correctly
                 if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:

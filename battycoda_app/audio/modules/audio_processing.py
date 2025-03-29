@@ -39,7 +39,6 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
 
         import numpy as np
         import soundfile as sf
-        from scipy.io import wavfile
 
         # Calculate file hash based on path (for consistency across containers)
         file_hash = hashlib.md5(audio_path.encode()).hexdigest()
@@ -129,18 +128,10 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
 
         # Standard method - read the entire file
         logger.debug(f"Reading full WAV file: {audio_path}")
-        try:
-            # First try with soundfile for better robustness
-            with sf.SoundFile(audio_path) as f:
-                fs = f.samplerate
-                audiodata = f.read(dtype="float32")
-        except Exception as sf_error:
-            logger.warning(f"Error with soundfile, trying wavfile: {str(sf_error)}")
-            try:
-                fs, audiodata = wavfile.read(audio_path)
-            except Exception as wav_error:
-                logger.error(f"Failed to read audio file with both libraries: {str(wav_error)}")
-                raise
+        # Read audio with soundfile for better robustness
+        with sf.SoundFile(audio_path) as f:
+            fs = f.samplerate
+            audiodata = f.read(dtype="float32")
 
         # Validate audio data
         if audiodata is None or audiodata.size == 0:
