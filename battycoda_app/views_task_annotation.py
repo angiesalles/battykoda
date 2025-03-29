@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Species, Task
-from .utils import convert_path_to_os_specific
+from .utils_modules.path_utils import convert_path_to_os_specific
 
 # Set up logging
 logger = logging.getLogger("battycoda.views_task_annotation")

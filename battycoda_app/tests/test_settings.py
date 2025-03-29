@@ -8,7 +8,9 @@ from unittest.mock import MagicMock, patch
 generate_spectrograms_patch = patch("battycoda_app.models.Task.generate_spectrograms", MagicMock(return_value=None))
 
 # Patch import_default_species to return empty list
-import_default_species_patch = patch("battycoda_app.utils.import_default_species", MagicMock(return_value=[]))
+import_default_species_patch = patch(
+    "battycoda_app.utils_modules.species_utils.import_default_species", MagicMock(return_value=[])
+)
 
 # Patch file operations
 file_operations_patch = patch(

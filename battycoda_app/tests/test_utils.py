@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from battycoda_app.models import Group, Species
-from battycoda_app.utils import import_default_species
+from battycoda_app.utils_modules.species_utils import import_default_species
 
 
 class UtilsTest(TestCase):

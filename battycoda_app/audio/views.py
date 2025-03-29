@@ -15,7 +15,7 @@ from django.urls import reverse
 import numpy as np
 from celery.result import AsyncResult
 
-from ..utils import convert_path_to_os_specific
+from ..utils_modules.path_utils import convert_path_to_os_specific
 
 # Removed unused imports
 from .utils import appropriate_file, get_audio_bit, normal_hwin, overview_hwin

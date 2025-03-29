@@ -2,16 +2,19 @@ from django.urls import path
 
 from . import views_segmentation  # This now imports from the package
 from . import (
-    views,
+    views_audio,
     views_audio_streaming,
+    views_auth,
     views_automation,
     views_batch_upload,
+    views_dashboard,
     views_debug,
     views_group,
     views_invitations,
     views_project,
     views_recording_core,
     views_species,
+    views_task,
     views_task_batch,
     views_tasks,
 )
@@ -19,35 +22,35 @@ from . import (
 app_name = "battycoda_app"
 
 urlpatterns = [
-    path("", views.index, name="index"),
+    path("", views_dashboard.index, name="index"),
     # Authentication URLs
-    path("accounts/login/", views.login_view, name="login"),
-    path("accounts/register/", views.register_view, name="register"),
-    path("accounts/logout/", views.logout_view, name="logout"),
-    path("accounts/profile/", views.profile_view, name="profile"),
-    path("accounts/profile/edit/", views.edit_profile_view, name="edit_profile"),
-    path("accounts/password-reset/", views.password_reset_request, name="password_reset_request"),
-    path("accounts/reset-password/<str:token>/", views.password_reset, name="password_reset"),
-    path("accounts/request-login-code/", views.request_login_code, name="request_login_code"),
+    path("accounts/login/", views_auth.login_view, name="login"),
+    path("accounts/register/", views_auth.register_view, name="register"),
+    path("accounts/logout/", views_auth.logout_view, name="logout"),
+    path("accounts/profile/", views_auth.profile_view, name="profile"),
+    path("accounts/profile/edit/", views_auth.edit_profile_view, name="edit_profile"),
+    path("accounts/password-reset/", views_auth.password_reset_request, name="password_reset_request"),
+    path("accounts/reset-password/<str:token>/", views_auth.password_reset, name="password_reset"),
+    path("accounts/request-login-code/", views_auth.request_login_code, name="request_login_code"),
     # Routes for task functionality only
     # Directory and file browsing functionality removed
     # Spectrogram routes
-    path("spectrogram/", views.spectrogram_view, name="spectrogram"),
-    path("status/task/<str:task_id>/", views.task_status_view, name="task_status"),
-    path("audio/snippet/", views.audio_snippet_view, name="audio_snippet"),
+    path("spectrogram/", views_audio.spectrogram_view, name="spectrogram"),
+    path("status/task/<str:task_id>/", views_task.task_status_view, name="task_status"),
+    path("audio/snippet/", views_audio.audio_snippet_view, name="audio_snippet"),
     # Test static file serving (disabled - using built-in Django static file handling)
-    # path('test-static/<path:filename>', views.test_static_view, name='test_static'),
+    # path('test-static/<path:filename>', views_audio.test_static_view, name='test_static'),
     # Task management routes
-    path("tasks/<int:task_id>/", views.task_detail_view, name="task_detail"),
+    path("tasks/<int:task_id>/", views_task.task_detail_view, name="task_detail"),
     # Individual task creation removed - tasks are now only created through batches
-    path("tasks/batches/", views.task_batch_list_view, name="task_batch_list"),
-    path("tasks/batches/<int:batch_id>/", views.task_batch_detail_view, name="task_batch_detail"),
+    path("tasks/batches/", views_task.task_batch_list_view, name="task_batch_list"),
+    path("tasks/batches/<int:batch_id>/", views_task.task_batch_detail_view, name="task_batch_detail"),
     path("tasks/batches/<int:batch_id>/export/", views_task_batch.export_task_batch_view, name="export_task_batch"),
-    path("tasks/batches/create/", views.create_task_batch_view, name="create_task_batch"),
-    path("tasks/next/", views.get_next_task_view, name="get_next_task"),
-    path("tasks/last/", views.get_last_task_view, name="get_last_task"),
-    path("tasks/batch/<int:batch_id>/annotate/", views.get_next_task_from_batch_view, name="annotate_batch"),
-    path("tasks/annotate/<int:task_id>/", views.task_annotation_view, name="annotate_task"),
+    path("tasks/batches/create/", views_task.create_task_batch_view, name="create_task_batch"),
+    path("tasks/next/", views_task.get_next_task_view, name="get_next_task"),
+    path("tasks/last/", views_task.get_last_task_view, name="get_last_task"),
+    path("tasks/batch/<int:batch_id>/annotate/", views_task.get_next_task_from_batch_view, name="annotate_batch"),
+    path("tasks/annotate/<int:task_id>/", views_task.task_annotation_view, name="annotate_task"),
     # Automation routes
     path("automation/", views_automation.automation_home_view, name="automation_home"),
     path("automation/runs/<int:run_id>/", views_automation.detection_run_detail_view, name="detection_run_detail"),
