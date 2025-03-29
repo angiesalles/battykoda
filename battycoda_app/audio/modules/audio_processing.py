@@ -36,6 +36,7 @@ def get_audio_bit(audio_path, call_number, window_size, extra_params=None):
     """
     try:
         import hashlib
+
         import numpy as np
         import soundfile as sf
         from scipy.io import wavfile

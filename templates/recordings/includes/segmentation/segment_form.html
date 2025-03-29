@@ -1,0 +1,33 @@
+<!-- Segment form card (initially hidden) -->
+<div id="segment-form-card" class="card bg-dark mt-4" style="display: none;">
+    <div class="card-header">
+        <h5 id="segment-form-title" class="mb-0">Add Segment</h5>
+    </div>
+    <div class="card-body">
+        <form id="segment-form">
+            <input type="hidden" id="segment-id" name="segment_id">
+            <div class="mb-3">
+                <label for="segment-name" class="form-label">Name</label>
+                <input type="text" class="form-control bg-dark text-light border-secondary" id="segment-name" name="segment_name" placeholder="Segment Name">
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="segment-onset" class="form-label">Onset (seconds)</label>
+                    <input type="number" class="form-control bg-dark text-light border-secondary" id="segment-onset" name="segment_onset" step="0.001" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="segment-offset" class="form-label">Offset (seconds)</label>
+                    <input type="number" class="form-control bg-dark text-light border-secondary" id="segment-offset" name="segment_offset" step="0.001" required>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="segment-notes" class="form-label">Notes</label>
+                <textarea class="form-control bg-dark text-light border-secondary" id="segment-notes" name="segment_notes" rows="3" placeholder="Optional notes about this segment"></textarea>
+            </div>
+            <div class="d-flex justify-content-between">
+                <button type="button" id="cancel-segment-btn" class="btn btn-outline-secondary">Cancel</button>
+                <button type="submit" id="save-segment-btn" class="btn btn-primary">Save Segment</button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -1,3 +1,5 @@
+{% load static %}
+
 {% comment %}
 Reusable waveform player component
 Parameters:
@@ -97,6 +99,9 @@ Parameters:
         Your browser does not support the audio element.
     </audio>
 
+    <!-- Include waveform player scripts -->
+    <script src="{% static 'js/waveform_player.js' %}"></script>
+    
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize waveform player for {{ container_id }}

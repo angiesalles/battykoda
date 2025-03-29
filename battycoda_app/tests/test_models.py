@@ -115,18 +115,18 @@ class SpeciesModelTest(BattycodaTestCase):
     def test_species_meta_options(self):
         self.assertEqual(Species._meta.verbose_name_plural, "Species")
         self.assertEqual(Species._meta.ordering, ["name"])
-        
+
     def test_species_unique_together_constraint(self):
         """Test that species names must be unique within a group but can be duplicated across groups"""
         # Create a second group
         group2 = Group.objects.create(name="Second Group", description="Another test group")
-        
+
         # Create a species with the same name in a different group (should work)
         species2 = Species.objects.create(
             name="Test Species", description="Same name, different group", created_by=self.user, group=group2
         )
         self.assertEqual(species2.name, self.species.name)
-        
+
         # Try to create a species with the same name in the same group (should fail)
         with self.assertRaises(IntegrityError):
             Species.objects.create(

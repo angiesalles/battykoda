@@ -9,11 +9,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--force',
-            action='store_true',
-            dest='force',
+            "--force",
+            action="store_true",
+            dest="force",
             default=False,
-            help='Force recreation of memberships even if they already exist'
+            help="Force recreation of memberships even if they already exist",
         )
 
     def handle(self, *args, **options):
@@ -21,22 +21,20 @@ class Command(BaseCommand):
         created_count = 0
         updated_count = 0
         skipped_count = 0
-        
+
         # Get all user profiles
-        profiles = UserProfile.objects.select_related('user', 'group').all()
-        
+        profiles = UserProfile.objects.select_related("user", "group").all()
+
         with transaction.atomic():
             for profile in profiles:
                 if profile.group:
                     # Create membership record if the user has a group
-                    if options['force']:
+                    if options["force"]:
                         # If force flag is used, we update or create
                         membership, created = GroupMembership.objects.update_or_create(
-                            user=profile.user,
-                            group=profile.group,
-                            defaults={'is_admin': profile.is_admin}
+                            user=profile.user, group=profile.group, defaults={"is_admin": profile.is_admin}
                         )
-                        
+
                         if created:
                             created_count += 1
                             self.stdout.write(
@@ -50,11 +48,9 @@ class Command(BaseCommand):
                     else:
                         # Otherwise, only create if it doesn't exist
                         membership, created = GroupMembership.objects.get_or_create(
-                            user=profile.user,
-                            group=profile.group,
-                            defaults={'is_admin': profile.is_admin}
+                            user=profile.user, group=profile.group, defaults={"is_admin": profile.is_admin}
                         )
-                        
+
                         if created:
                             created_count += 1
                             self.stdout.write(
@@ -65,8 +61,10 @@ class Command(BaseCommand):
                             self.stdout.write(
                                 f"Membership already exists for {profile.user.username} in group {profile.group.name}"
                             )
-        
-        self.stdout.write(self.style.SUCCESS(
-            f"Finished! Created {created_count} GroupMembership records, "
-            f"updated {updated_count}, skipped {skipped_count}."
-        ))
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Finished! Created {created_count} GroupMembership records, "
+                f"updated {updated_count}, skipped {skipped_count}."
+            )
+        )

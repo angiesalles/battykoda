@@ -9,12 +9,13 @@ import logging
 # Configure logging
 logger = logging.getLogger("battycoda.audio.visualization")
 
-# Re-export functions from specialized modules
-from .tick_generation import get_spectrogram_ticks
 from .segmentation import auto_segment_audio, energy_based_segment_audio
 
+# Re-export functions from specialized modules
+from .tick_generation import get_spectrogram_ticks
+
 __all__ = [
-    'get_spectrogram_ticks',
-    'auto_segment_audio',
-    'energy_based_segment_audio',
+    "get_spectrogram_ticks",
+    "auto_segment_audio",
+    "energy_based_segment_audio",
 ]

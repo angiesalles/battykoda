@@ -76,7 +76,7 @@ def task_annotation_view(request, task_id):
 
     # First, get the species object directly from the task's species field
     species_obj = task.species
-    
+
     # If the task has a pre-selected label from classification, put it first in the list
     if task.label:
         call_types.append(task.label)
@@ -92,7 +92,7 @@ def task_annotation_view(request, task_id):
                 # Skip if this call type was already added from the task label
                 if call.short_name in call_types:
                     continue
-                    
+
                 call_types.append(call.short_name)
                 # Use long_name as the description if available
                 description = call.long_name if call.long_name else ""
@@ -152,37 +152,34 @@ def task_annotation_view(request, task_id):
     midpoint_time = (task.onset + task.offset) / 2
 
     # Get window sizes for the spectrogram
-    from .audio.utils import normal_hwin, overview_hwin, get_spectrogram_ticks
+    from .audio.utils import get_spectrogram_ticks, normal_hwin, overview_hwin
 
     normal_window_size = normal_hwin()
     overview_window_size = overview_hwin()
-    
+
     # Try to get sample rate from the source if this task has a source segment with a recording
     sample_rate = None
     try:
         # First, try to get from source segment if it exists
-        if hasattr(task, 'source_segment') and task.source_segment and task.source_segment.recording:
+        if hasattr(task, "source_segment") and task.source_segment and task.source_segment.recording:
             sample_rate = task.source_segment.recording.sample_rate
             logger.info(f"Using sample rate from source segment's recording: {sample_rate}Hz")
     except Exception as e:
         logger.debug(f"No sample rate from source segment: {str(e)}")
-    
+
     # If we couldn't get the sample rate from the source segment, use a default
     if not sample_rate:
         logger.debug("Using default sample rate for spectrograms")
-    
+
     # Generate tick marks for the spectrogram using our utility function
     tick_data = get_spectrogram_ticks(
-        task, 
-        sample_rate=sample_rate,
-        normal_window_size=normal_window_size,
-        overview_window_size=overview_window_size
+        task, sample_rate=sample_rate, normal_window_size=normal_window_size, overview_window_size=overview_window_size
     )
-    
+
     # Extract the tick data
-    x_ticks_detail = tick_data['x_ticks_detail']
-    x_ticks_overview = tick_data['x_ticks_overview']
-    y_ticks = tick_data['y_ticks']
+    x_ticks_detail = tick_data["x_ticks_detail"]
+    x_ticks_overview = tick_data["x_ticks_overview"]
+    y_ticks = tick_data["y_ticks"]
 
     # Create context for the template
     context = {
@@ -206,7 +203,7 @@ def task_annotation_view(request, task_id):
         # Add tick mark data
         "x_ticks_detail": x_ticks_detail,
         "x_ticks_overview": x_ticks_overview,
-        "y_ticks": y_ticks
+        "y_ticks": y_ticks,
     }
 
     # Return the annotation interface

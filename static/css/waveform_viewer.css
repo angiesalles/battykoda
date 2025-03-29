@@ -1,0 +1,327 @@
+/**
+ * Waveform Viewer CSS
+ * 
+ * This file contains all styles for the waveform viewer interface,
+ * including grid layout, spectrogram display, and responsive behavior.
+ */
+
+/* Grid layout update for single spectrogram view */
+.grid-container {
+    display: grid;
+    grid-template-columns: 1fr 250px 250px;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+        "spectrogram controls call-type"
+        "spectrogram confidence audio"
+        "spectrogram others audio";
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.spectrogram-section {
+    grid-area: spectrogram;
+}
+
+.controls {
+    grid-area: controls;
+}
+
+.call-type {
+    grid-area: call-type;
+}
+
+.confidence {
+    grid-area: confidence;
+}
+
+.audio-section {
+    grid-area: audio;
+}
+
+.others {
+    grid-area: others;
+}
+
+/* Axis label styling */
+.spectrogram-y-axis {
+    display: flex;
+    flex-direction: row;
+    margin-right: 10px;
+    min-width: 60px; /* Ensure minimum width for the axis */
+}
+
+.spectrogram-x-axis {
+    margin-top: 5px;
+    min-height: 40px; /* Ensure minimum height for the axis */
+}
+
+.axis-label {
+    font-weight: bold;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.y-tick-marks {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 400px; /* Match height of spectrogram */
+    margin-left: 5px;
+    text-align: right;
+    min-width: 40px; /* Ensure tick labels have space */
+    z-index: 10; /* Ensure visibility */
+}
+
+.x-tick-marks {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 10px;
+    margin-top: 5px;
+    z-index: 10; /* Ensure visibility */
+}
+
+.y-tick, .x-tick {
+    color: #cccccc;
+    font-size: 12px;
+    display: inline-block !important; /* Force display */
+    padding: 2px;
+    background-color: rgba(30, 30, 30, 0.7); /* Semi-transparent background */
+    border-radius: 2px;
+}
+
+/* Make sure the spectrogram container fits properly */
+.spectrogram-container {
+    border: 1px solid #444;
+    background-color: #1a1a1a;
+    padding: 5px;
+    border-radius: 5px;
+}
+
+/* Make spectrogram image responsive */
+#spectrogram {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Dark theme for waveform viewer */
+.waveform-viewer {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+/* Improved grid layout for better spacing */
+.grid-container {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    gap: 20px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+/* Main sections */
+.spectrogram-small {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+}
+
+.controls {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+}
+
+.call-type {
+    grid-column: 3;
+    grid-row: 1 / span 2; /* Make it span both rows to have enough height */
+    width: 100%;
+    overflow-y: visible;
+}
+
+.spectrogram-large {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+}
+
+.confidence {
+    grid-column: 1;
+    grid-row: 3;
+    width: 100%;
+}
+
+.audio-section {
+    grid-column: 2;
+    grid-row: 3;
+    width: 100%;
+}
+
+.others {
+    grid-column: 1 / span 3;
+    grid-row: 4;
+    width: 100%;
+}
+
+/* Ensure images and containers are sized properly */
+.waveform-viewer img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+.spectrogram-container {
+    min-height: 300px;
+    width: 100%;
+    overflow: visible;
+}
+
+.form-check {
+    margin-bottom: 0.5rem;
+}
+
+/* Make headers consistent */
+.waveform-viewer h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+    color: #fff;
+}
+
+/* Other styling */
+.button-group button {
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+.other-channels-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.other-channels-content > div {
+    flex: 1 1 300px;
+    max-width: 350px;
+}
+
+/* Dark card-like appearance for sections */
+.spectrogram-small, .controls, .call-type, 
+.spectrogram-large, .confidence, .audio-section, .others {
+    background-color: #1e1e1e;
+    border-radius: 4px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+/* Override Bootstrap form control styles for dark theme */
+.waveform-viewer .form-control, .waveform-viewer .form-select {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+    color: #e0e0e0;
+}
+
+.waveform-viewer .form-control:focus, .waveform-viewer .form-select:focus {
+    background-color: #333;
+    color: #fff;
+    border-color: #007bff;
+}
+
+/* Override Bootstrap button styles */
+.waveform-viewer .btn-outline-secondary {
+    color: #adb5bd;
+    border-color: #495057;
+}
+
+.waveform-viewer .btn-outline-secondary:hover,
+.waveform-viewer .btn-outline-secondary.active {
+    color: #fff;
+    background-color: #495057;
+    border-color: #6c757d;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 992px) {
+    .grid-container {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto auto;
+    }
+    
+    .spectrogram-small {
+        grid-column: 1 / span 2;
+        grid-row: 1;
+    }
+    
+    .controls {
+        grid-column: 1;
+        grid-row: 2;
+    }
+    
+    .spectrogram-large {
+        grid-column: 1 / span 2;
+        grid-row: 3;
+    }
+    
+    .call-type {
+        grid-column: 2;
+        grid-row: 2;
+    }
+    
+    .confidence {
+        grid-column: 1;
+        grid-row: 4;
+    }
+    
+    .audio-section {
+        grid-column: 2;
+        grid-row: 4;
+    }
+    
+    .others {
+        grid-column: 1 / span 2;
+        grid-row: 5;
+    }
+}
+
+@media (max-width: 576px) {
+    .grid-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto auto auto;
+    }
+    
+    .spectrogram-small {
+        grid-column: 1;
+        grid-row: 1;
+    }
+    
+    .controls {
+        grid-column: 1;
+        grid-row: 2;
+    }
+    
+    .call-type {
+        grid-column: 1;
+        grid-row: 3;
+    }
+    
+    .spectrogram-large {
+        grid-column: 1;
+        grid-row: 4;
+    }
+    
+    .confidence {
+        grid-column: 1;
+        grid-row: 5;
+    }
+    
+    .audio-section {
+        grid-column: 1;
+        grid-row: 6;
+    }
+    
+    .others {
+        grid-column: 1;
+        grid-row: 7;
+    }
+}

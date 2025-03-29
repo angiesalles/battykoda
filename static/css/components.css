@@ -1,0 +1,90 @@
+/* 
+ * BattyCoda Components CSS
+ * Styling for reusable components 
+ */
+
+/* Flash messages */
+.flash-messages {
+    margin-bottom: 15px;
+}
+
+.flash-message {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 3px;
+    background-color: #ef5350;
+    color: white;
+}
+
+.flash-success {
+    background-color: #4CAF50;
+}
+
+.flash-info {
+    background-color: #2196F3;
+}
+
+/* Images */
+.responsive-image {
+    max-width: 100%;
+    height: auto;
+}
+
+.image-container {
+    position: relative;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.image-container.broken-image {
+    border: 2px solid red;
+}
+
+.image-wrapper {
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Code and pre */
+.code-block {
+    background-color: #2a2a2a;
+    padding: 15px;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre;
+    overflow-x: auto;
+    margin: 10px 0;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+tr {
+    border-bottom: 1px solid #333;
+}
+
+td, th {
+    padding: 10px;
+    text-align: left;
+}
+
+/* Notification styles */
+.notification {
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: #22c55e;
+}
+
+/* Success page styling */
+.success-message {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #4CAF50;
+}

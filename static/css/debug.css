@@ -1,0 +1,26 @@
+/* 
+ * BattyCoda Debug CSS
+ * Styling for debug tools and features 
+ */
+
+/* Debug */
+.debug-info {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: rgba(255,0,0,0.7);
+    color: white;
+    padding: 2px;
+    font-size: 10px;
+}
+
+.debug-controls {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.7);
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1000;
+}

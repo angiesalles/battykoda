@@ -5,13 +5,14 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from .email_utils import send_invitation_email
 from .forms import GroupInvitationForm
-from .models import Group, GroupInvitation, GroupMembership, User, UserProfile
+from .models import Group, GroupInvitation, GroupMembership, UserProfile
 
 logger = logging.getLogger("battycoda.invitations")
 
@@ -31,7 +32,9 @@ def group_users_view(request):
     group_memberships = GroupMembership.objects.filter(group=group).select_related("user", "user__profile")
 
     # Get active invitations for this group
-    active_invitations = GroupInvitation.objects.filter(group=group, accepted=False).exclude(expires_at__lt=timezone.now())
+    active_invitations = GroupInvitation.objects.filter(group=group, accepted=False).exclude(
+        expires_at__lt=timezone.now()
+    )
 
     context = {
         "group": group,
@@ -172,8 +175,6 @@ def accept_invitation_view(request, token):
         messages.info(request, "Please register or log in to accept your group invitation.")
 
         # If the invitation email matches an existing user, suggest login
-        from django.contrib.auth.models import User
-
         if User.objects.filter(email=invitation.email).exists():
             return redirect("battycoda_app:login")
         else:

@@ -48,7 +48,7 @@ def send_invitation_email(group_name, inviter_name, recipient_email, invitation_
     Send a group invitation email.
 
     Args:
-        group_name (str): Name of the group 
+        group_name (str): Name of the group
         inviter_name (str): Name of the person who sent the invitation
         recipient_email (str): Email address of the recipient
         invitation_link (str): Link to accept the invitation

@@ -1,17 +1,19 @@
 from django.urls import path
 
+from . import views_segmentation  # This now imports from the package
 from . import (
     views,
     views_audio_streaming,
     views_automation,
     views_batch_upload,
     views_debug,
+    views_group,
+    views_invitations,
     views_project,
     views_recording_core,
-    views_recordings,
-    views_segmentation,
     views_species,
-    views_task_batch
+    views_task_batch,
+    views_tasks,
 )
 
 app_name = "battycoda_app"
@@ -50,12 +52,32 @@ urlpatterns = [
     path("automation/", views_automation.automation_home_view, name="automation_home"),
     path("automation/runs/<int:run_id>/", views_automation.detection_run_detail_view, name="detection_run_detail"),
     path("automation/runs/create/", views_automation.create_detection_run_view, name="create_detection_run"),
-    path("automation/runs/create/<int:segmentation_id>/", views_automation.create_detection_run_view, name="create_detection_run_for_segmentation"),
-    path("automation/runs/<int:run_id>/status/", views_automation.detection_run_status_view, name="detection_run_status"),
-    path("automation/runs/<int:run_id>/apply/", views_automation.apply_detection_results_view, name="apply_detection_results"),
-    path("automation/runs/<int:run_id>/apply/<int:segment_id>/", views_automation.apply_detection_results_view, name="apply_detection_result_for_segment"),
-    path("automation/runs/<int:run_id>/create-tasks/", views_automation.create_task_batch_from_detection_run, name="create_task_batch_from_detection_run"),
-    path("automation/runs/<int:run_id>/delete/", views_automation.delete_detection_run_view, name="delete_detection_run"),
+    path(
+        "automation/runs/create/<int:segmentation_id>/",
+        views_automation.create_detection_run_view,
+        name="create_detection_run_for_segmentation",
+    ),
+    path(
+        "automation/runs/<int:run_id>/status/", views_automation.detection_run_status_view, name="detection_run_status"
+    ),
+    path(
+        "automation/runs/<int:run_id>/apply/",
+        views_automation.apply_detection_results_view,
+        name="apply_detection_results",
+    ),
+    path(
+        "automation/runs/<int:run_id>/apply/<int:segment_id>/",
+        views_automation.apply_detection_results_view,
+        name="apply_detection_result_for_segment",
+    ),
+    path(
+        "automation/runs/<int:run_id>/create-tasks/",
+        views_automation.create_task_batch_from_detection_run,
+        name="create_task_batch_from_detection_run",
+    ),
+    path(
+        "automation/runs/<int:run_id>/delete/", views_automation.delete_detection_run_view, name="delete_detection_run"
+    ),
     # Species management routes
     path("species/", views_species.species_list_view, name="species_list"),
     path("species/<int:species_id>/", views_species.species_detail_view, name="species_detail"),
@@ -72,50 +94,78 @@ urlpatterns = [
     path("projects/<int:project_id>/edit/", views_project.edit_project_view, name="edit_project"),
     path("projects/<int:project_id>/delete/", views_project.delete_project_view, name="delete_project"),
     # Group management routes
-    path("groups/", views.group_list_view, name="group_list"),
-    path("groups/<int:group_id>/", views.group_detail_view, name="group_detail"),
-    path("groups/create/", views.create_group_view, name="create_group"),
-    path("groups/<int:group_id>/edit/", views.edit_group_view, name="edit_group"),
-    path("groups/<int:group_id>/members/", views.manage_group_members_view, name="manage_group_members"),
-    path("groups/switch/<int:group_id>/", views.switch_group_view, name="switch_group"),
+    path("groups/", views_group.group_list_view, name="group_list"),
+    path("groups/<int:group_id>/", views_group.group_detail_view, name="group_detail"),
+    path("groups/create/", views_group.create_group_view, name="create_group"),
+    path("groups/<int:group_id>/edit/", views_group.edit_group_view, name="edit_group"),
+    path("groups/<int:group_id>/members/", views_group.manage_group_members_view, name="manage_group_members"),
+    path("groups/switch/<int:group_id>/", views_group.switch_group_view, name="switch_group"),
     # Group users and invitations
-    path("users/", views.group_users_view, name="group_users"),
-    path("users/invite/", views.invite_user_view, name="invite_user"),
-    path("invitation/<str:token>/", views.accept_invitation_view, name="accept_invitation"),
+    path("users/", views_invitations.group_users_view, name="group_users"),
+    path("users/invite/", views_invitations.invite_user_view, name="invite_user"),
+    path("invitation/<str:token>/", views_invitations.accept_invitation_view, name="accept_invitation"),
     # Debug routes
     path("debug/env/", views_debug.debug_env_view, name="debug_env"),
-    
     # Recordings management - Core views
     path("recordings/", views_recording_core.recording_list_view, name="recording_list"),
     path("recordings/<int:recording_id>/", views_recording_core.recording_detail_view, name="recording_detail"),
     path("recordings/create/", views_recording_core.create_recording_view, name="create_recording"),
     path("recordings/<int:recording_id>/edit/", views_recording_core.edit_recording_view, name="edit_recording"),
     path("recordings/<int:recording_id>/delete/", views_recording_core.delete_recording_view, name="delete_recording"),
-    
     # Batch Upload
     path("recordings/batch-upload/", views_batch_upload.batch_upload_recordings_view, name="batch_upload_recordings"),
-    path("recordings/upload-progress/", views_batch_upload.upload_progress_view, name="upload_progress"),
-    
     # Segmentation related views
     path("recordings/<int:recording_id>/segment/", views_segmentation.segment_recording_view, name="segment_recording"),
-    path("recordings/<int:recording_id>/auto-segment/", views_segmentation.auto_segment_recording_view, name="auto_segment_recording"),
-    path("recordings/<int:recording_id>/auto-segment/<int:algorithm_id>/", views_segmentation.auto_segment_recording_view, name="auto_segment_recording_with_algorithm"),
-    path("recordings/<int:recording_id>/auto-segment/status/", views_segmentation.auto_segment_status_view, name="auto_segment_status"),
-    path("recordings/<int:recording_id>/upload-pickle/", views_segmentation.upload_pickle_segments_view, name="upload_pickle_segments"),
-    
+    path(
+        "recordings/<int:recording_id>/auto-segment/",
+        views_segmentation.auto_segment_recording_view,
+        name="auto_segment_recording",
+    ),
+    path(
+        "recordings/<int:recording_id>/auto-segment/<int:algorithm_id>/",
+        views_segmentation.auto_segment_recording_view,
+        name="auto_segment_recording_with_algorithm",
+    ),
+    path(
+        "recordings/<int:recording_id>/auto-segment/status/",
+        views_segmentation.auto_segment_status_view,
+        name="auto_segment_status",
+    ),
+    path(
+        "recordings/<int:recording_id>/upload-pickle/",
+        views_segmentation.upload_pickle_segments_view,
+        name="upload_pickle_segments",
+    ),
     # Audio streaming and data related views
-    path("recordings/<int:recording_id>/waveform-data/", views_audio_streaming.get_audio_waveform_data, name="recording_waveform_data"),
-    path("recordings/<int:recording_id>/stream/", views_audio_streaming.stream_audio_view, name="stream_recording_audio"),
-    
-    # Legacy views still in views_recordings.py
-    path("recordings/<int:recording_id>/spectrogram-status/", views_recordings.recording_spectrogram_status_view, name="recording_spectrogram_status"),
-    path("recordings/<int:recording_id>/create-tasks/", views_recordings.create_tasks_from_segments_view, name="create_tasks_from_segments"),
-    
+    path(
+        "recordings/<int:recording_id>/waveform-data/",
+        views_audio_streaming.get_audio_waveform_data,
+        name="recording_waveform_data",
+    ),
+    path(
+        "recordings/<int:recording_id>/stream/", views_audio_streaming.stream_audio_view, name="stream_recording_audio"
+    ),
+    # Tasks and spectrograms
+    path(
+        "recordings/<int:recording_id>/spectrogram-status/",
+        views_tasks.recording_spectrogram_status_view,
+        name="recording_spectrogram_status",
+    ),
+    path(
+        "recordings/<int:recording_id>/create-tasks/",
+        views_tasks.create_tasks_from_segments_view,
+        name="create_tasks_from_segments",
+    ),
     # Segmentation management
     path("segmentation/", views_segmentation.batch_segmentation_view, name="batch_segmentation"),
-    path("segmentation/jobs/status/", views_segmentation.segmentation_jobs_status_view, name="segmentation_jobs_status"),
-    path("segmentation/<int:segmentation_id>/activate/", views_recordings.activate_segmentation_view, name="activate_segmentation"),
-    
+    path(
+        "segmentation/jobs/status/", views_segmentation.segmentation_jobs_status_view, name="segmentation_jobs_status"
+    ),
+    path(
+        "segmentation/<int:segmentation_id>/activate/",
+        views_segmentation.activate_segmentation_view,
+        name="activate_segmentation",
+    ),
     # Segment management
     path("segments/<int:recording_id>/add/", views_segmentation.add_segment_view, name="add_segment"),
     path("segments/<int:segment_id>/edit/", views_segmentation.edit_segment_view, name="edit_segment"),

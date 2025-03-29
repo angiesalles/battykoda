@@ -1,0 +1,66 @@
+/* 
+ * BattyCoda Responsive CSS
+ * Responsive layout adjustments 
+ */
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .grid-container {
+        grid-template-columns: 1fr 1fr;
+        grid-gap: 12px;
+    }
+    
+    .spectrogram-large {
+        grid-column: 1 / span 2;
+        grid-row: 3;
+    }
+    
+    .others {
+        grid-column: 1 / span 2;
+        grid-row: 4;
+    }
+    
+    .audio-section {
+        grid-column: 1 / span 2;
+        grid-row: 5;
+    }
+}
+
+@media (max-width: 768px) {
+    .grid-container {
+        grid-template-columns: 1fr;
+        grid-gap: 10px;
+        padding: 12px;
+        width: 100%;
+    }
+    
+    .spectrogram-small,
+    .controls,
+    .call-type,
+    .confidence,
+    .spectrogram-large,
+    .audio-section,
+    .others {
+        grid-column: 1;
+    }
+    
+    .spectrogram-small { grid-row: 1; }
+    .controls { grid-row: 2; }
+    .call-type { grid-row: 3; }
+    .confidence { grid-row: 4; }
+    .spectrogram-large { grid-row: 5; }
+    .audio-section { grid-row: 6; }
+    .others { grid-row: 7; }
+    
+    .nav-container {
+        flex-direction: column;
+    }
+    
+    .nav-links, .user-info {
+        margin-bottom: 10px;
+    }
+    
+    .content-container {
+        padding: 15px;
+    }
+}

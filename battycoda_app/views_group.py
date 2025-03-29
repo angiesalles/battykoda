@@ -20,7 +20,9 @@ def group_list_view(request):
     # Get all groups the user is a member of through GroupMembership
 
     # Get user's memberships and related groups
-    user_groups = Group.objects.filter(group_memberships__user=request.user).select_related().distinct().order_by("name")
+    user_groups = (
+        Group.objects.filter(group_memberships__user=request.user).select_related().distinct().order_by("name")
+    )
 
     # Debug output
     print(f"Found {user_groups.count()} groups for user {request.user.username}")

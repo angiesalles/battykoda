@@ -7,8 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
 from django.template.loader import render_to_string
+from django.views.decorators.http import require_POST
 
 from .forms import CallFormSetFactory, SpeciesEditForm, SpeciesForm
 from .models import Call, Recording, Species, Task, TaskBatch
@@ -82,29 +82,25 @@ def create_species_view(request):
             species.save()
 
             # Process call types from JSON
-            call_types_json = request.POST.get('call_types_json', '[]')
-            
+            call_types_json = request.POST.get("call_types_json", "[]")
+
             try:
                 # If the JSON is empty or whitespace, use an empty list
                 call_types_json = call_types_json.strip()
-                if not call_types_json or call_types_json == '[]':
+                if not call_types_json or call_types_json == "[]":
                     call_types = []
                 else:
                     call_types = json.loads(call_types_json)
-                
+
                 for call_data in call_types:
                     # Create the call
-                    short_name = call_data.get('short_name', '').strip()
-                    long_name = call_data.get('long_name', '').strip()
-                    
+                    short_name = call_data.get("short_name", "").strip()
+                    long_name = call_data.get("long_name", "").strip()
+
                     if short_name:
                         # Check for duplicates
                         if not Call.objects.filter(species=species, short_name=short_name).exists():
-                            call = Call(
-                                species=species,
-                                short_name=short_name,
-                                long_name=long_name
-                            )
+                            call = Call(species=species, short_name=short_name, long_name=long_name)
                             call.save()
                         # Skip duplicates silently
                     # Skip calls with empty short_name silently
@@ -121,8 +117,7 @@ def create_species_view(request):
     existing_species_names = []
     if request.user.profile and request.user.profile.group:
         existing_species_names = list(
-            Species.objects.filter(group=request.user.profile.group)
-            .values_list('name', flat=True)
+            Species.objects.filter(group=request.user.profile.group).values_list("name", flat=True)
         )
 
     context = {
@@ -137,7 +132,7 @@ def create_species_view(request):
 def edit_species_view(request, species_id):
     """Handle editing of a species"""
     species = get_object_or_404(Species, id=species_id)
-    
+
     # Check if user has permission to edit this species
     profile = request.user.profile
     if species.group != profile.group:
@@ -160,7 +155,7 @@ def edit_species_view(request, species_id):
 
     # Get calls again to ensure they're in the context
     calls = Call.objects.filter(species=species)
-    
+
     context = {
         "form": form,
         "species": species,
@@ -177,7 +172,9 @@ def delete_species_view(request, species_id):
 
     # Check if the user has permission to delete this species
     profile = request.user.profile
-    if species.created_by != request.user and (not profile.group or species.group != profile.group or not profile.is_admin):
+    if species.created_by != request.user and (
+        not profile.group or species.group != profile.group or not profile.is_admin
+    ):
         messages.error(request, "You don't have permission to delete this species.")
         return redirect("battycoda_app:species_list")
 
@@ -189,20 +186,23 @@ def delete_species_view(request, species_id):
 
     # Check if deletion is allowed (no tasks, batches, or recordings associated)
     has_dependencies = task_count > 0 or batch_count > 0 or recording_count > 0
-    
+
     if request.method == "POST":
         if has_dependencies:
-            messages.error(request, "Cannot delete species with associated tasks, batches, or recordings. Please remove these dependencies first.")
+            messages.error(
+                request,
+                "Cannot delete species with associated tasks, batches, or recordings. Please remove these dependencies first.",
+            )
             return redirect("battycoda_app:delete_species", species_id=species.id)
-            
+
         try:
             with transaction.atomic():
                 # Store name for the success message
                 species_name = species.name
-                
+
                 # Delete the species (this will cascade to calls)
                 species.delete()
-                
+
                 messages.success(request, f"Successfully deleted species: {species_name}")
                 return redirect("battycoda_app:species_list")
         except Exception as e:
@@ -226,60 +226,44 @@ def delete_species_view(request, species_id):
 def add_call_view(request, species_id):
     """Add a new call to a species and return the updated calls list HTML"""
     species = get_object_or_404(Species, id=species_id)
-    
+
     # Check if user has permission to edit this species
     profile = request.user.profile
     if species.group != profile.group:
-        return JsonResponse({
-            "success": False, 
-            "error": "You don't have permission to modify this species."
-        })
-    
+        return JsonResponse({"success": False, "error": "You don't have permission to modify this species."})
+
     # Get the call data from the request
     try:
         data = json.loads(request.body)
-        short_name = data.get('short_name', '').strip()
-        long_name = data.get('long_name', '').strip()
-        
+        short_name = data.get("short_name", "").strip()
+        long_name = data.get("long_name", "").strip()
+
         if not short_name:
-            return JsonResponse({
-                "success": False,
-                "error": "Short name is required."
-            })
-        
+            return JsonResponse({"success": False, "error": "Short name is required."})
+
         # Check if a call with this name already exists
         if Call.objects.filter(species=species, short_name=short_name).exists():
-            return JsonResponse({
-                "success": False,
-                "error": f"A call with short name '{short_name}' already exists."
-            })
-        
+            return JsonResponse({"success": False, "error": f"A call with short name '{short_name}' already exists."})
+
         # Create the new call
         call = Call(species=species, short_name=short_name, long_name=long_name)
         call.save()
-        
+
         # Get updated list of calls
         calls = Call.objects.filter(species=species)
-        
+
         # Render the updated calls table HTML
-        calls_html = render_to_string(
-            'species/includes/calls_table.html',
-            {'calls': calls}
+        calls_html = render_to_string("species/includes/calls_table.html", {"calls": calls})
+
+        return JsonResponse(
+            {"success": True, "calls_html": calls_html, "message": f"Call '{short_name}' added successfully."}
         )
-        
-        return JsonResponse({
-            "success": True,
-            "calls_html": calls_html,
-            "message": f"Call '{short_name}' added successfully."
-        })
-        
+
     except Exception as e:
         logger.error(f"Error adding call: {str(e)}")
         logger.error(traceback.format_exc())
-        return JsonResponse({
-            "success": False,
-            "error": str(e)
-        })
+        return JsonResponse({"success": False, "error": str(e)})
+
 
 @login_required
 @require_POST
@@ -287,42 +271,32 @@ def delete_call_view(request, species_id, call_id):
     """Delete a call from a species and return the updated calls list HTML"""
     species = get_object_or_404(Species, id=species_id)
     call = get_object_or_404(Call, id=call_id, species=species)
-    
+
     # Check if user has permission to edit this species
     profile = request.user.profile
     if species.group != profile.group:
-        return JsonResponse({
-            "success": False, 
-            "error": "You don't have permission to modify this species."
-        })
-    
+        return JsonResponse({"success": False, "error": "You don't have permission to modify this species."})
+
     try:
         # Delete the call
         call_short_name = call.short_name
         call.delete()
-        
+
         # Get updated list of calls
         calls = Call.objects.filter(species=species)
-        
+
         # Render the updated calls table HTML
-        calls_html = render_to_string(
-            'species/includes/calls_table.html',
-            {'calls': calls}
+        calls_html = render_to_string("species/includes/calls_table.html", {"calls": calls})
+
+        return JsonResponse(
+            {"success": True, "calls_html": calls_html, "message": f"Call '{call_short_name}' deleted successfully."}
         )
-        
-        return JsonResponse({
-            "success": True,
-            "calls_html": calls_html,
-            "message": f"Call '{call_short_name}' deleted successfully."
-        })
-        
+
     except Exception as e:
         logger.error(f"Error deleting call: {str(e)}")
         logger.error(traceback.format_exc())
-        return JsonResponse({
-            "success": False,
-            "error": str(e)
-        })
+        return JsonResponse({"success": False, "error": str(e)})
+
 
 @login_required
 @require_POST

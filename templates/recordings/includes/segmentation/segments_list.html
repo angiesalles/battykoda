@@ -1,0 +1,63 @@
+<!-- Segments list -->
+<div class="card bg-dark">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Segments</h5>
+        <span id="segments-count" class="badge bg-primary">{{ segments|length }}</span>
+    </div>
+    <div class="card-body">
+        <div id="segments-container">
+            {% if segments %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover table-striped">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Time</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="segments-list">
+                            {% for segment in segments %}
+                            <tr id="segment-row-{{ segment.id }}" data-segment-id="{{ segment.id }}">
+                                <td>{{ segment.id }}</td>
+                                <td>{{ segment.onset|floatformat:2 }}s - {{ segment.offset|floatformat:2 }}s</td>
+                                <td>{{ segment.duration|floatformat:2 }}s</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary play-segment-btn" 
+                                                data-onset="{{ segment.onset }}" 
+                                                data-offset="{{ segment.offset }}">
+                                            <i class="fas fa-play"></i>
+                                        </button>
+                                        <button class="btn btn-outline-warning edit-segment-btn" 
+                                                data-segment-id="{{ segment.id }}"
+                                                data-segment-name="{{ segment.name|default:'' }}"
+                                                data-segment-onset="{{ segment.onset }}"
+                                                data-segment-offset="{{ segment.offset }}"
+                                                data-segment-notes="{{ segment.notes|default:'' }}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger delete-segment-btn" 
+                                                data-segment-id="{{ segment.id }}">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div id="no-segments-message" class="text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-cut fa-4x text-muted"></i>
+                    </div>
+                    <h5>No segments found</h5>
+                    <p class="text-muted">Create segments by selecting regions on the waveform</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

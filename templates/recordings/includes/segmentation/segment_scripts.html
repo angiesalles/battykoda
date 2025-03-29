@@ -1,0 +1,426 @@
+<!-- Segmentation JavaScript -->
+<script>
+    // Global variables
+    let wavesurfer = window.wavesurfer; // This is set by the waveform_player.html include
+    let currentSelection = null;
+    let isEditing = false;
+    
+    // DOM elements
+    const segmentsList = document.getElementById('segments-list');
+    const segmentsCount = document.getElementById('segments-count');
+    const noSegmentsMessage = document.getElementById('no-segments-message');
+    const segmentFormCard = document.getElementById('segment-form-card');
+    const segmentForm = document.getElementById('segment-form');
+    const segmentFormTitle = document.getElementById('segment-form-title');
+    const segmentId = document.getElementById('segment-id');
+    const segmentName = document.getElementById('segment-name');
+    const segmentOnset = document.getElementById('segment-onset');
+    const segmentOffset = document.getElementById('segment-offset');
+    const segmentNotes = document.getElementById('segment-notes');
+    
+    // Buttons
+    const addSegmentBtn = document.getElementById('add-segment-btn');
+    const selectNewBtn = document.getElementById('select-new-btn');
+    const playSelectionBtn = document.getElementById('play-selection-btn');
+    const clearSelectionBtn = document.getElementById('clear-selection-btn');
+    const saveSegmentsBtn = document.getElementById('save-segments-btn');
+    const cancelSegmentBtn = document.getElementById('cancel-segment-btn');
+    
+    // Initialize segments from JSON data
+    const segments = {{ segments_json|safe }};
+    
+    // Event listeners for buttons
+    addSegmentBtn.addEventListener('click', () => {
+        if (currentSelection) {
+            showSegmentForm('add', {
+                onset: currentSelection.start,
+                offset: currentSelection.end
+            });
+        } else {
+            showSegmentForm('add', {
+                onset: wavesurfer.getCurrentTime(),
+                offset: wavesurfer.getCurrentTime() + 0.1
+            });
+        }
+    });
+    
+    selectNewBtn.addEventListener('click', () => {
+        wavesurfer.enableDragSelection({
+            color: 'rgba(0, 123, 255, 0.3)'
+        });
+    });
+    
+    playSelectionBtn.addEventListener('click', () => {
+        if (currentSelection) {
+            wavesurfer.play(currentSelection.start, currentSelection.end);
+        }
+    });
+    
+    clearSelectionBtn.addEventListener('click', () => {
+        wavesurfer.clearRegions();
+        currentSelection = null;
+    });
+    
+    saveSegmentsBtn.addEventListener('click', () => {
+        // Submit the form for all segments
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = window.location.href;
+        
+        // Add CSRF token
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    });
+    
+    cancelSegmentBtn.addEventListener('click', () => {
+        hideSegmentForm();
+    });
+    
+    // Form submission handler
+    segmentForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(segmentForm);
+        const segmentIdValue = segmentId.value;
+        
+        try {
+            let url, method;
+            
+            if (segmentIdValue) {
+                // Edit existing segment
+                url = `/segments/${segmentIdValue}/edit/`;
+                method = 'POST';
+            } else {
+                // Add new segment
+                url = `/segments/{{ recording.id }}/add/`;
+                method = 'POST';
+            }
+            
+            const response = await fetch(url, {
+                method: method,
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                if (!segmentIdValue) {
+                    // Add new segment to the list
+                    addSegmentToList(data.segment);
+                } else {
+                    // Update existing segment in the list
+                    updateSegmentInList(data.segment);
+                }
+                
+                // Hide the form
+                hideSegmentForm();
+                
+                // Show success message
+                showMessage('success', segmentIdValue ? 'Segment updated successfully.' : 'Segment added successfully.');
+            } else {
+                showMessage('danger', data.error || 'An error occurred.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showMessage('danger', 'An error occurred while saving the segment.');
+        }
+    });
+    
+    // Initialize event handlers for all segments
+    document.addEventListener('DOMContentLoaded', () => {
+        // Add event listeners to all segment buttons
+        if (segmentsList) {
+            const rows = segmentsList.querySelectorAll('tr');
+            rows.forEach(row => {
+                addSegmentButtonListeners(row);
+            });
+        }
+        
+        // Create tasks button handler
+        const createTasksBtn = document.getElementById('create-tasks-btn');
+        if (createTasksBtn) {
+            createTasksBtn.addEventListener('click', () => {
+                window.location.href = `/recordings/{{ recording.id }}/create-tasks/`;
+            });
+        }
+        
+        // Waveform region selection handler
+        wavesurfer.on('region-created', (region) => {
+            // Clear all other regions
+            Object.keys(wavesurfer.regions.list).forEach(id => {
+                if (id !== region.id) {
+                    wavesurfer.regions.list[id].remove();
+                }
+            });
+            
+            // Store the current selection
+            currentSelection = {
+                start: region.start,
+                end: region.end
+            };
+        });
+        
+        // Update segments display initially
+        updateSegmentsDisplay();
+    });
+    
+    // Function to add event listeners to a segment row
+    function addSegmentButtonListeners(row) {
+        // Play button
+        const playBtn = row.querySelector('.play-segment-btn');
+        if (playBtn) {
+            playBtn.addEventListener('click', () => {
+                const onset = parseFloat(playBtn.dataset.onset);
+                const offset = parseFloat(playBtn.dataset.offset);
+                wavesurfer.play(onset, offset);
+            });
+        }
+        
+        // Edit button
+        const editBtn = row.querySelector('.edit-segment-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', () => {
+                const segmentId = editBtn.dataset.segmentId;
+                const segmentName = editBtn.dataset.segmentName;
+                const segmentOnset = parseFloat(editBtn.dataset.segmentOnset);
+                const segmentOffset = parseFloat(editBtn.dataset.segmentOffset);
+                const segmentNotes = editBtn.dataset.segmentNotes;
+                
+                showSegmentForm('edit', {
+                    id: segmentId,
+                    name: segmentName,
+                    onset: segmentOnset,
+                    offset: segmentOffset,
+                    notes: segmentNotes
+                });
+            });
+        }
+        
+        // Delete button
+        const deleteBtn = row.querySelector('.delete-segment-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                const segmentId = deleteBtn.dataset.segmentId;
+                
+                if (confirm('Are you sure you want to delete this segment?')) {
+                    try {
+                        const formData = new FormData();
+                        
+                        // Add CSRF token
+                        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+                        formData.append('csrfmiddlewaretoken', csrfToken);
+                        
+                        const response = await fetch(`/segments/${segmentId}/delete/`, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            // Remove the segment from the list
+                            const row = document.getElementById(`segment-row-${segmentId}`);
+                            if (row) {
+                                row.remove();
+                            }
+                            
+                            // Update segments display
+                            updateSegmentsDisplay();
+                            
+                            // Show success message
+                            showMessage('success', 'Segment deleted successfully.');
+                        } else {
+                            showMessage('danger', data.error || 'An error occurred.');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showMessage('danger', 'An error occurred while deleting the segment.');
+                    }
+                }
+            });
+        }
+    }
+    
+    // Function to show the segment form
+    function showSegmentForm(mode, data) {
+        // Set form title
+        segmentFormTitle.textContent = mode === 'add' ? 'Add Segment' : 'Edit Segment';
+        
+        // Set form values
+        segmentId.value = data.id || '';
+        segmentName.value = data.name || '';
+        segmentOnset.value = data.onset.toFixed(6);
+        segmentOffset.value = data.offset.toFixed(6);
+        segmentNotes.value = data.notes || '';
+        
+        // Show the form
+        segmentFormCard.style.display = 'block';
+        
+        // Scroll to the form
+        segmentFormCard.scrollIntoView({ behavior: 'smooth' });
+        
+        // Set editing flag
+        isEditing = true;
+    }
+    
+    // Function to hide the segment form
+    function hideSegmentForm() {
+        segmentFormCard.style.display = 'none';
+        segmentForm.reset();
+        isEditing = false;
+    }
+    
+    // Function to add a segment to the list
+    function addSegmentToList(segment) {
+        // Add row to table if table exists
+        if (segmentsList) {
+            const row = document.createElement('tr');
+            row.id = `segment-row-${segment.id}`;
+            row.dataset.segmentId = segment.id;
+            row.innerHTML = `
+                <td>${segment.id}</td>
+                <td>${segment.onset.toFixed(2)}s - ${segment.offset.toFixed(2)}s</td>
+                <td>${(segment.offset - segment.onset).toFixed(2)}s</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary play-segment-btn" 
+                                data-onset="${segment.onset}" 
+                                data-offset="${segment.offset}">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button class="btn btn-outline-warning edit-segment-btn" 
+                                data-segment-id="${segment.id}"
+                                data-segment-name="${segment.name || ''}"
+                                data-segment-onset="${segment.onset}"
+                                data-segment-offset="${segment.offset}"
+                                data-segment-notes="${segment.notes || ''}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-danger delete-segment-btn" 
+                                data-segment-id="${segment.id}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            segmentsList.appendChild(row);
+            
+            // Add event listeners to buttons
+            addSegmentButtonListeners(row);
+        }
+        
+        // Update display
+        updateSegmentsDisplay();
+    }
+    
+    // Function to update a segment in the list
+    function updateSegmentInList(segment) {
+        const row = document.getElementById(`segment-row-${segment.id}`);
+        if (row) {
+            // Update row content
+            row.innerHTML = `
+                <td>${segment.id}</td>
+                <td>${segment.onset.toFixed(2)}s - ${segment.offset.toFixed(2)}s</td>
+                <td>${(segment.offset - segment.onset).toFixed(2)}s</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary play-segment-btn" 
+                                data-onset="${segment.onset}" 
+                                data-offset="${segment.offset}">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button class="btn btn-outline-warning edit-segment-btn" 
+                                data-segment-id="${segment.id}"
+                                data-segment-name="${segment.name || ''}"
+                                data-segment-onset="${segment.onset}"
+                                data-segment-offset="${segment.offset}"
+                                data-segment-notes="${segment.notes || ''}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-danger delete-segment-btn" 
+                                data-segment-id="${segment.id}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            
+            // Re-add event listeners
+            addSegmentButtonListeners(row);
+        }
+    }
+    
+    // Function to update segments display
+    function updateSegmentsDisplay() {
+        // Get table and count
+        const table = document.querySelector('#segments-container .table-responsive');
+        const count = segmentsList ? segmentsList.querySelectorAll('tr').length : 0;
+        
+        // Update count
+        if (segmentsCount) {
+            segmentsCount.textContent = count;
+        }
+        
+        // Show/hide table and message
+        if (table && noSegmentsMessage) {
+            if (count > 0) {
+                table.style.display = 'block';
+                noSegmentsMessage.style.display = 'none';
+                
+                // Enable create tasks button
+                const createTasksBtn = document.getElementById('create-tasks-btn');
+                if (createTasksBtn) {
+                    createTasksBtn.disabled = false;
+                }
+            } else {
+                table.style.display = 'none';
+                noSegmentsMessage.style.display = 'block';
+                
+                // Disable create tasks button
+                const createTasksBtn = document.getElementById('create-tasks-btn');
+                if (createTasksBtn) {
+                    createTasksBtn.disabled = true;
+                }
+            }
+        }
+    }
+    
+    // Function to show a message
+    function showMessage(type, message) {
+        const messagesContainer = document.querySelector('.messages');
+        
+        if (messagesContainer) {
+            // Create alert
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.role = 'alert';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Add to container
+            messagesContainer.appendChild(alert);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+    }
+</script>

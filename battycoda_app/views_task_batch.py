@@ -91,49 +91,53 @@ def export_task_batch_view(request, batch_id):
     filename = f"taskbatch_{batch.id}_{batch.name.replace(' ', '_')}_{timestamp}.csv"
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    
+
     # Create CSV writer
     writer = csv.writer(response)
-    
+
     # Write header row
-    writer.writerow([
-        "Task ID", 
-        "Onset (s)", 
-        "Offset (s)", 
-        "Duration (s)",
-        "Status", 
-        "Label", 
-        "Classification Result", 
-        "Confidence", 
-        "Notes",
-        "WAV File", 
-        "Species", 
-        "Project", 
-        "Created By", 
-        "Created At", 
-        "Updated At"
-    ])
-    
+    writer.writerow(
+        [
+            "Task ID",
+            "Onset (s)",
+            "Offset (s)",
+            "Duration (s)",
+            "Status",
+            "Label",
+            "Classification Result",
+            "Confidence",
+            "Notes",
+            "WAV File",
+            "Species",
+            "Project",
+            "Created By",
+            "Created At",
+            "Updated At",
+        ]
+    )
+
     # Write data rows
     for task in tasks:
-        writer.writerow([
-            task.id,
-            task.onset,
-            task.offset,
-            task.offset - task.onset,
-            task.status,
-            task.label if task.label else "",
-            task.classification_result if task.classification_result else "",
-            task.confidence if task.confidence is not None else "",
-            task.notes.replace('\n', ' ').replace('\r', '') if task.notes else "",
-            task.wav_file_name,
-            task.species.name,
-            task.project.name,
-            task.created_by.username,
-            task.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-            task.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
-        ])
-    
+        writer.writerow(
+            [
+                task.id,
+                task.onset,
+                task.offset,
+                task.offset - task.onset,
+                task.status,
+                task.label if task.label else "",
+                task.classification_result if task.classification_result else "",
+                task.confidence if task.confidence is not None else "",
+                task.notes.replace("\n", " ").replace("\r", "") if task.notes else "",
+                task.wav_file_name,
+                task.species.name,
+                task.project.name,
+                task.created_by.username,
+                task.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                task.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+        )
+
     return response
 
 
@@ -145,8 +149,8 @@ def create_task_batch_view(request):
         request,
         "Task batches can now only be created from classification results. "
         "Please create a recording, segment it, run classification, and then create a task batch "
-        "from the classification results for manual review."
+        "from the classification results for manual review.",
     )
-    
+
     # Redirect to the task batch list
     return redirect("battycoda_app:task_batch_list")

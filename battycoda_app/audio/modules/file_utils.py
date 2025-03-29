@@ -67,20 +67,20 @@ def appropriate_file(path, args, folder_only=False):
 
 def process_pickle_file(pickle_file):
     """Process a pickle file that contains onset and offset data.
-    
+
     Args:
         pickle_file: A file-like object containing pickle-serialized data
-        
+
     Returns:
         tuple: (onsets, offsets) as lists of floats
-        
+
     Raises:
         ValueError: If the pickle file format is not recognized or contains invalid data
         Exception: For any other errors during processing
     """
     try:
         import numpy as np
-        
+
         # Load the pickle file
         pickle_data = pickle.load(pickle_file)
 
@@ -99,7 +99,9 @@ def process_pickle_file(pickle_file):
         else:
             # Unrecognized format
             logger.error(f"Pickle file format not recognized: {type(pickle_data)}")
-            raise ValueError("Pickle file format not recognized. Expected a dictionary with 'onsets' and 'offsets' keys, or a list/tuple with at least 2 elements.")
+            raise ValueError(
+                "Pickle file format not recognized. Expected a dictionary with 'onsets' and 'offsets' keys, or a list/tuple with at least 2 elements."
+            )
 
         # Convert to lists if they're NumPy arrays or other iterables
         if isinstance(onsets, np.ndarray):
@@ -119,15 +121,16 @@ def process_pickle_file(pickle_file):
         # Check if lists are the same length
         if len(onsets) != len(offsets):
             raise ValueError("Onsets and offsets lists must have the same length.")
-            
+
         # Convert numpy types to Python native types if needed
         onsets = [float(onset) for onset in onsets]
         offsets = [float(offset) for offset in offsets]
-        
+
         return onsets, offsets
 
     except Exception as e:
         logger.error(f"Error processing pickle file: {str(e)}")
         import traceback
+
         logger.error(traceback.format_exc())
         raise

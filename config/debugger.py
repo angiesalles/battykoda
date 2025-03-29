@@ -11,9 +11,9 @@ import sys
 def activate_debugger(port=12345):
     """
     Activates the PyCharm debugger.
-    
+
     This function is temporarily disabled to avoid connection errors.
-    
+
     Args:
         port (int): The port on which PyCharm is listening for debug connections.
     """

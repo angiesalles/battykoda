@@ -1,0 +1,108 @@
+/* 
+ * BattyCoda Audio CSS
+ * Styling for audio-related components 
+ */
+
+/* Audio */
+audio {
+    max-width: 100%;
+}
+
+.channel-audio {
+    width: 100%;
+    max-width: 400px;
+}
+
+/* Spectrogram tick marks - ensure visibility */
+.y-tick, .x-tick {
+    color: #ffffff;
+    font-size: 12px;
+    display: inline-block !important;
+    padding: 2px;
+    background-color: rgba(30, 30, 30, 0.7);
+    border-radius: 2px;
+    margin: 2px;
+    text-shadow: 1px 1px 2px #000;
+}
+
+/* Specific components from classification view */
+.spectrogram-small {
+    grid-column: 1;
+    grid-row: 1;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.controls {
+    grid-column: 1;
+    grid-row: 2;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.call-type {
+    grid-column: 2;
+    grid-row: 1;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.spectrogram-large {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.audio-section {
+    grid-column: 1 / span 2;
+    grid-row: 3;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.confidence {
+    grid-column: 2;
+    grid-row: 2;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.others {
+    grid-column: 3;
+    grid-row: 3;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* Other channel styling */
+.other-channels-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.other-channels-content audio {
+    max-width: 100%;
+    display: block;
+    margin: 10px auto;
+}
+
+.other-channels-content .channel-item {
+    margin-top: 20px;
+    margin-bottom: 5px;
+    border-top: 1px solid #333;
+    padding-top: 15px;
+}
